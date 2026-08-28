@@ -1,0 +1,128 @@
+:root {
+  /* ── Neutrales cálidos (light) ────────────────────── */
+  --color-bg:            #fafaf9;
+  --color-bg-elevated:   #ffffff;
+  --color-bg-subtle:     #f4f4f3;
+  --color-bg-muted:      #e7e5e4;
+  --color-bg-inverse:    #0c0a09;
+
+  --color-fg:            #0c0a09;
+  --color-fg-muted:      #57534e;
+  --color-fg-subtle:     #78716c;
+  --color-fg-inverse:    #fafaf9;
+
+  --color-border:        #e7e5e4;
+  --color-border-strong: #d6d3d1;
+  --color-border-focus:  #0c0a09;
+
+  /* ── Acento (esmeralda sutil) ─────────────────────── */
+  --color-accent:        #047857;
+  --color-accent-hover:  #065f46;
+  --color-accent-soft:   #ecfdf5;
+  --color-accent-fg:     #ffffff;
+  --color-accent-border: #a7f3d0;
+
+  /* ── Semánticos ──────────────────────────────────── */
+  --color-success:       #047857;
+  --color-success-soft:  #ecfdf5;
+  --color-warning:       #b45309;
+  --color-warning-soft:  #fffbeb;
+  --color-danger:        #b91c1c;
+  --color-danger-soft:   #fef2f2;
+  --color-info:          #1d4ed8;
+  --color-info-soft:     #eff6ff;
+
+  /* ── Tipografía ──────────────────────────────────── */
+  --font-sans:  system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", sans-serif;
+  --font-mono:  ui-monospace, "SF Mono", "Cascadia Code", "JetBrains Mono", monospace;
+
+  --text-xs:      0.75rem;
+  --text-sm:      0.8125rem;
+  --text-base:    0.9375rem;
+  --text-md:      1rem;
+  --text-lg:      1.125rem;
+  --text-xl:      1.375rem;
+  --text-2xl:     1.75rem;
+  --text-3xl:     2.25rem;
+  --text-4xl:     3rem;
+
+  --leading-tight:   1.2;
+  --leading-snug:    1.4;
+  --leading-normal:  1.55;
+  --leading-relaxed: 1.7;
+
+  --tracking-tight:  -0.022em;
+  --tracking-normal: 0;
+  --tracking-wide:   0.04em;
+  --tracking-widest: 0.1em;
+
+  --weight-regular:  400;
+  --weight-medium:   500;
+  --weight-semibold: 600;
+  --weight-bold:     700;
+
+  /* ── Espaciado ───────────────────────────────────── */
+  --space-0:  0;
+  --space-1:  0.25rem;
+  --space-2:  0.5rem;
+  --space-3:  0.75rem;
+  --space-4:  1rem;
+  --space-5:  1.5rem;
+  --space-6:  2rem;
+  --space-8:  3rem;
+  --space-10: 4rem;
+
+  /* ── Radios ──────────────────────────────────────── */
+  --radius-xs:   0.25rem;
+  --radius-sm:   0.375rem;
+  --radius:      0.5rem;
+  --radius-md:   0.625rem;
+  --radius-lg:   0.75rem;
+  --radius-xl:   1rem;
+  --radius-2xl:  1.25rem;
+  --radius-full: 9999px;
+
+  /* ── Sombras ─────────────────────────────────────── */
+  --shadow-xs: 0 1px 2px 0 rgba(12, 10, 9, 0.04);
+  --shadow-sm: 0 1px 3px 0 rgba(12, 10, 9, 0.06), 0 1px 2px -1px rgba(12, 10, 9, 0.04);
+  --shadow-md: 0 4px 6px -1px rgba(12, 10, 9, 0.07), 0 2px 4px -2px rgba(12, 10, 9, 0.04);
+  --shadow-lg: 0 10px 15px -3px rgba(12, 10, 9, 0.08), 0 4px 6px -4px rgba(12, 10, 9, 0.03);
+  --shadow-xl: 0 20px 25px -5px rgba(12, 10, 9, 0.09), 0 8px 10px -6px rgba(12, 10, 9, 0.03);
+
+  /* ── Transiciones ────────────────────────────────── */
+  --transition-fast:   120ms cubic-bezier(0.4, 0, 0.2, 1);
+  --transition-normal: 180ms cubic-bezier(0.4, 0, 0.2, 1);
+  --transition-slow:   260ms cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.dark {
+  --color-bg:            #0c0a09;
+  --color-bg-elevated:   #1c1917;
+  --color-bg-subtle:     #171412;
+  --color-bg-muted:      #292524;
+  --color-bg-inverse:    #fafaf9;
+
+  --color-fg:            #fafaf9;
+  --color-fg-muted:      #a8a29e;
+  --color-fg-subtle:     #78716c;
+  --color-fg-inverse:    #0c0a09;
+
+  --color-border:        #292524;
+  --color-border-strong: #44403c;
+  --color-border-focus:  #fafaf9;
+
+  --color-accent:        #10b981;
+  --color-accent-hover:  #34d399;
+  --color-accent-soft:   #064e3b;
+  --color-accent-fg:     #ffffff;
+  --color-accent-border: #047857;
+
+  --color-success:       #10b981;
+  --color-success-soft:  #064e3b;
+  --color-warning:       #f59e0b;
+  --color-warning-soft:  #78350f;
+  --color-danger:        #ef4444;
+  --color-danger-soft:   #7f1d1d;
+  --color-info:          #3b82f6;
+  --color-info-soft:     #1e3a8a;
+}

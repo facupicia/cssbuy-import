@@ -1,0 +1,89 @@
+@import "tailwindcss";
+@import "../styles/tokens.css";
+
+@theme inline {
+  --color-bg: var(--color-bg);
+  --color-bg-elevated: var(--color-bg-elevated);
+  --color-bg-subtle: var(--color-bg-subtle);
+  --color-bg-muted: var(--color-bg-muted);
+  --color-bg-inverse: var(--color-bg-inverse);
+
+  --color-fg: var(--color-fg);
+  --color-fg-muted: var(--color-fg-muted);
+  --color-fg-subtle: var(--color-fg-subtle);
+  --color-fg-inverse: var(--color-fg-inverse);
+
+  --color-border: var(--color-border);
+  --color-border-strong: var(--color-border-strong);
+  --color-border-focus: var(--color-border-focus);
+
+  --color-accent: var(--color-accent);
+  --color-accent-hover: var(--color-accent-hover);
+  --color-accent-soft: var(--color-accent-soft);
+  --color-accent-fg: var(--color-accent-fg);
+  --color-accent-border: var(--color-accent-border);
+
+  --color-success: var(--color-success);
+  --color-success-soft: var(--color-success-soft);
+  --color-warning: var(--color-warning);
+  --color-warning-soft: var(--color-warning-soft);
+  --color-danger: var(--color-danger);
+  --color-danger-soft: var(--color-danger-soft);
+  --color-info: var(--color-info);
+  --color-info-soft: var(--color-info-soft);
+
+  --radius-sm: var(--radius-sm);
+  --radius: var(--radius);
+  --radius-md: var(--radius-md);
+  --radius-lg: var(--radius-lg);
+  --radius-xl: var(--radius-xl);
+
+  --font-sans: var(--font-sans);
+  --font-mono: var(--font-mono);
+}
+
+* {
+  border-color: var(--color-border);
+}
+
+html {
+  background-color: var(--color-bg);
+  color: var(--color-fg);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+body {
+  background-color: var(--color-bg);
+  color: var(--color-fg);
+  font-family: var(--font-sans);
+  font-size: var(--text-base);
+  line-height: var(--leading-normal);
+}
+
+::selection {
+  background-color: var(--color-accent-soft);
+  color: var(--color-fg);
+}
+
+:focus-visible {
+  outline: 2px solid var(--color-border-focus);
+  outline-offset: 2px;
+  border-radius: var(--radius-sm);
+}
+
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: var(--color-border-strong);
+  border-radius: var(--radius-full);
+  border: 2px solid var(--color-bg);
+}
+::-webkit-scrollbar-thumb:hover {
+  background: var(--color-fg-subtle);
+}

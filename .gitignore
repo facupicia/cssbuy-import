@@ -1,0 +1,14 @@
+node_modules/
+.next/
+out/
+*.local
+.env.local
+.env*.local
+*.tsbuildinfo
+
+# Sesión guardada de CSSBuy (contiene cookies de login)
+.cssbuy-session.json
+
+# Sistema
+Thumbs.db
+.DS_Store
