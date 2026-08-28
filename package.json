@@ -6,7 +6,8 @@
     "dev": "next dev -p 3001",
     "build": "next build",
     "start": "next start -p 3001",
-    "lint": "eslint"
+    "lint": "eslint",
+    "sync": "tsx scripts/sync.ts"
   },
   "dependencies": {
     "@radix-ui/react-dialog": "^1.1.19",
@@ -38,6 +39,7 @@
     "eslint-config-next": "16.2.9",
     "playwright": "^1.62.1",
     "tailwindcss": "^4",
+    "tsx": "^4.23.12",
     "typescript": "^5"
   }
 }

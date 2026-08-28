@@ -186,9 +186,9 @@ export default function CalculatorPage() {
 
   const syncCssbuy = async () => {
     setSyncingCssbuy(true);
-    toast.info("Sincronizando con CSSBuy...", {
-      description: "Si es la primera vez, se abrirá un navegador para que inicies sesión (puede haber captcha).",
-      duration: 8000,
+    toast.info("Sincronizando órdenes...", {
+      description: "Consultando servidor y base de datos...",
+      duration: 4000,
     });
     try {
       const res = await fetch("/api/cssbuy/sync", { method: "POST" });
@@ -203,7 +203,22 @@ export default function CalculatorPage() {
           description: `${data.total} órdenes encontradas (${data.inserted} nuevas, ${data.updated} actualizadas).`,
         });
       } else {
-        toast.error("Error al sincronizar", { description: data.message || "Error desconocido", duration: 10000 });
+        // Fallback: Si el scraping directo no es posible (ej: en Vercel serverless), cargar lo que ya está en PostgreSQL
+        const getRes = await fetch("/api/cssbuy/sync");
+        const getData = await getRes.json();
+        if (getData.ok && Array.isArray(getData.orders) && getData.orders.length > 0) {
+          const valid = getData.orders.filter((o: any) => !isInvalidOrder(o));
+          setOrders(valid);
+          localStorage.setItem("cssbuy-orders", JSON.stringify(valid));
+          toast.success("Órdenes cargadas desde la Base de Datos", {
+            description: `${valid.length} órdenes obtenidas de PostgreSQL.`,
+          });
+        } else {
+          toast.error("Error al sincronizar con CSSBuy", {
+            description: data.message || "No se pudo conectar a CSSBuy ni a la base de datos.",
+            duration: 8000,
+          });
+        }
       }
     } catch {
       toast.error("Error de red al sincronizar con el servidor");
