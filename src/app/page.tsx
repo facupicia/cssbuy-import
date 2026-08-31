@@ -769,7 +769,18 @@ export default function CalculatorPage() {
       localCotizaciones.unshift(newCot);
       localStorage.setItem("cssbuy-cotizaciones-local", JSON.stringify(localCotizaciones));
 
-      toast.success("Cotización guardada exitosamente", { description: nombre });
+      // Que se note dónde quedó guardada: era el punto ciego de antes.
+      const destino =
+        data.mode === "postgres"
+          ? "Guardada en la base de datos"
+          : data.mode === "supabase"
+            ? "Guardada en Supabase"
+            : "Guardada solo en este navegador (no hay base configurada)";
+      if (data.mode === "local_only") {
+        toast.warning(destino, { description: nombre });
+      } else {
+        toast.success(destino, { description: nombre });
+      }
     } catch (err: any) {
       toast.error("Error al guardar", { description: err.message });
     } finally {

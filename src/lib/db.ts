@@ -195,3 +195,83 @@ export function rowToCssbuyOrder(r: CssbuyOrderRow) {
     foto_peso,
   };
 }
+
+/* ── Cotizaciones guardadas ──────────────────────────────────────────── */
+
+export async function ensureCotizacionesTable(): Promise<void> {
+  await getPool().query(`
+    CREATE TABLE IF NOT EXISTS shop_cotizaciones (
+      id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+      nombre TEXT NOT NULL,
+      fx JSONB NOT NULL,
+      envio JSONB NOT NULL,
+      aduana JSONB NOT NULL,
+      productos JSONB NOT NULL,
+      resultados JSONB NOT NULL,
+      created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+    )
+  `);
+}
+
+export interface CotizacionRow {
+  id: string;
+  nombre: string;
+  fx: any;
+  envio: any;
+  aduana: any;
+  productos: any;
+  resultados: any;
+  created_at: Date;
+}
+
+export async function getCotizaciones(): Promise<CotizacionRow[]> {
+  await ensureCotizacionesTable();
+  const res = await getPool().query(
+    `SELECT id, nombre, fx, envio, aduana, productos, resultados, created_at
+     FROM shop_cotizaciones
+     ORDER BY created_at DESC`
+  );
+  return res.rows;
+}
+
+export async function insertCotizacion(c: {
+  nombre: string;
+  fx: unknown;
+  envio: unknown;
+  aduana: unknown;
+  productos: unknown;
+  resultados: unknown;
+}): Promise<CotizacionRow> {
+  await ensureCotizacionesTable();
+  const res = await getPool().query(
+    `INSERT INTO shop_cotizaciones (nombre, fx, envio, aduana, productos, resultados)
+     VALUES ($1, $2, $3, $4, $5, $6)
+     RETURNING id, nombre, fx, envio, aduana, productos, resultados, created_at`,
+    [
+      c.nombre,
+      JSON.stringify(c.fx),
+      JSON.stringify(c.envio),
+      JSON.stringify(c.aduana),
+      JSON.stringify(c.productos),
+      JSON.stringify(c.resultados),
+    ]
+  );
+  return res.rows[0];
+}
+
+export async function getCotizacion(id: string): Promise<CotizacionRow | null> {
+  await ensureCotizacionesTable();
+  const res = await getPool().query(
+    `SELECT id, nombre, fx, envio, aduana, productos, resultados, created_at
+     FROM shop_cotizaciones WHERE id = $1`,
+    [id]
+  );
+  return res.rows[0] || null;
+}
+
+/** Devuelve false si el id no existía. */
+export async function deleteCotizacion(id: string): Promise<boolean> {
+  await ensureCotizacionesTable();
+  const res = await getPool().query(`DELETE FROM shop_cotizaciones WHERE id = $1`, [id]);
+  return (res.rowCount ?? 0) > 0;
+}
