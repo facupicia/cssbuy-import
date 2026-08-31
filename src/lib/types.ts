@@ -29,6 +29,8 @@ export interface Product {
   pesoG: number;
   cantidad: number;
   precioVentaUSD: number;
+  /** Precio de venta unitario fijado a mano en ARS. Tiene prioridad sobre markup y precioVentaUSD. */
+  precioVentaARS?: number;
   markup?: number;
   link?: string;
   imgURL?: string;
@@ -53,6 +55,10 @@ export interface ProductCalc extends Product {
   markup: number;
   precioSugeridoUSD: number;
   precioSugeridoARS: number;
+  /** Markup realmente aplicado segun el precio de venta final (venta / costo). */
+  markupEfectivo: number;
+  /** Margen sobre el precio de venta: (venta - costo) / venta. */
+  margenUnitPct: number;
   ventaUSD: number;
   gananciaUnitUSD: number;
   gananciaTotalUSD: number;

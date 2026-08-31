@@ -5,6 +5,8 @@
   --color-bg-subtle:     #f4f4f3;
   --color-bg-muted:      #e7e5e4;
   --color-bg-inverse:    #0c0a09;
+  --color-bg-hover:      #f0efee;
+  --color-bg-sticky:     #f7f7f6;
 
   --color-fg:            #0c0a09;
   --color-fg-muted:      #57534e;
@@ -36,6 +38,7 @@
   --font-sans:  system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", sans-serif;
   --font-mono:  ui-monospace, "SF Mono", "Cascadia Code", "JetBrains Mono", monospace;
 
+  --text-2xs:     0.6875rem;
   --text-xs:      0.75rem;
   --text-sm:      0.8125rem;
   --text-base:    0.9375rem;
@@ -89,6 +92,8 @@
   --shadow-lg: 0 10px 15px -3px rgba(12, 10, 9, 0.08), 0 4px 6px -4px rgba(12, 10, 9, 0.03);
   --shadow-xl: 0 20px 25px -5px rgba(12, 10, 9, 0.09), 0 8px 10px -6px rgba(12, 10, 9, 0.03);
 
+  --shadow-sticky: 6px 0 8px -6px rgba(12, 10, 9, 0.18);
+
   /* ── Transiciones ────────────────────────────────── */
   --transition-fast:   120ms cubic-bezier(0.4, 0, 0.2, 1);
   --transition-normal: 180ms cubic-bezier(0.4, 0, 0.2, 1);
@@ -101,6 +106,8 @@
   --color-bg-subtle:     #171412;
   --color-bg-muted:      #292524;
   --color-bg-inverse:    #fafaf9;
+  --color-bg-hover:      #232020;
+  --color-bg-sticky:     #14110f;
 
   --color-fg:            #fafaf9;
   --color-fg-muted:      #a8a29e;

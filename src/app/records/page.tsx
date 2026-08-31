@@ -32,6 +32,7 @@ import { Card } from "@/components/ui/Card";
 import { Badge } from "@/components/ui/Badge";
 import { Input } from "@/components/ui/Input";
 import { EmptyState } from "@/components/ui/EmptyState";
+import { StatTile } from "@/components/ui/StatTile";
 import { toast } from "@/components/ui/Toast";
 import { Navbar } from "@/components/Navbar";
 import { RecordScraperModal } from "@/components/RecordScraperModal";
@@ -94,15 +95,15 @@ export default function RecordsPage() {
     <div className="min-h-screen bg-[var(--color-bg)] flex flex-col">
       <Navbar onOpenRecordScraper={() => setScraperOpen(true)} />
 
-      <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 py-6 space-y-6">
+      <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 py-6 pb-24 md:pb-6 space-y-6">
         {/* Header */}
         <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
           <div>
-            <h1 className="text-xl font-bold tracking-tight text-[var(--color-fg)]">
-              CSSBuy Balance Records
+            <h1 className="text-xl sm:text-2xl font-bold tracking-tight text-[var(--color-fg)]">
+              Balance
             </h1>
-            <p className="text-xs text-[var(--color-fg-muted)]">
-              Análisis y desglose de movimientos de dinero: compras, fotos, flete interno y recargas
+            <p className="text-xs sm:text-sm text-[var(--color-fg-muted)] mt-0.5">
+              Movimientos de tu cuenta CSSBuy: compras, fotos, flete interno y recargas.
             </p>
           </div>
 
@@ -134,53 +135,37 @@ export default function RecordsPage() {
 
         {/* Metric Cards */}
         {records.length > 0 && (
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-            <Card padding="sm" className="space-y-1">
-              <span className="text-[10px] text-[var(--color-fg-muted)] uppercase tracking-wider">
-                Total Movimientos
-              </span>
-              <p className="text-xl font-bold font-mono text-[var(--color-fg)]">
-                {summary.totalRecords}
-              </p>
-              <p className="text-[10px] text-[var(--color-fg-subtle)]">
-                {summary.groupCount} órdenes agrupadas
-              </p>
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+            <Card padding="sm">
+              <StatTile
+                label="Movimientos"
+                value={String(summary.totalRecords)}
+                sub={`${summary.groupCount} órdenes agrupadas`}
+              />
             </Card>
-
-            <Card padding="sm" className="space-y-1">
-              <span className="text-[10px] text-[var(--color-fg-muted)] uppercase tracking-wider">
-                Total Gastado
-              </span>
-              <p className="text-xl font-bold font-mono text-[var(--color-danger)]">
-                ¥{summary.totalSpent.toFixed(2)}
-              </p>
-              <p className="text-[10px] text-[var(--color-fg-subtle)]">
-                Compras + servicios + flete
-              </p>
+            <Card padding="sm">
+              <StatTile
+                label="Gastado"
+                value={`¥${summary.totalSpent.toFixed(2)}`}
+                sub="Compras + servicios + flete"
+                tone="danger"
+              />
             </Card>
-
-            <Card padding="sm" className="space-y-1">
-              <span className="text-[10px] text-[var(--color-fg-muted)] uppercase tracking-wider">
-                Total Recargado
-              </span>
-              <p className="text-xl font-bold font-mono text-[var(--color-success)]">
-                ¥{summary.totalRecharged.toFixed(2)}
-              </p>
-              <p className="text-[10px] text-[var(--color-fg-subtle)]">
-                Ingresos a la cuenta
-              </p>
+            <Card padding="sm">
+              <StatTile
+                label="Recargado"
+                value={`¥${summary.totalRecharged.toFixed(2)}`}
+                sub="Ingresos a la cuenta"
+                tone="success"
+              />
             </Card>
-
-            <Card padding="sm" className="space-y-1">
-              <span className="text-[10px] text-[var(--color-fg-muted)] uppercase tracking-wider">
-                Saldo Teórico
-              </span>
-              <p className="text-xl font-bold font-mono text-[var(--color-info)]">
-                ¥{(summary.totalRecharged - summary.totalSpent).toFixed(2)}
-              </p>
-              <p className="text-[10px] text-[var(--color-fg-subtle)]">
-                Diferencial acumulado
-              </p>
+            <Card padding="sm">
+              <StatTile
+                label="Saldo teórico"
+                value={`¥${(summary.totalRecharged - summary.totalSpent).toFixed(2)}`}
+                sub="Recargado menos gastado"
+                tone={summary.totalRecharged - summary.totalSpent >= 0 ? "accent" : "danger"}
+              />
             </Card>
           </div>
         )}
@@ -255,7 +240,7 @@ export default function RecordsPage() {
 
                       <div className="flex items-center gap-4 text-right flex-shrink-0">
                         <div>
-                          <span className="text-[10px] text-[var(--color-fg-muted)] uppercase block">
+                          <span className="text-[11px] text-[var(--color-fg-muted)] uppercase block">
                             Costo Landed China
                           </span>
                           <span className="font-bold font-mono text-sm text-[var(--color-fg)]">
@@ -273,19 +258,19 @@ export default function RecordsPage() {
                       <div className="border-t border-[var(--color-border)] bg-[var(--color-bg-subtle)]/40 p-3 space-y-2">
                         <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-2 text-xs mb-3">
                           <div className="p-2 bg-[var(--color-bg-elevated)] rounded border border-[var(--color-border)]">
-                            <span className="text-[10px] text-[var(--color-fg-muted)]">Item:</span>{" "}
+                            <span className="text-[11px] text-[var(--color-fg-muted)]">Item:</span>{" "}
                             <span className="font-mono font-semibold">¥{Math.abs(group.buyItemTotal).toFixed(2)}</span>
                           </div>
                           <div className="p-2 bg-[var(--color-bg-elevated)] rounded border border-[var(--color-border)]">
-                            <span className="text-[10px] text-[var(--color-fg-muted)]">Servicios/Fotos:</span>{" "}
+                            <span className="text-[11px] text-[var(--color-fg-muted)]">Servicios/Fotos:</span>{" "}
                             <span className="font-mono font-semibold">¥{Math.abs(group.serviceFeeTotal).toFixed(2)}</span>
                           </div>
                           <div className="p-2 bg-[var(--color-bg-elevated)] rounded border border-[var(--color-border)]">
-                            <span className="text-[10px] text-[var(--color-fg-muted)]">Flete Local:</span>{" "}
+                            <span className="text-[11px] text-[var(--color-fg-muted)]">Flete Local:</span>{" "}
                             <span className="font-mono font-semibold">¥{Math.abs(group.domesticShippingTotal).toFixed(2)}</span>
                           </div>
                           <div className="p-2 bg-[var(--color-bg-elevated)] rounded border border-[var(--color-border)]">
-                            <span className="text-[10px] text-[var(--color-fg-muted)]">Ajustes:</span>{" "}
+                            <span className="text-[11px] text-[var(--color-fg-muted)]">Ajustes:</span>{" "}
                             <span className="font-mono font-semibold">¥{Math.abs(group.adjustPriceTotal).toFixed(2)}</span>
                           </div>
                         </div>

@@ -159,13 +159,27 @@ export function calcularTodo(
 
   // Paso 6: ganancias y totales
   const productosFinal: ProductCalc[] = productosConCostoTotal.map((p) => {
-    const precioVentaUnitUSD = p.precioVentaUSD > 0 ? p.precioVentaUSD : p.precioSugeridoUSD;
+    // Prioridad del precio de venta unitario:
+    //   1) precio fijado a mano en ARS  2) override historico en USD  3) sugerido por markup
+    let precioVentaUnitUSD: number;
+    if (typeof p.precioVentaARS === "number" && p.precioVentaARS > 0 && blue > 0) {
+      precioVentaUnitUSD = p.precioVentaARS / blue;
+    } else if (p.precioVentaUSD > 0) {
+      precioVentaUnitUSD = p.precioVentaUSD;
+    } else {
+      precioVentaUnitUSD = p.precioSugeridoUSD;
+    }
+
     const ventaUSD = precioVentaUnitUSD * p.cantidad;
     const gananciaTotalUSD = ventaUSD - p.costoTotalUSD;
     const gananciaUnitUSD = p.cantidad > 0 ? gananciaTotalUSD / p.cantidad : 0;
+    const markupEfectivo = p.costoUnitUSD > 0 ? precioVentaUnitUSD / p.costoUnitUSD : 0;
+    const margenUnitPct = precioVentaUnitUSD > 0 ? gananciaUnitUSD / precioVentaUnitUSD : 0;
 
     return {
       ...p,
+      markupEfectivo,
+      margenUnitPct,
       ventaUSD,
       gananciaUnitUSD,
       gananciaTotalUSD,

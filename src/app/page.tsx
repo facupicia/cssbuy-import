@@ -35,6 +35,9 @@ import {
   Image as ImageIcon,
   Calendar,
   X,
+  MoreHorizontal,
+  TrendingUp,
+  Wallet2,
 } from "lucide-react";
 import {
   Product,
@@ -58,6 +61,10 @@ import { Input } from "@/components/ui/Input";
 import { Switch } from "@/components/ui/Switch";
 import { Badge } from "@/components/ui/Badge";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/Dialog";
+import { ProductsTable } from "@/components/ProductsTable";
+import { Menu, MenuTrigger, MenuContent, MenuItem, MenuSeparator, MenuLabel } from "@/components/ui/Menu";
+import { StatTile } from "@/components/ui/StatTile";
+import { EmptyState } from "@/components/ui/EmptyState";
 import { Navbar } from "@/components/Navbar";
 import { WarehouseScraperModal } from "@/components/WarehouseScraperModal";
 import { RecordScraperModal } from "@/components/RecordScraperModal";
@@ -326,6 +333,21 @@ export default function CalculatorPage() {
   const updateProducto = useCallback((id: string, field: keyof Product, value: any) => {
     setProductos((prev) => prev.map((p) => (p.id === id ? { ...p, [field]: value } : p)));
   }, []);
+
+  const patchProducto = useCallback((id: string, patch: Partial<Product>) => {
+    setProductos((prev) => prev.map((p) => (p.id === id ? { ...p, ...patch } : p)));
+  }, []);
+
+  /**
+   * Fija el precio de venta unitario en ARS. Limpia los overrides viejos
+   * (markup individual y precio en USD) para que quede una sola fuente de verdad.
+   */
+  const setPrecioVentaARS = useCallback(
+    (id: string, ars: number | undefined) => {
+      patchProducto(id, { precioVentaARS: ars, precioVentaUSD: 0, markup: undefined });
+    },
+    [patchProducto]
+  );
 
   const importFromOrder = useCallback(
     (order: CssbuyOrder) => {
@@ -768,7 +790,8 @@ export default function CalculatorPage() {
       "Precio unit CNY",
       "Flete China CNY",
       "Peso unit g",
-      "Markup Multiplicador",
+      "Markup efectivo",
+      "Margen %",
       "Link",
       "Costo unit USD",
       "Costo unit ARS",
@@ -786,13 +809,14 @@ export default function CalculatorPage() {
       p.precioCNY,
       p.envioChinaCNY,
       p.pesoG,
-      p.markup.toFixed(2),
+      p.markupEfectivo.toFixed(2),
+      (p.margenUnitPct * 100).toFixed(1),
       `"${p.link || ""}"`,
       p.costoUnitUSD.toFixed(2),
       p.costoUnitARS.toFixed(2),
       p.precioSugeridoUSD.toFixed(2),
       p.precioSugeridoARS.toFixed(2),
-      (p.precioVentaUSD > 0 ? p.precioVentaUSD : p.precioSugeridoUSD).toFixed(2),
+      (fx.blue > 0 ? p.ventaUnitARS / fx.blue : 0).toFixed(2),
       p.ventaUnitARS.toFixed(2),
       p.gananciaUnitUSD.toFixed(2),
       p.gananciaTotalUSD.toFixed(2),
@@ -804,6 +828,7 @@ export default function CalculatorPage() {
       "",
       "",
       resultados.pesoTotalG,
+      "",
       "",
       "",
       resultados.costoTotalUSD.toFixed(2),
@@ -825,7 +850,7 @@ export default function CalculatorPage() {
     a.click();
     URL.revokeObjectURL(url);
     toast.success("CSV exportado con éxito");
-  }, [resultados, nombreEnvio]);
+  }, [resultados, nombreEnvio, fx.blue]);
 
   // Exportar JSON completo
   const exportarJSON = useCallback(() => {
@@ -864,19 +889,19 @@ export default function CalculatorPage() {
         syncingCssbuy={syncingCssbuy}
       />
 
-      <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 py-6 space-y-6">
+      <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 py-6 pb-24 md:pb-6 space-y-6">
         {/* Top Header & Fast Actions */}
-        <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
-          <div>
-            <h1 className="text-xl font-bold tracking-tight text-[var(--color-fg)]">
-              Calculadora de Costos CSSBuy
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+          <div className="min-w-0">
+            <h1 className="text-xl sm:text-2xl font-bold tracking-tight text-[var(--color-fg)]">
+              Calculadora de Costos
             </h1>
-            <p className="text-xs text-[var(--color-fg-muted)]">
-              Simulador de landed cost, flete por peso, aduana, depósito y precio de venta sugerido
+            <p className="text-xs sm:text-sm text-[var(--color-fg-muted)] mt-0.5">
+              Landed cost, flete por peso, aduana y precio de venta, producto por producto.
             </p>
           </div>
 
-          <div className="flex items-center flex-wrap gap-2">
+          <div className="flex items-center gap-2 shrink-0">
             <input
               type="file"
               ref={fileInputRef}
@@ -893,44 +918,72 @@ export default function CalculatorPage() {
             />
 
             <Button
-              variant="outline"
+              variant="primary"
               size="sm"
-              icon={<Upload className="h-3.5 w-3.5" />}
-              onClick={() => fileInputRef.current?.click()}
-              title="Cargar archivo orders.json del scraper"
+              icon={<Plus className="h-3.5 w-3.5" />}
+              onClick={addProducto}
             >
-              Cargar orders.json ({orders.length})
+              Agregar producto
             </Button>
 
-            <Button
-              variant="outline"
-              size="sm"
-              icon={<Receipt className="h-3.5 w-3.5" />}
-              onClick={() => recordFileInputRef.current?.click()}
-              title="Cargar archivo records.json de movimientos"
-            >
-              Cargar records.json ({records.length})
-            </Button>
+            <Menu>
+              <MenuTrigger asChild>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  icon={<MoreHorizontal className="h-4 w-4" />}
+                  title="Más acciones"
+                  aria-label="Más acciones"
+                />
+              </MenuTrigger>
+              <MenuContent>
+                <MenuLabel>Importar</MenuLabel>
+                <MenuItem
+                  icon={<Upload className="h-3.5 w-3.5" />}
+                  onSelect={() => fileInputRef.current?.click()}
+                >
+                  Cargar orders.json
+                  <span className="ml-auto font-mono text-[11px] text-[var(--color-fg-subtle)]">
+                    {orders.length}
+                  </span>
+                </MenuItem>
+                <MenuItem
+                  icon={<Receipt className="h-3.5 w-3.5" />}
+                  onSelect={() => recordFileInputRef.current?.click()}
+                >
+                  Cargar records.json
+                  <span className="ml-auto font-mono text-[11px] text-[var(--color-fg-subtle)]">
+                    {records.length}
+                  </span>
+                </MenuItem>
 
-            <Button
-              variant="outline"
-              size="sm"
-              icon={<Download className="h-3.5 w-3.5" />}
-              onClick={exportarCSV}
-              disabled={productos.length === 0}
-            >
-              Exportar CSV
-            </Button>
+                <MenuSeparator />
+                <MenuLabel>Exportar</MenuLabel>
+                <MenuItem
+                  icon={<Download className="h-3.5 w-3.5" />}
+                  disabled={productos.length === 0}
+                  onSelect={exportarCSV}
+                >
+                  Exportar CSV
+                </MenuItem>
+                <MenuItem
+                  icon={<Download className="h-3.5 w-3.5" />}
+                  disabled={productos.length === 0}
+                  onSelect={exportarJSON}
+                >
+                  Exportar JSON
+                </MenuItem>
 
-            <Button
-              variant="ghost"
-              size="sm"
-              icon={<RotateCcw className="h-3.5 w-3.5" />}
-              onClick={resetAll}
-              title="Reiniciar calculadora"
-            >
-              Limpiar
-            </Button>
+                <MenuSeparator />
+                <MenuItem
+                  icon={<RotateCcw className="h-3.5 w-3.5" />}
+                  className="text-[var(--color-danger)]"
+                  onSelect={resetAll}
+                >
+                  Limpiar calculadora
+                </MenuItem>
+              </MenuContent>
+            </Menu>
           </div>
         </div>
 
@@ -961,7 +1014,7 @@ export default function CalculatorPage() {
                 <button
                   onClick={handleRefreshFx}
                   disabled={fxLoading}
-                  className="text-[10px] text-[var(--color-accent)] hover:underline cursor-pointer inline-flex items-center gap-1 disabled:opacity-50"
+                  className="text-[11px] text-[var(--color-accent)] hover:underline cursor-pointer inline-flex items-center gap-1 disabled:opacity-50"
                   title="Actualizar dólar desde API gratuita (dolarapi.com / open.er-api.com)"
                 >
                   {fxLoading ? (
@@ -973,7 +1026,7 @@ export default function CalculatorPage() {
                 </button>
                 <button
                   onClick={handleSaveDefaultConfig}
-                  className="text-[10px] text-[var(--color-accent)] hover:underline cursor-pointer"
+                  className="text-[11px] text-[var(--color-accent)] hover:underline cursor-pointer"
                   title="Guardar como valores por defecto"
                 >
                   Guardar default
@@ -1029,12 +1082,12 @@ export default function CalculatorPage() {
                 hint={pesoTotalG > 0 ? `USD ${((envio.freightUSD || 0) / (pesoTotalG / 1000 || 1)).toFixed(1)}/kg` : undefined}
               />
               <Input
-                label="Markup Multiplicador"
+                label="Markup sugerido"
                 type="number"
                 step="0.1"
                 value={envio.markup || ""}
                 onChange={(e) => setEnvio({ ...envio, markup: parseFloat(e.target.value) || 2 })}
-                hint={`Margen: ${fmtPct(1 - 1 / (envio.markup || 2))}`}
+                hint={`Precio sugerido = costo x ${(envio.markup || 2).toFixed(1)} · margen ${fmtPct(1 - 1 / (envio.markup || 2))}`}
               />
               <div className="col-span-2">
                 <Input
@@ -1056,7 +1109,7 @@ export default function CalculatorPage() {
                 <Shield className="h-3.5 w-3.5 text-amber-500" /> Aduana e Impuestos
               </span>
               <div className="flex items-center gap-1.5">
-                <span className="text-[10px] text-[var(--color-fg-muted)]">Franquicia USD 50</span>
+                <span className="text-[11px] text-[var(--color-fg-muted)]">Franquicia USD 50</span>
                 <Switch
                   checked={aduana.dentroFranquicia}
                   onCheckedChange={(c) => setAduana({ ...aduana, dentroFranquicia: c })}
@@ -1107,7 +1160,7 @@ export default function CalculatorPage() {
                 <span className="text-xs font-bold text-[var(--color-fg)]">
                   Pedidos CSSBuy ({orders.length})
                 </span>
-                <span className="text-[10px] text-[var(--color-fg-muted)]">
+                <span className="text-[11px] text-[var(--color-fg-muted)]">
                   {orders.filter(isWarehouseOrder).length} en almacén • {orders.filter(isProcessOrder).length} en proceso / nuevos
                 </span>
               </div>
@@ -1199,7 +1252,7 @@ export default function CalculatorPage() {
                   </div>
 
                   <div className="flex items-center gap-1.5 bg-[var(--color-bg-elevated)] border border-[var(--color-border)] rounded px-2 py-0.5 shadow-xs">
-                    <label className="text-[10px] text-[var(--color-fg-muted)] font-medium">Desde:</label>
+                    <label className="text-[11px] text-[var(--color-fg-muted)] font-medium">Desde:</label>
                     <input
                       type="date"
                       value={ordersStartDate}
@@ -1209,7 +1262,7 @@ export default function CalculatorPage() {
                   </div>
 
                   <div className="flex items-center gap-1.5 bg-[var(--color-bg-elevated)] border border-[var(--color-border)] rounded px-2 py-0.5 shadow-xs">
-                    <label className="text-[10px] text-[var(--color-fg-muted)] font-medium">Hasta:</label>
+                    <label className="text-[11px] text-[var(--color-fg-muted)] font-medium">Hasta:</label>
                     <input
                       type="date"
                       value={ordersEndDate}
@@ -1221,7 +1274,7 @@ export default function CalculatorPage() {
                   {(ordersStartDate || ordersEndDate) && (
                     <button
                       onClick={() => handleDatePreset("all")}
-                      className="inline-flex items-center gap-1 px-2 py-1 rounded bg-[var(--color-bg-muted)] text-[var(--color-fg-muted)] hover:text-[var(--color-fg)] text-[10px] font-medium transition-colors cursor-pointer"
+                      className="inline-flex items-center gap-1 px-2 py-1 rounded bg-[var(--color-bg-muted)] text-[var(--color-fg-muted)] hover:text-[var(--color-fg)] text-[11px] font-medium transition-colors cursor-pointer"
                       title="Limpiar filtro de fechas"
                     >
                       <X className="h-3 w-3" /> Limpiar
@@ -1230,7 +1283,7 @@ export default function CalculatorPage() {
                 </div>
 
                 {/* Atajos Rápidos */}
-                <div className="flex items-center gap-1 overflow-x-auto text-[10px]">
+                <div className="flex items-center gap-1 overflow-x-auto text-[11px]">
                   <span className="text-[var(--color-fg-subtle)] mr-0.5">Atajos:</span>
                   <button
                     type="button"
@@ -1335,7 +1388,7 @@ export default function CalculatorPage() {
                             {order.producto || `#${order.oid}`}
                           </p>
                           {order.variante && (
-                            <p className="text-[10px] text-[var(--color-fg-muted)] truncate">
+                            <p className="text-[11px] text-[var(--color-fg-muted)] truncate">
                               {order.variante}
                             </p>
                           )}
@@ -1376,10 +1429,10 @@ export default function CalculatorPage() {
                             ¥{order.precio_unitario_cny}
                           </span>
                           {order.peso_g > 0 && (
-                            <span className="text-[10px]">{order.peso_g}g</span>
+                            <span className="text-[11px]">{order.peso_g}g</span>
                           )}
                           {order.fecha_pedido ? (
-                            <span className="text-[10px] text-[var(--color-fg-subtle)] font-mono flex items-center gap-0.5" title="Fecha del pedido">
+                            <span className="text-[11px] text-[var(--color-fg-subtle)] font-mono flex items-center gap-0.5" title="Fecha del pedido">
                               <Calendar className="h-2.5 w-2.5" />
                               {new Date((order.fecha_pedido > 1e11 ? order.fecha_pedido : order.fecha_pedido * 1000)).toLocaleDateString("es-AR", { day: "2-digit", month: "2-digit", year: "2-digit" })}
                             </span>
@@ -1389,7 +1442,7 @@ export default function CalculatorPage() {
                         <Button
                           variant={added ? "secondary" : "outline"}
                           size="sm"
-                          className="h-6 px-2 text-[10px]"
+                          className="h-6 px-2 text-[11px]"
                           disabled={added}
                           icon={added ? <Check className="h-3 w-3 text-[var(--color-success)]" /> : <Plus className="h-3 w-3" />}
                           onClick={() => importFromOrder(order)}
@@ -1407,366 +1460,184 @@ export default function CalculatorPage() {
 
         {/* Products Table Section */}
         <Card padding="none" className="overflow-hidden">
-          <div className="p-4 border-b border-[var(--color-border)] flex items-center justify-between flex-wrap gap-2">
-            <div>
+          <div className="p-4 border-b border-[var(--color-border)] flex items-center justify-between flex-wrap gap-3">
+            <div className="min-w-0">
               <h2 className="text-sm font-bold text-[var(--color-fg)]">
-                Productos en el Paquete ({productos.length})
+                Productos en el paquete{" "}
+                <span className="text-[var(--color-fg-muted)] font-mono tnum font-medium">
+                  ({productos.length})
+                </span>
               </h2>
-              <p className="text-xs text-[var(--color-fg-muted)]">
-                Peso total: <span className="font-mono font-semibold text-[var(--color-fg)]">{pesoTotalG}g</span> ({(pesoTotalG / 1000).toFixed(2)} kg) • Costo FOB: <span className="font-mono font-semibold text-[var(--color-fg)]">{fmtUSD(resultados.productosUSDTotal)}</span>
+              <p className="text-xs text-[var(--color-fg-muted)] mt-0.5">
+                Peso{" "}
+                <span className="font-mono tnum font-semibold text-[var(--color-fg)]">
+                  {(pesoTotalG / 1000).toFixed(2)} kg
+                </span>
+                {" · "}FOB{" "}
+                <span className="font-mono tnum font-semibold text-[var(--color-fg)]">
+                  {fmtUSD(resultados.productosUSDTotal)}
+                </span>
               </p>
             </div>
 
-            <div className="flex items-center gap-2">
-              <Button
-                variant="primary"
-                size="sm"
-                icon={<Plus className="h-3.5 w-3.5" />}
-                onClick={addProducto}
-              >
-                Agregar Producto
-              </Button>
-            </div>
+            <Button
+              variant="outline"
+              size="sm"
+              icon={<Plus className="h-3.5 w-3.5" />}
+              onClick={addProducto}
+            >
+              Agregar producto
+            </Button>
           </div>
 
           {productos.length === 0 ? (
-            <div className="p-12 text-center">
-              <div className="w-12 h-12 rounded-full bg-[var(--color-bg-muted)] flex items-center justify-center mx-auto mb-3 text-xl">
-                📦
-              </div>
-              <h3 className="text-sm font-semibold text-[var(--color-fg)] mb-1">
-                No hay productos cargados
-              </h3>
-              <p className="text-xs text-[var(--color-fg-muted)] max-w-sm mx-auto mb-4">
-                Podés importar tus órdenes sincronizadas de CSSBuy arriba o agregar productos manualmente.
-              </p>
-              <Button
-                variant="outline"
-                size="sm"
-                icon={<Plus className="h-3.5 w-3.5" />}
-                onClick={addProducto}
-              >
-                Agregar Producto Manualmente
-              </Button>
-            </div>
+            <EmptyState
+              className="border-0 rounded-none bg-transparent py-14"
+              icon={<ShoppingBag className="h-5 w-5" />}
+              title="Todavía no hay productos"
+              description="Importá tus órdenes de CSSBuy desde el panel de arriba, o cargá un producto a mano para simular el costo."
+              action={
+                <Button
+                  variant="primary"
+                  size="sm"
+                  icon={<Plus className="h-3.5 w-3.5" />}
+                  onClick={addProducto}
+                >
+                  Agregar producto
+                </Button>
+              }
+            />
           ) : (
-            <div className="overflow-x-auto">
-              <table className="w-full text-left text-xs border-collapse">
-                <thead>
-                  <tr className="border-b border-[var(--color-border)] bg-[var(--color-bg-subtle)] text-[11px] font-semibold text-[var(--color-fg-muted)] uppercase tracking-wider">
-                    <th className="py-2.5 px-3 min-w-[180px]">Producto / Variante</th>
-                    <th className="py-2.5 px-3 text-center w-14">Cant.</th>
-                    <th className="py-2.5 px-3 text-right w-20">Precio (¥)</th>
-                    <th className="py-2.5 px-3 text-right w-20">Flete Int. (¥)</th>
-                    <th className="py-2.5 px-3 text-right w-20">Peso (g)</th>
-                    <th className="py-2.5 px-3 text-right w-24">Costo Unit.</th>
-                    <th className="py-2.5 px-3 text-right w-24">Costo Total</th>
-                    <th className="py-2.5 px-3 text-right w-20">Markup</th>
-                    <th className="py-2.5 px-3 text-right w-24">Sugerido (USD)</th>
-                    <th className="py-2.5 px-3 text-right w-24">Venta Unit (USD)</th>
-                    <th className="py-2.5 px-3 text-right w-28">Precio ARS</th>
-                    <th className="py-2.5 px-3 text-right w-28">Ganancia</th>
-                    <th className="py-2.5 px-3 text-center w-10"></th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-[var(--color-border)]">
-                  {resultados.productosCalc.map((p) => {
-                    const rawProd = productos.find((item) => item.id === p.id);
-                    const hasCustomMarkup = rawProd?.markup !== undefined && rawProd?.markup !== null && rawProd?.markup > 0;
-
-                    return (
-                      <tr key={p.id} className="hover:bg-[var(--color-bg-subtle)]/50 transition-colors">
-                        <td className="py-2 px-3">
-                          <div className="flex items-center gap-2">
-                            {p.imgURL || (p.fotos_qc && p.fotos_qc.length > 0) || p.foto_peso ? (
-                              <button
-                                type="button"
-                                onClick={() => {
-                                  const matchingOrder = orders.find((o) => o.oid === p.oid);
-                                  openPhotoModal(
-                                    matchingOrder || {
-                                      oid: p.oid || "",
-                                      producto: p.nombre,
-                                      imagen: p.imgURL || "",
-                                      url: p.link || "",
-                                      vendedor: "",
-                                      variante: "",
-                                      precio_unitario_cny: p.precioCNY,
-                                      envio_local_cny: p.envioLocalCNY,
-                                      envio_china_cny: p.envioChinaCNY,
-                                      cantidad: p.cantidad,
-                                      estado: "En paquete",
-                                      peso_g: p.pesoG,
-                                      tracking: "",
-                                      fecha_pedido: 0,
-                                      fotos_qc: p.fotos_qc,
-                                      foto_peso: p.foto_peso,
-                                    }
-                                  );
-                                }}
-                                className="relative group cursor-pointer focus:outline-none rounded overflow-hidden flex-shrink-0"
-                                title="Ver fotos del producto e inspección"
-                              >
-                                <img
-                                  src={p.imgURL || p.fotos_qc?.[0] || p.foto_peso}
-                                  alt=""
-                                  className="w-8 h-8 rounded object-cover flex-shrink-0 border border-[var(--color-border)] group-hover:scale-105 transition-transform"
-                                />
-                              </button>
-                            ) : (
-                              <div className="w-8 h-8 rounded bg-[var(--color-bg-muted)] flex items-center justify-center text-xs flex-shrink-0">
-                                🛍️
-                              </div>
-                            )}
-                            <div className="min-w-0 flex-1">
-                              <input
-                                type="text"
-                                value={p.nombre}
-                                placeholder="Nombre del producto"
-                                onChange={(e) => updateProducto(p.id, "nombre", e.target.value)}
-                                className="w-full text-xs font-medium bg-transparent border-b border-transparent focus:border-[var(--color-border-focus)] focus:outline-none"
-                              />
-                            </div>
-                          </div>
-                        </td>
-
-                        <td className="py-2 px-3 text-center">
-                          <input
-                            type="number"
-                            min="1"
-                            value={p.cantidad}
-                            onChange={(e) => updateProducto(p.id, "cantidad", parseInt(e.target.value) || 1)}
-                            className="w-12 text-center py-1 bg-[var(--color-bg-elevated)] border border-[var(--color-border)] rounded text-xs"
-                          />
-                        </td>
-
-                        <td className="py-2 px-3 text-right">
-                          <input
-                            type="number"
-                            step="0.1"
-                            value={p.precioCNY}
-                            onChange={(e) => updateProducto(p.id, "precioCNY", parseFloat(e.target.value) || 0)}
-                            className="w-20 text-right py-1 px-1.5 bg-[var(--color-bg-elevated)] border border-[var(--color-border)] rounded text-xs font-mono"
-                          />
-                        </td>
-
-                        <td className="py-2 px-3 text-right">
-                          <input
-                            type="number"
-                            step="0.1"
-                            value={p.envioChinaCNY}
-                            onChange={(e) => updateProducto(p.id, "envioChinaCNY", parseFloat(e.target.value) || 0)}
-                            className="w-20 text-right py-1 px-1.5 bg-[var(--color-bg-elevated)] border border-[var(--color-border)] rounded text-xs font-mono"
-                          />
-                        </td>
-
-                        <td className="py-2 px-3 text-right">
-                          <input
-                            type="number"
-                            value={p.pesoG}
-                            onChange={(e) => updateProducto(p.id, "pesoG", parseInt(e.target.value) || 0)}
-                            className="w-20 text-right py-1 px-1.5 bg-[var(--color-bg-elevated)] border border-[var(--color-border)] rounded text-xs font-mono"
-                          />
-                        </td>
-
-                        <td className="py-2 px-3 text-right">
-                          <div className="font-mono font-medium text-[var(--color-fg)]">
-                            {fmtUSD(p.costoUnitUSD)}
-                          </div>
-                          <div className="text-[10px] text-[var(--color-fg-muted)] font-mono">
-                            {fmtARS(p.costoUnitARS)}
-                          </div>
-                        </td>
-
-                        <td className="py-2 px-3 text-right">
-                          <div className="font-mono font-semibold text-[var(--color-fg)]">
-                            {fmtUSD(p.costoTotalUSD)}
-                          </div>
-                          <div className="text-[10px] text-[var(--color-fg-muted)] font-mono">
-                            {fmtARS(p.costoTotalUSD * fx.blue)}
-                          </div>
-                        </td>
-
-                        {/* Individual Markup Column */}
-                        <td className="py-2 px-3 text-right">
-                          <div className="flex items-center justify-end gap-1">
-                            <input
-                              type="number"
-                              step="0.1"
-                              min="0.1"
-                              placeholder={String(envio.markup || 2)}
-                              value={hasCustomMarkup ? rawProd?.markup : ""}
-                              onChange={(e) => {
-                                const val = e.target.value === "" ? undefined : parseFloat(e.target.value) || undefined;
-                                updateProducto(p.id, "markup", val);
-                              }}
-                              className={`w-14 text-right py-1 px-1.5 bg-[var(--color-bg-elevated)] border rounded text-xs font-mono font-medium focus:outline-none focus:border-[var(--color-accent)] transition-colors ${
-                                hasCustomMarkup
-                                  ? "border-[var(--color-accent)] text-[var(--color-accent)] font-bold bg-[var(--color-accent)]/5"
-                                  : "border-[var(--color-border)] text-[var(--color-fg)]"
-                              }`}
-                              title={
-                                hasCustomMarkup
-                                  ? `Markup individual: ${rawProd?.markup}x (personalizado)`
-                                  : `Markup global: ${envio.markup || 2}x (por defecto)`
-                              }
-                            />
-                            <span className="text-[10px] text-[var(--color-fg-muted)] font-mono">x</span>
-                          </div>
-                        </td>
-
-                        {/* Sugerido USD */}
-                        <td className="py-2 px-3 text-right font-mono text-[var(--color-fg)] font-medium">
-                          {fmtUSD(p.precioSugeridoUSD)}
-                        </td>
-
-                        {/* Venta Unit USD (override manual) */}
-                        <td className="py-2 px-3 text-right">
-                          <input
-                            type="number"
-                            step="0.5"
-                            placeholder={p.precioSugeridoUSD.toFixed(1)}
-                            value={p.precioVentaUSD || ""}
-                            onChange={(e) =>
-                              updateProducto(p.id, "precioVentaUSD", parseFloat(e.target.value) || 0)
-                            }
-                            className="w-20 text-right py-1 px-1.5 bg-[var(--color-bg-elevated)] border border-[var(--color-border)] rounded text-xs font-mono font-medium focus:border-[var(--color-accent)]"
-                            title="Precio de venta unitario manual en USD (si se deja vacío, usa el sugerido)"
-                          />
-                        </td>
-
-                        {/* Precio en ARS (Nueva Columna) */}
-                        <td className="py-2 px-3 text-right">
-                          <div className="flex flex-col items-end">
-                            <span className="font-mono font-bold text-xs text-[var(--color-accent)]">
-                              {fmtARS(p.ventaUnitARS)}
-                            </span>
-                            {p.cantidad > 1 && (
-                              <span className="text-[10px] text-[var(--color-fg-muted)] font-mono" title="Total en ARS para todas las unidades">
-                                Tot: {fmtARS(p.ventaUnitARS * p.cantidad)}
-                              </span>
-                            )}
-                          </div>
-                        </td>
-
-                        {/* Ganancia */}
-                        <td className="py-2 px-3 text-right">
-                          <div className="flex flex-col items-end">
-                            <span
-                              className={`font-mono font-semibold ${
-                                p.gananciaTotalUSD >= 0
-                                  ? "text-[var(--color-success)]"
-                                  : "text-[var(--color-danger)]"
-                              }`}
-                            >
-                              {p.gananciaTotalUSD >= 0 ? "+" : ""}
-                              {fmtUSD(p.gananciaTotalUSD)}
-                            </span>
-                            <span
-                              className={`text-[10px] font-mono ${
-                                p.gananciaTotalARS >= 0
-                                  ? "text-[var(--color-success)]/80"
-                                  : "text-[var(--color-danger)]/80"
-                              }`}
-                            >
-                              {p.gananciaTotalARS >= 0 ? "+" : ""}
-                              {fmtARS(p.gananciaTotalARS)}
-                            </span>
-                          </div>
-                        </td>
-
-                        <td className="py-2 px-3 text-center">
-                          <button
-                            type="button"
-                            onClick={() => removeProducto(p.id)}
-                            className="text-[var(--color-fg-subtle)] hover:text-[var(--color-danger)] p-1 rounded transition-colors cursor-pointer"
-                            title="Eliminar producto"
-                          >
-                            <Trash2 className="h-3.5 w-3.5" />
-                          </button>
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-            </div>
+            <ProductsTable
+              items={resultados.productosCalc}
+              raw={productos}
+              blue={fx.blue}
+              markupGlobal={envio.markup || 2}
+              onUpdate={updateProducto}
+              onSetPrecioARS={setPrecioVentaARS}
+              onRemove={removeProducto}
+              onOpenPhotos={(p) => {
+                const matchingOrder = orders.find((o) => o.oid === p.oid);
+                openPhotoModal(
+                  matchingOrder || {
+                    oid: p.oid || "",
+                    producto: p.nombre,
+                    imagen: p.imgURL || "",
+                    url: p.link || "",
+                    vendedor: "",
+                    variante: "",
+                    precio_unitario_cny: p.precioCNY,
+                    envio_local_cny: p.envioLocalCNY,
+                    envio_china_cny: p.envioChinaCNY,
+                    cantidad: p.cantidad,
+                    estado: "En paquete",
+                    peso_g: p.pesoG,
+                    tracking: "",
+                    fecha_pedido: 0,
+                    fotos_qc: p.fotos_qc,
+                    foto_peso: p.foto_peso,
+                  }
+                );
+              }}
+            />
           )}
         </Card>
 
         {/* Global Summary Bottom Card */}
         {productos.length > 0 && (
-          <Card padding="md" className="bg-[var(--color-bg-elevated)] border-[var(--color-border)] shadow-md">
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-4 divide-y md:divide-y-0 md:divide-x divide-[var(--color-border)]">
-              {/* Costo Total Landed */}
-              <div className="space-y-1">
-                <span className="text-xs text-[var(--color-fg-muted)] uppercase tracking-wider">
-                  Costo Total Estimado
-                </span>
-                <p className="text-2xl font-bold font-mono text-[var(--color-fg)]">
-                  {fmtUSD(resultados.costoTotalUSD)}
-                </p>
-                <p className="text-xs text-[var(--color-fg-muted)] font-mono">
-                  {fmtARS(resultados.costoTotalARS)}
-                </p>
+          <Card padding="none" className="overflow-hidden shadow-[var(--shadow-md)]">
+            <div className="grid grid-cols-2 lg:grid-cols-4">
+              <div className="p-4 border-b border-r border-[var(--color-border)] lg:border-b-0">
+                <StatTile
+                  label="Costo total"
+                  icon={<Wallet2 className="h-3.5 w-3.5" />}
+                  value={fmtARS(resultados.costoTotalARS)}
+                  sub={fmtUSD(resultados.costoTotalUSD)}
+                />
               </div>
 
-              {/* Ingreso Total Sugerido */}
-              <div className="space-y-1 md:pl-4 pt-2 md:pt-0">
-                <span className="text-xs text-[var(--color-fg-muted)] uppercase tracking-wider">
-                  Ingreso Sugerido Total
-                </span>
-                <p className="text-2xl font-bold font-mono text-[var(--color-accent)]">
-                  {fmtARS(resultados.ingresoTotalARS)}
-                </p>
-                <p className="text-xs text-[var(--color-fg-muted)] font-mono">
-                  {fmtUSD(resultados.ingresoTotalUSD)}
-                </p>
+              <div className="p-4 border-b border-[var(--color-border)] lg:border-b-0 lg:border-r">
+                <StatTile
+                  label="Ingreso"
+                  icon={<DollarSign className="h-3.5 w-3.5" />}
+                  value={fmtARS(resultados.ingresoTotalARS)}
+                  sub={fmtUSD(resultados.ingresoTotalUSD)}
+                  tone="accent"
+                />
               </div>
 
-              {/* Ganancia Neta */}
-              <div className="space-y-1 md:pl-4 pt-2 md:pt-0">
-                <span className="text-xs text-[var(--color-fg-muted)] uppercase tracking-wider">
-                  Ganancia Neta Estimada
-                </span>
-                <p className="text-2xl font-bold font-mono text-[var(--color-success)]">
-                  +{fmtUSD(resultados.gananciaTotalUSD)}
-                </p>
-                <p className="text-xs font-semibold text-[var(--color-success)] font-mono">
-                  +{fmtARS(resultados.gananciaTotalARS)}
-                </p>
+              <div className="p-4 border-r border-[var(--color-border)]">
+                <StatTile
+                  label="Ganancia"
+                  icon={<TrendingUp className="h-3.5 w-3.5" />}
+                  value={`${resultados.gananciaTotalARS >= 0 ? "+" : ""}${fmtARS(resultados.gananciaTotalARS)}`}
+                  sub={`${resultados.gananciaTotalUSD >= 0 ? "+" : ""}${fmtUSD(resultados.gananciaTotalUSD)} · margen ${fmtPct(
+                    resultados.ingresoTotalUSD > 0
+                      ? resultados.gananciaTotalUSD / resultados.ingresoTotalUSD
+                      : 0
+                  )}`}
+                  tone={resultados.gananciaTotalUSD >= 0 ? "success" : "danger"}
+                />
               </div>
 
-              {/* Actions */}
-              <div className="space-y-2 md:pl-4 pt-2 md:pt-0 flex flex-col justify-center">
+              {/* Guardar cotización */}
+              <div className="p-4 flex flex-col justify-center gap-2 bg-[var(--color-bg-subtle)]">
                 <Input
                   placeholder="Nombre de la cotización"
                   value={nombreEnvio}
                   onChange={(e) => setNombreEnvio(e.target.value)}
+                  className="h-9"
                 />
-                <div className="flex gap-2">
-                  <Button
-                    variant="primary"
-                    size="sm"
-                    className="w-full"
-                    icon={<Save className="h-3.5 w-3.5" />}
-                    loading={savingCotizacion}
-                    onClick={guardarCotizacion}
-                  >
-                    Guardar
-                  </Button>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    icon={<Download className="h-3.5 w-3.5" />}
-                    onClick={exportarJSON}
-                  />
-                </div>
+                <Button
+                  variant="primary"
+                  size="sm"
+                  className="w-full"
+                  icon={<Save className="h-3.5 w-3.5" />}
+                  loading={savingCotizacion}
+                  onClick={guardarCotizacion}
+                >
+                  Guardar cotización
+                </Button>
               </div>
             </div>
           </Card>
         )}
+
+        {/* Espacio para que la barra fija de mobile no tape el final */}
+        {productos.length > 0 && <div className="h-32 md:h-20 lg:hidden" aria-hidden />}
       </main>
+
+      {/* Barra de resultado siempre visible en mobile */}
+      {productos.length > 0 && (
+        <div className="lg:hidden fixed bottom-[52px] md:bottom-0 inset-x-0 z-30 border-t border-[var(--color-border)] bg-[var(--color-bg-elevated)]/95 backdrop-blur-md px-4 py-2.5">
+          <div className="flex items-center justify-between gap-3">
+            <div className="min-w-0 leading-tight">
+              <span className="block text-[11px] uppercase tracking-wide text-[var(--color-fg-muted)]">
+                Costo
+              </span>
+              <span className="font-mono tnum text-sm font-semibold truncate">
+                {fmtARS(resultados.costoTotalARS)}
+              </span>
+            </div>
+            <div className="min-w-0 leading-tight text-right">
+              <span className="block text-[11px] uppercase tracking-wide text-[var(--color-fg-muted)]">
+                Ganancia
+              </span>
+              <span
+                className={`font-mono tnum text-sm font-bold truncate ${
+                  resultados.gananciaTotalARS >= 0
+                    ? "text-[var(--color-success)]"
+                    : "text-[var(--color-danger)]"
+                }`}
+              >
+                {resultados.gananciaTotalARS >= 0 ? "+" : ""}
+                {fmtARS(resultados.gananciaTotalARS)}
+              </span>
+            </div>
+          </div>
+        </div>
+      )}
+
 
       {/* Order Photos & QC Modal */}
       <Dialog

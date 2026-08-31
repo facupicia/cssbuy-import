@@ -150,15 +150,15 @@ export default function CotizacionesPage() {
     <div className="min-h-screen bg-[var(--color-bg)] flex flex-col">
       <Navbar />
 
-      <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 py-6 space-y-6">
+      <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 py-6 pb-24 md:pb-6 space-y-6">
         {/* Header */}
         <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
           <div>
-            <h1 className="text-xl font-bold tracking-tight text-[var(--color-fg)]">
-              Cotizaciones Guardadas
+            <h1 className="text-xl sm:text-2xl font-bold tracking-tight text-[var(--color-fg)]">
+              Cotizaciones
             </h1>
-            <p className="text-xs text-[var(--color-fg-muted)]">
-              Historial de cálculos de landed cost guardados en la nube y localmente
+            <p className="text-xs sm:text-sm text-[var(--color-fg-muted)] mt-0.5">
+              Historial de cálculos guardados, con su costo y su ganancia estimada.
             </p>
           </div>
 
@@ -245,37 +245,56 @@ export default function CotizacionesPage() {
                       </button>
                     </div>
 
-                    <div className="grid grid-cols-2 gap-2 p-2.5 bg-[var(--color-bg-subtle)] rounded-[var(--radius)] text-xs">
-                      <div>
-                        <span className="text-[10px] text-[var(--color-fg-muted)] uppercase tracking-wider block">
-                          Costo Total
+                    <div className="grid grid-cols-2 gap-3 p-3 bg-[var(--color-bg-subtle)] rounded-[var(--radius)]">
+                      <div className="min-w-0">
+                        <span className="block text-[11px] text-[var(--color-fg-muted)] uppercase tracking-wider">
+                          Costo total
                         </span>
-                        <span className="font-bold font-mono text-[var(--color-fg)]">
+                        <span className="block font-bold font-mono tnum text-sm text-[var(--color-fg)] truncate">
+                          {fmtARS(res?.costoTotalARS || 0)}
+                        </span>
+                        <span className="block text-[11px] font-mono tnum text-[var(--color-fg-muted)]">
                           {fmtUSD(res?.costoTotalUSD || 0)}
                         </span>
                       </div>
-                      <div>
-                        <span className="text-[10px] text-[var(--color-fg-muted)] uppercase tracking-wider block">
-                          Sugerido ARS
+                      <div className="min-w-0">
+                        <span className="block text-[11px] text-[var(--color-fg-muted)] uppercase tracking-wider">
+                          Ingreso
                         </span>
-                        <span className="font-bold font-mono text-[var(--color-accent)]">
+                        <span className="block font-bold font-mono tnum text-sm text-[var(--color-accent)] truncate">
                           {fmtARS(res?.ingresoTotalARS || 0)}
                         </span>
-                      </div>
-                      <div>
-                        <span className="text-[10px] text-[var(--color-fg-muted)] uppercase tracking-wider block">
-                          Ganancia Neta
-                        </span>
-                        <span className="font-semibold font-mono text-[var(--color-success)]">
-                          +{fmtUSD(res?.gananciaTotalUSD || 0)}
+                        <span className="block text-[11px] font-mono tnum text-[var(--color-fg-muted)]">
+                          {fmtUSD(res?.ingresoTotalUSD || 0)}
                         </span>
                       </div>
-                      <div>
-                        <span className="text-[10px] text-[var(--color-fg-muted)] uppercase tracking-wider block">
-                          Productos
+                      <div className="min-w-0">
+                        <span className="block text-[11px] text-[var(--color-fg-muted)] uppercase tracking-wider">
+                          Ganancia
                         </span>
-                        <span className="font-medium text-[var(--color-fg)]">
-                          {cantProductos} ítems ({res?.pesoTotalG || 0}g)
+                        <span
+                          className={`block font-bold font-mono tnum text-sm truncate ${
+                            (res?.gananciaTotalARS || 0) >= 0
+                              ? "text-[var(--color-success)]"
+                              : "text-[var(--color-danger)]"
+                          }`}
+                        >
+                          {(res?.gananciaTotalARS || 0) >= 0 ? "+" : ""}
+                          {fmtARS(res?.gananciaTotalARS || 0)}
+                        </span>
+                        <span className="block text-[11px] font-mono tnum text-[var(--color-fg-muted)]">
+                          margen {fmtPct(res?.margenTotalPct || 0)}
+                        </span>
+                      </div>
+                      <div className="min-w-0">
+                        <span className="block text-[11px] text-[var(--color-fg-muted)] uppercase tracking-wider">
+                          Paquete
+                        </span>
+                        <span className="block font-semibold font-mono tnum text-sm text-[var(--color-fg)]">
+                          {cantProductos} {cantProductos === 1 ? "ítem" : "ítems"}
+                        </span>
+                        <span className="block text-[11px] font-mono tnum text-[var(--color-fg-muted)]">
+                          {((res?.pesoTotalG || 0) / 1000).toFixed(2)} kg
                         </span>
                       </div>
                     </div>
@@ -329,40 +348,48 @@ export default function CotizacionesPage() {
                 {/* Resumen */}
                 <div className="grid grid-cols-3 gap-3 p-3 bg-[var(--color-bg-subtle)] rounded-[var(--radius)] text-xs">
                   <div>
-                    <span className="text-[10px] text-[var(--color-fg-muted)] uppercase">Costo Paquete</span>
+                    <span className="text-[11px] text-[var(--color-fg-muted)] uppercase">Costo Paquete</span>
                     <p className="font-bold font-mono text-sm">{fmtUSD(selected.resultados?.costoTotalUSD || 0)}</p>
-                    <p className="text-[10px] text-[var(--color-fg-muted)] font-mono">{fmtARS(selected.resultados?.costoTotalARS || 0)}</p>
+                    <p className="text-[11px] text-[var(--color-fg-muted)] font-mono">{fmtARS(selected.resultados?.costoTotalARS || 0)}</p>
                   </div>
                   <div>
-                    <span className="text-[10px] text-[var(--color-fg-muted)] uppercase">Venta Sugerida</span>
+                    <span className="text-[11px] text-[var(--color-fg-muted)] uppercase">Venta Sugerida</span>
                     <p className="font-bold font-mono text-sm text-[var(--color-accent)]">{fmtARS(selected.resultados?.ingresoTotalARS || 0)}</p>
-                    <p className="text-[10px] text-[var(--color-fg-muted)] font-mono">{fmtUSD(selected.resultados?.ingresoTotalUSD || 0)}</p>
+                    <p className="text-[11px] text-[var(--color-fg-muted)] font-mono">{fmtUSD(selected.resultados?.ingresoTotalUSD || 0)}</p>
                   </div>
                   <div>
-                    <span className="text-[10px] text-[var(--color-fg-muted)] uppercase">Ganancia Neta</span>
+                    <span className="text-[11px] text-[var(--color-fg-muted)] uppercase">Ganancia Neta</span>
                     <p className="font-bold font-mono text-sm text-[var(--color-success)]">+{fmtUSD(selected.resultados?.gananciaTotalUSD || 0)}</p>
-                    <p className="text-[10px] text-[var(--color-fg-muted)] font-mono">Margen: {fmtPct(selected.resultados?.margenTotalPct || 0)}</p>
+                    <p className="text-[11px] text-[var(--color-fg-muted)] font-mono">Margen: {fmtPct(selected.resultados?.margenTotalPct || 0)}</p>
                   </div>
                 </div>
 
                 {/* Tabla de Productos */}
-                <div className="border border-[var(--color-border)] rounded-[var(--radius)] overflow-hidden">
-                  <table className="w-full text-left text-xs">
-                    <thead className="bg-[var(--color-bg-subtle)] border-b border-[var(--color-border)] text-[var(--color-fg-muted)] uppercase text-[10px]">
+                <div className="border border-[var(--color-border)] rounded-[var(--radius)] overflow-x-auto">
+                  <table className="w-full min-w-[560px] text-left text-xs">
+                    <thead className="bg-[var(--color-bg-subtle)] border-b border-[var(--color-border)] text-[var(--color-fg-muted)] uppercase text-[11px]">
                       <tr>
                         <th className="py-2 px-3">Producto</th>
                         <th className="py-2 px-3 text-center">Cant.</th>
                         <th className="py-2 px-3 text-right">Precio CNY</th>
                         <th className="py-2 px-3 text-right">Peso</th>
                         <th className="py-2 px-3 text-right">Costo USD</th>
-                        <th className="py-2 px-3 text-right">Markup</th>
+                        <th className="py-2 px-3 text-right">Margen</th>
                         <th className="py-2 px-3 text-right">Precio ARS</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-[var(--color-border)]">
                       {selected.productos.map((p, idx) => {
                         const itemCalc = selected.resultados?.productosCalc?.[idx];
-                        const itemMarkup = itemCalc?.markup || p.markup || selected.envio?.markup || 2;
+                        // Cotizaciones viejas no traen markupEfectivo: lo derivamos de venta/costo.
+                        const costoUnit = itemCalc?.costoUnitUSD || 0;
+                        const ventaUnitUSD = costoUnit > 0 && itemCalc
+                          ? (itemCalc.ventaUnitARS || 0) / (selected.fx?.blue || 1)
+                          : 0;
+                        const itemMarkup = itemCalc?.markupEfectivo
+                          ?? (costoUnit > 0 ? ventaUnitUSD / costoUnit : (p.markup || selected.envio?.markup || 2));
+                        const itemMargen = itemCalc?.margenUnitPct
+                          ?? (ventaUnitUSD > 0 ? (ventaUnitUSD - costoUnit) / ventaUnitUSD : 0);
                         return (
                           <tr key={idx}>
                             <td className="py-2 px-3">
@@ -378,7 +405,12 @@ export default function CotizacionesPage() {
                               {fmtUSD(itemCalc?.costoUnitUSD || 0)}
                             </td>
                             <td className="py-2 px-3 text-right font-mono font-medium">
-                              {itemMarkup.toFixed(1)}x
+                              <div className="flex flex-col items-end leading-tight">
+                                <span>{(itemMargen * 100).toFixed(0)}%</span>
+                                <span className="text-[11px] text-[var(--color-fg-muted)]">
+                                  {itemMarkup.toFixed(2)}x
+                                </span>
+                              </div>
                             </td>
                             <td className="py-2 px-3 text-right font-mono font-bold text-[var(--color-accent)]">
                               {fmtARS(itemCalc?.ventaUnitARS || 0)}
