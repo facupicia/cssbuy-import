@@ -12,3 +12,7 @@ out/
 # Sistema
 Thumbs.db
 .DS_Store
+
+# Symlinks que genera el CLI de skills: apuntan a rutas absolutas de cada
+# máquina. Los skills en sí viven en .agents/ y se re-enlazan con `skills install`.
+.claude/skills/
