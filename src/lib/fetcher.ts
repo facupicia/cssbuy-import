@@ -37,6 +37,25 @@ export async function fetcherPost<T = any>(url: string, data?: any): Promise<T> 
   return res.json();
 }
 
+export async function fetcherPatch<T = any>(url: string, data?: any): Promise<T> {
+  const res = await fetch(url, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: data ? JSON.stringify(data) : undefined,
+  });
+  if (!res.ok) {
+    const error = new FetchError("Error en la solicitud");
+    try {
+      error.info = await res.json();
+    } catch {
+      error.info = { error: res.statusText };
+    }
+    error.status = res.status;
+    throw error;
+  }
+  return res.json();
+}
+
 export async function fetcherDelete<T = any>(url: string): Promise<T> {
   const res = await fetch(url, {
     method: "DELETE",

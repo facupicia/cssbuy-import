@@ -28,8 +28,16 @@ export function StatTile({ label, value, sub, icon, tone = "neutral", className 
         {icon}
         {label}
       </span>
-      <p className={cn("text-xl xl:text-2xl font-bold font-mono tnum truncate", tones[tone])}>{value}</p>
-      {sub && <p className="text-xs font-mono tnum text-[var(--color-fg-muted)] truncate">{sub}</p>}
+      {/* En mobile las tiles van a 2 columnas: con text-xl los importes en ARS
+          se cortaban. Se achica el escalón chico y el título expone el valor entero. */}
+      <p
+        title={value}
+        className={cn("text-lg sm:text-xl xl:text-2xl font-bold font-mono tnum truncate", tones[tone])}
+      >
+        {value}
+      </p>
+      {/* El subtítulo puede envolver: cortarlo escondía datos como "Invertido total …". */}
+      {sub && <p className="text-xs font-mono tnum text-[var(--color-fg-muted)] break-words">{sub}</p>}
     </div>
   );
 }

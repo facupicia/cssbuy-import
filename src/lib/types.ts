@@ -175,3 +175,63 @@ export interface RecordSummary {
   groupCount: number;
   unlinkedCount: number;
 }
+
+/* ── Inventario ──────────────────────────────────────────────────────── */
+
+export type InventoryEstado = "en_transito" | "en_deposito" | "agotado";
+export type InventoryOrigen = "manual" | "cssbuy" | "cotizacion";
+
+export interface InventoryItem {
+  id: string;
+  nombre: string;
+  sku?: string | null;
+  variante?: string | null;
+  imagen?: string | null;
+  link?: string | null;
+  /** Unidades recibidas / compradas para este ítem. */
+  cantidadInicial: number;
+  /** Unidades ya vendidas. Nunca mayor que cantidadInicial. */
+  cantidadVendida: number;
+  /** Costo landed unitario en USD (referencia). */
+  costoUnitUSD: number;
+  /** Costo landed unitario en ARS: base para la ganancia. */
+  costoUnitARS: number;
+  /** Precio de venta unitario en ARS. */
+  precioVentaARS: number;
+  estado: InventoryEstado;
+  ubicacion?: string | null;
+  notas?: string | null;
+  origen: InventoryOrigen;
+  /** oid de la orden CSSBuy o id de la cotización que originó el ítem. */
+  origenRef?: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface InventoryItemCalc extends InventoryItem {
+  /** cantidadInicial - cantidadVendida. */
+  stock: number;
+  /** Capital total puesto en el ítem (costo * cantidadInicial), en ARS. */
+  invertidoARS: number;
+  /** Capital todavía inmovilizado en el stock sin vender, en ARS. */
+  capitalStockARS: number;
+  /** Ganancia ya embolsada por las unidades vendidas, en ARS. */
+  gananciaRealizadaARS: number;
+  /** Ganancia que falta realizar si se vende todo el stock restante, en ARS. */
+  gananciaPotencialARS: number;
+  /** Ingreso ya facturado por las unidades vendidas, en ARS. */
+  ingresoRealizadoARS: number;
+  /** Margen unitario sobre el precio de venta: (venta - costo) / venta. */
+  margenUnitPct: number;
+}
+
+export interface InventorySummary {
+  totalItems: number;
+  unidadesStock: number;
+  unidadesVendidas: number;
+  capitalStockARS: number;
+  invertidoTotalARS: number;
+  gananciaRealizadaARS: number;
+  gananciaPotencialARS: number;
+  ingresoRealizadoARS: number;
+}

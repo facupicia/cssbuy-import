@@ -1,4 +1,6 @@
 import { Pool } from "pg";
+import type { InventoryItem } from "./types";
+import type { InventoryInput } from "./inventory";
 
 let pool: Pool | null = null;
 
@@ -274,4 +276,204 @@ export async function deleteCotizacion(id: string): Promise<boolean> {
   await ensureCotizacionesTable();
   const res = await getPool().query(`DELETE FROM shop_cotizaciones WHERE id = $1`, [id]);
   return (res.rowCount ?? 0) > 0;
+}
+
+/* ── Inventario ──────────────────────────────────────────────────────── */
+
+let inventoryTablePromise: Promise<void> | null = null;
+
+export async function ensureInventoryTable(): Promise<void> {
+  // Memoizado por proceso: evita el DDL repetido y la carrera de
+  // "CREATE TABLE IF NOT EXISTS" cuando dos requests entran a la vez.
+  if (!inventoryTablePromise) {
+    inventoryTablePromise = getPool()
+      .query(`
+        CREATE TABLE IF NOT EXISTS inventory_items (
+          id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+          nombre TEXT NOT NULL,
+          sku TEXT,
+          variante TEXT,
+          imagen TEXT,
+          link TEXT,
+          cantidad_inicial NUMERIC NOT NULL DEFAULT 0,
+          cantidad_vendida NUMERIC NOT NULL DEFAULT 0,
+          costo_unit_usd NUMERIC NOT NULL DEFAULT 0,
+          costo_unit_ars NUMERIC NOT NULL DEFAULT 0,
+          precio_venta_ars NUMERIC NOT NULL DEFAULT 0,
+          estado TEXT NOT NULL DEFAULT 'en_deposito',
+          ubicacion TEXT,
+          notas TEXT,
+          origen TEXT NOT NULL DEFAULT 'manual',
+          origen_ref TEXT,
+          created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+          updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
+        )
+      `)
+      .then(() => undefined)
+      .catch((err: unknown) => {
+        // 23505/42P07: otra conexión creó la tabla al mismo tiempo. No es error.
+        const code = (err as { code?: string })?.code;
+        if (code === "23505" || code === "42P07") return;
+        inventoryTablePromise = null; // permitir reintento ante fallos reales
+        throw err;
+      });
+  }
+  return inventoryTablePromise;
+}
+
+interface InventoryRow {
+  id: string;
+  nombre: string;
+  sku: string | null;
+  variante: string | null;
+  imagen: string | null;
+  link: string | null;
+  cantidad_inicial: string | number;
+  cantidad_vendida: string | number;
+  costo_unit_usd: string | number;
+  costo_unit_ars: string | number;
+  precio_venta_ars: string | number;
+  estado: string;
+  ubicacion: string | null;
+  notas: string | null;
+  origen: string;
+  origen_ref: string | null;
+  created_at: Date;
+  updated_at: Date;
+}
+
+function mapInventoryRow(r: InventoryRow): InventoryItem {
+  return {
+    id: r.id,
+    nombre: r.nombre,
+    sku: r.sku,
+    variante: r.variante,
+    imagen: r.imagen,
+    link: r.link,
+    cantidadInicial: Number(r.cantidad_inicial) || 0,
+    cantidadVendida: Number(r.cantidad_vendida) || 0,
+    costoUnitUSD: Number(r.costo_unit_usd) || 0,
+    costoUnitARS: Number(r.costo_unit_ars) || 0,
+    precioVentaARS: Number(r.precio_venta_ars) || 0,
+    estado: (r.estado as InventoryItem["estado"]) || "en_deposito",
+    ubicacion: r.ubicacion,
+    notas: r.notas,
+    origen: (r.origen as InventoryItem["origen"]) || "manual",
+    origenRef: r.origen_ref,
+    createdAt: new Date(r.created_at).toISOString(),
+    updatedAt: new Date(r.updated_at).toISOString(),
+  };
+}
+
+const INVENTORY_COLS = `id, nombre, sku, variante, imagen, link, cantidad_inicial,
+  cantidad_vendida, costo_unit_usd, costo_unit_ars, precio_venta_ars, estado,
+  ubicacion, notas, origen, origen_ref, created_at, updated_at`;
+
+export async function getInventoryItems(): Promise<InventoryItem[]> {
+  await ensureInventoryTable();
+  const res = await getPool().query(
+    `SELECT ${INVENTORY_COLS} FROM inventory_items ORDER BY created_at DESC`
+  );
+  return res.rows.map(mapInventoryRow);
+}
+
+export async function getInventoryItem(id: string): Promise<InventoryItem | null> {
+  await ensureInventoryTable();
+  const res = await getPool().query(
+    `SELECT ${INVENTORY_COLS} FROM inventory_items WHERE id = $1`,
+    [id]
+  );
+  return res.rows[0] ? mapInventoryRow(res.rows[0]) : null;
+}
+
+/** Mapa campo del modelo → columna de la tabla, para inserts y updates parciales. */
+const FIELD_TO_COL: Record<string, string> = {
+  nombre: "nombre",
+  sku: "sku",
+  variante: "variante",
+  imagen: "imagen",
+  link: "link",
+  cantidadInicial: "cantidad_inicial",
+  cantidadVendida: "cantidad_vendida",
+  costoUnitUSD: "costo_unit_usd",
+  costoUnitARS: "costo_unit_ars",
+  precioVentaARS: "precio_venta_ars",
+  estado: "estado",
+  ubicacion: "ubicacion",
+  notas: "notas",
+  origen: "origen",
+  origenRef: "origen_ref",
+};
+
+export async function insertInventoryItem(input: InventoryInput): Promise<InventoryItem> {
+  await ensureInventoryTable();
+  const cols: string[] = [];
+  const placeholders: string[] = [];
+  const values: unknown[] = [];
+
+  for (const [field, col] of Object.entries(FIELD_TO_COL)) {
+    if (field in input && (input as Record<string, unknown>)[field] !== undefined) {
+      cols.push(col);
+      placeholders.push(`$${values.length + 1}`);
+      values.push((input as Record<string, unknown>)[field]);
+    }
+  }
+
+  if (!cols.includes("nombre")) {
+    throw new Error("El ítem de inventario necesita un nombre");
+  }
+
+  const res = await getPool().query(
+    `INSERT INTO inventory_items (${cols.join(", ")})
+     VALUES (${placeholders.join(", ")})
+     RETURNING ${INVENTORY_COLS}`,
+    values
+  );
+  return mapInventoryRow(res.rows[0]);
+}
+
+export async function updateInventoryItem(
+  id: string,
+  input: InventoryInput
+): Promise<InventoryItem | null> {
+  await ensureInventoryTable();
+  const sets: string[] = [];
+  const values: unknown[] = [];
+
+  for (const [field, col] of Object.entries(FIELD_TO_COL)) {
+    if (field in input && (input as Record<string, unknown>)[field] !== undefined) {
+      sets.push(`${col} = $${values.length + 1}`);
+      values.push((input as Record<string, unknown>)[field]);
+    }
+  }
+
+  if (sets.length === 0) return getInventoryItem(id);
+
+  sets.push("updated_at = now()");
+  values.push(id);
+
+  const res = await getPool().query(
+    `UPDATE inventory_items SET ${sets.join(", ")}
+     WHERE id = $${values.length}
+     RETURNING ${INVENTORY_COLS}`,
+    values
+  );
+  return res.rows[0] ? mapInventoryRow(res.rows[0]) : null;
+}
+
+/** Devuelve false si el id no existía. */
+export async function deleteInventoryItem(id: string): Promise<boolean> {
+  await ensureInventoryTable();
+  const res = await getPool().query(`DELETE FROM inventory_items WHERE id = $1`, [id]);
+  return (res.rowCount ?? 0) > 0;
+}
+
+/** oids de CSSBuy ya presentes en el inventario, para no importarlos dos veces. */
+export async function getInventoryOrigenRefs(origen: string): Promise<string[]> {
+  await ensureInventoryTable();
+  const res = await getPool().query(
+    `SELECT DISTINCT origen_ref FROM inventory_items WHERE origen = $1 AND origen_ref IS NOT NULL`,
+    [origen]
+  );
+  return res.rows.map((r: { origen_ref: string }) => r.origen_ref);
 }
