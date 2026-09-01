@@ -602,10 +602,29 @@ async function syncViaPlaywright(
   try {
     const pw = await import("playwright");
     chromium = pw.chromium;
-  } catch {
+  } catch (e) {
+    // El mensaje viejo decía siempre "Playwright no está instalado", que en el
+    // contenedor era falso: el paquete está, pero el build standalone de Next
+    // copia playwright-core sin sus archivos de datos (browsers.json) y además
+    // no hay Chromium. Distinguimos los casos para no mandar a instalar de más.
+    const detalle = e instanceof Error ? e.message : String(e);
+    const enContenedor = fs.existsSync("/.dockerenv");
+
+    if (enContenedor) {
+      throw new Error(
+        "El sync automático no puede correr en el servidor: CSSBuy está detrás de " +
+        "Cloudflare y exige un navegador real que resuelva su desafío. " +
+        "Corré el sync desde tu PC (npm run dev y el botón Sync, o npm run sync): " +
+        "escribe en la misma base que lee el servidor, así que los pedidos " +
+        "aparecen acá igual. " +
+        `Detalle técnico: ${detalle}`
+      );
+    }
+
     throw new Error(
-      "Playwright no está instalado. Instalalo con: npx playwright install chromium. " +
-      "Mientras tanto, usá el Scraper de Consola y cargá orders.json manualmente."
+      "No se pudo cargar Playwright. Instalá el navegador con: npx playwright install chromium. " +
+      "Mientras tanto, usá el Scraper de Consola y cargá orders.json manualmente. " +
+      `Detalle: ${detalle}`
     );
   }
 
