@@ -69,6 +69,7 @@ import { TiendanubeExportDialog } from "@/components/inventario/TiendanubeExport
 import { BulkEditDialog, type BulkChanges } from "@/components/inventario/BulkEditDialog";
 import { SyncCotizacionDialog } from "@/components/inventario/SyncCotizacionDialog";
 import { MarcasDialog } from "@/components/inventario/MarcasDialog";
+import { DescripcionDialog } from "@/components/inventario/DescripcionDialog";
 
 /* ── Formulario de ítem ──────────────────────────────────────────────── */
 
@@ -174,6 +175,7 @@ export default function InventarioPage() {
   const [marcaFilter, setMarcaFilter] = useState<string | "todas">("todas");
   const [marcasOpen, setMarcasOpen] = useState(false);
   const [generandoSkus, setGenerandoSkus] = useState(false);
+  const [fichaDe, setFichaDe] = useState<InventoryItem | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -967,6 +969,15 @@ export default function InventarioPage() {
                               variant="ghost"
                               size="sm"
                               className="h-7 px-2"
+                              icon={<FileText className="h-3.5 w-3.5" />}
+                              onClick={() => setFichaDe(it)}
+                              title="Ver la ficha que va a Tiendanube"
+                              aria-label="Ver ficha"
+                            />
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              className="h-7 px-2"
                               icon={<Pencil className="h-3.5 w-3.5" />}
                               onClick={() => openEdit(it)}
                               title="Editar"
@@ -1138,6 +1149,15 @@ export default function InventarioPage() {
                           variant="ghost"
                           size="sm"
                           className="px-2"
+                          icon={<FileText className="h-4 w-4" />}
+                          onClick={() => setFichaDe(it)}
+                          title="Ver la ficha que va a Tiendanube"
+                          aria-label="Ver ficha"
+                        />
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="px-2"
                           icon={<Pencil className="h-4 w-4" />}
                           onClick={() => openEdit(it)}
                           title="Editar item"
@@ -1188,6 +1208,13 @@ export default function InventarioPage() {
         onOpenChange={setImportOpen}
         existing={items}
         onDone={load}
+      />
+
+      {/* Ficha del producto */}
+      <DescripcionDialog
+        item={fichaDe}
+        nombreDeMarca={nombreMarca}
+        onOpenChange={(v) => !v && setFichaDe(null)}
       />
 
       {/* Marcas */}

@@ -188,8 +188,14 @@ export function TiendanubeExportDialog({
                 icon={<Eye className="h-3.5 w-3.5" />}
                 onClick={() => setVerPreview((v) => !v)}
               >
-                {verPreview ? "Ocultar" : "Ver"} cómo queda
+                {verPreview ? "Ocultar" : "Ver"} un ejemplo
               </Button>
+              {verPreview && (
+                <p className="mt-2 text-[11px] text-[var(--color-fg-subtle)]">
+                  Ejemplo con {items[0]?.nombre?.slice(0, 40) || "el primer producto"}. Para ver
+                  la ficha de otro, usá el botón de ficha en su fila.
+                </p>
+              )}
               {verPreview && (
                 <div
                   className="mt-2 max-h-72 overflow-y-auto rounded-[var(--radius)] border border-[var(--color-border)] bg-white p-3"
