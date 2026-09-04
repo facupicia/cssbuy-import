@@ -24,6 +24,7 @@ import {
   Layers,
   Store,
   X,
+  FileText,
 } from "lucide-react";
 import {
   InventoryItem,
@@ -61,6 +62,7 @@ import { toast } from "@/components/ui/Toast";
 import { InventoryCharts } from "@/components/InventoryCharts";
 import { TiendanubeExportDialog } from "@/components/inventario/TiendanubeExportDialog";
 import { BulkEditDialog, type BulkChanges } from "@/components/inventario/BulkEditDialog";
+import { SyncCotizacionDialog } from "@/components/inventario/SyncCotizacionDialog";
 
 /* ── Formulario de ítem ──────────────────────────────────────────────── */
 
@@ -156,6 +158,7 @@ export default function InventarioPage() {
   const [exportOpen, setExportOpen] = useState(false);
   const [confirmBulkDelete, setConfirmBulkDelete] = useState(false);
   const [orden, setOrden] = useState<OrdenInventario>("reciente");
+  const [syncCotOpen, setSyncCotOpen] = useState(false);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -406,6 +409,16 @@ export default function InventarioPage() {
               onClick={() => setImportOpen(true)}
             >
               Importar de CSSBuy
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              icon={<FileText className="h-3.5 w-3.5" />}
+              onClick={() => setSyncCotOpen(true)}
+              disabled={items.length === 0}
+              title="Traer precio y costo de las cotizaciones guardadas"
+            >
+              Precios de cotización
             </Button>
             <Button
               variant="outline"
@@ -982,6 +995,13 @@ export default function InventarioPage() {
         open={importOpen}
         onOpenChange={setImportOpen}
         existing={items}
+        onDone={load}
+      />
+
+      {/* Precios desde cotizaciones */}
+      <SyncCotizacionDialog
+        open={syncCotOpen}
+        onOpenChange={setSyncCotOpen}
         onDone={load}
       />
 

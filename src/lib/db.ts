@@ -540,3 +540,36 @@ export async function bulkDeleteInventory(ids: string[]): Promise<number> {
   );
   return res.rowCount ?? 0;
 }
+
+/**
+ * Escribe precio y costo por ítem en una sola sentencia.
+ *
+ * Cada fila lleva su propio valor, así que no sirve el UPDATE ... WHERE IN de
+ * `bulkUpdateInventory`: se arma un VALUES y se hace join contra él. Un solo
+ * round-trip para todo el lote.
+ */
+export async function applyInventoryPrices(
+  cambios: { id: string; precioVentaARS: number; costoUnitARS: number; costoUnitUSD: number }[]
+): Promise<number> {
+  await ensureInventoryTable();
+  if (cambios.length === 0) return 0;
+
+  const values: unknown[] = [];
+  const tuplas = cambios.map((c, i) => {
+    const b = i * 4;
+    values.push(c.id, c.precioVentaARS, c.costoUnitARS, c.costoUnitUSD);
+    return `($${b + 1}::uuid, $${b + 2}::numeric, $${b + 3}::numeric, $${b + 4}::numeric)`;
+  });
+
+  const res = await getPool().query(
+    `UPDATE inventory_items AS t
+     SET precio_venta_ars = v.precio,
+         costo_unit_ars   = v.costo_ars,
+         costo_unit_usd   = v.costo_usd,
+         updated_at       = now()
+     FROM (VALUES ${tuplas.join(", ")}) AS v(id, precio, costo_ars, costo_usd)
+     WHERE t.id = v.id`,
+    values
+  );
+  return res.rowCount ?? 0;
+}
