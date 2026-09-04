@@ -96,6 +96,25 @@ export interface Propiedad {
  * nombre/valor. Cuando no tiene esa forma ("negro / L"), se cae a una sola
  * propiedad llamada "Variante" con el texto tal cual.
  */
+/**
+ * Los vendedores nombran la misma propiedad de formas distintas (Size, Talla,
+ * 尺码…). Se unifican para que en la tienda no aparezcan propiedades en chino
+ * ni tres variantes de "talle" que el cliente ve como filtros separados.
+ */
+const NOMBRE_CANONICO: Record<string, string> = {
+  size: "Talle",
+  talla: "Talle",
+  talle: "Talle",
+  "tamaño": "Talle",
+  tamano: "Talle",
+  "尺码": "Talle",
+  "尺寸": "Talle",
+  color: "Color",
+  colores: "Color",
+  colour: "Color",
+  "颜色": "Color",
+};
+
 export function parseVariante(variante?: string | null): Propiedad[] {
   const texto = (variante || "").trim();
   if (!texto) return [];
@@ -106,7 +125,8 @@ export function parseVariante(variante?: string | null): Propiedad[] {
   for (const parte of partes) {
     const i = parte.indexOf(":");
     if (i > 0) {
-      const nombre = parte.slice(0, i).trim();
+      const crudo = parte.slice(0, i).trim();
+      const nombre = NOMBRE_CANONICO[crudo.toLowerCase()] ?? crudo;
       const valor = parte.slice(i + 1).trim();
       if (nombre && valor) props.push({ nombre, valor });
     }

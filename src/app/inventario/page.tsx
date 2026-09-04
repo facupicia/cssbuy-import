@@ -39,6 +39,7 @@ import {
   ESTADO_LABEL,
 } from "@/lib/inventory";
 import { fmtARS, fmtUSD, fmtPct } from "@/lib/utils";
+import { parseTalle, tallesDisponibles } from "@/lib/variantes";
 import { fetchLiveFx } from "@/lib/fx";
 import { fetcher, fetcherPost, fetcherPatch, fetcherDelete } from "@/lib/fetcher";
 import { Navbar } from "@/components/Navbar";
@@ -159,6 +160,7 @@ export default function InventarioPage() {
   const [confirmBulkDelete, setConfirmBulkDelete] = useState(false);
   const [orden, setOrden] = useState<OrdenInventario>("reciente");
   const [syncCotOpen, setSyncCotOpen] = useState(false);
+  const [talleFilter, setTalleFilter] = useState<string | "todos">("todos");
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -184,6 +186,7 @@ export default function InventarioPage() {
     const q = search.trim().toLowerCase();
     return items
       .filter((it) => (estadoFilter === "todos" ? true : it.estado === estadoFilter))
+      .filter((it) => (talleFilter === "todos" ? true : parseTalle(it.variante) === talleFilter))
       .filter((it) => {
         if (!q) return true;
         return (
@@ -210,7 +213,16 @@ export default function InventarioPage() {
             return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
         }
       });
-  }, [items, search, estadoFilter, orden]);
+  }, [items, search, estadoFilter, talleFilter, orden]);
+
+  // Solo se ofrecen los talles que existen en el inventario: una lista fija
+  // mostraría filtros que no devuelven nada.
+  const talles = useMemo(() => tallesDisponibles(items.map((i) => i.variante)), [items]);
+
+  // Si el talle filtrado deja de existir (se borró el último ítem), se limpia.
+  useEffect(() => {
+    if (talleFilter !== "todos" && !talles.includes(talleFilter)) setTalleFilter("todos");
+  }, [talles, talleFilter]);
 
   // La selección solo tiene sentido sobre lo que se está viendo: si cambia el
   // filtro, se descartan los ids que ya no están en pantalla.
@@ -522,6 +534,32 @@ export default function InventarioPage() {
                 { value: "agotado", label: "Agotado" },
               ]}
             />
+            {talles.length > 1 && (
+              <div className="flex items-center gap-1.5 shrink-0" role="group" aria-label="Filtrar por talle">
+                <span className="text-[11px] uppercase tracking-wide text-[var(--color-fg-muted)]">
+                  Talle
+                </span>
+                {(["todos", ...talles] as const).map((t) => {
+                  const activo = talleFilter === t;
+                  return (
+                    <button
+                      key={t}
+                      type="button"
+                      onClick={() => setTalleFilter(t)}
+                      aria-pressed={activo}
+                      className={`min-w-8 h-8 px-2 rounded-[var(--radius-sm)] text-xs font-medium border transition-colors cursor-pointer ${
+                        activo
+                          ? "bg-[var(--color-accent)] text-[var(--color-accent-fg)] border-[var(--color-accent)]"
+                          : "bg-[var(--color-bg-elevated)] text-[var(--color-fg-muted)] border-[var(--color-border)] hover:text-[var(--color-fg)] hover:border-[var(--color-border-strong)]"
+                      }`}
+                    >
+                      {t === "todos" ? "Todos" : t}
+                    </button>
+                  );
+                })}
+              </div>
+            )}
+
             <label className="flex items-center gap-2 shrink-0">
               <span className="text-[11px] uppercase tracking-wide text-[var(--color-fg-muted)]">
                 Ordenar
@@ -696,6 +734,11 @@ export default function InventarioPage() {
                                 <span className="font-medium text-[var(--color-fg)] truncate max-w-[220px]">
                                   {it.nombre}
                                 </span>
+                                {parseTalle(it.variante) && (
+                                  <span className="shrink-0 px-1.5 py-0.5 rounded-[var(--radius-xs)] bg-[var(--color-bg-muted)] text-[10px] font-mono font-semibold text-[var(--color-fg-muted)]">
+                                    {parseTalle(it.variante)}
+                                  </span>
+                                )}
                                 {it.link && (
                                   <a
                                     href={it.link}
@@ -843,6 +886,11 @@ export default function InventarioPage() {
                           <span className="font-medium text-sm text-[var(--color-fg)] truncate">
                             {it.nombre}
                           </span>
+                          {parseTalle(it.variante) && (
+                            <span className="shrink-0 px-1.5 py-0.5 rounded-[var(--radius-xs)] bg-[var(--color-bg-muted)] text-[10px] font-mono font-semibold text-[var(--color-fg-muted)]">
+                              {parseTalle(it.variante)}
+                            </span>
+                          )}
                           {it.link && (
                             <a
                               href={it.link}
