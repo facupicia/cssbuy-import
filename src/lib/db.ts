@@ -720,3 +720,27 @@ export async function contarItemsPorMarca(): Promise<Record<string, number>> {
 export async function ensureSchema(): Promise<void> {
   await ensureMarcasTable();
 }
+
+/** Escribe el SKU de cada ítem en una sola sentencia (un valor por fila). */
+export async function applyInventorySkus(
+  cambios: { id: string; sku: string }[]
+): Promise<number> {
+  await ensureSchema();
+  if (cambios.length === 0) return 0;
+
+  const values: unknown[] = [];
+  const tuplas = cambios.map((c, i) => {
+    const b = i * 2;
+    values.push(c.id, c.sku);
+    return `($${b + 1}::uuid, $${b + 2}::text)`;
+  });
+
+  const res = await getPool().query(
+    `UPDATE inventory_items AS t
+     SET sku = v.sku, updated_at = now()
+     FROM (VALUES ${tuplas.join(", ")}) AS v(id, sku)
+     WHERE t.id = v.id`,
+    values
+  );
+  return res.rowCount ?? 0;
+}

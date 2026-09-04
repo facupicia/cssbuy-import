@@ -26,6 +26,7 @@ import {
   X,
   FileText,
   Tag,
+  Hash,
 } from "lucide-react";
 import {
   InventoryItem,
@@ -42,6 +43,7 @@ import {
 } from "@/lib/inventory";
 import { fmtARS, fmtUSD, fmtPct } from "@/lib/utils";
 import { parseTalle, tallesDisponibles } from "@/lib/variantes";
+import { generarSku } from "@/lib/sku";
 import { fetchLiveFx } from "@/lib/fx";
 import { fetcher, fetcherPost, fetcherPatch, fetcherDelete } from "@/lib/fetcher";
 import { Navbar } from "@/components/Navbar";
@@ -171,6 +173,7 @@ export default function InventarioPage() {
   const [marcas, setMarcas] = useState<Marca[]>([]);
   const [marcaFilter, setMarcaFilter] = useState<string | "todas">("todas");
   const [marcasOpen, setMarcasOpen] = useState(false);
+  const [generandoSkus, setGenerandoSkus] = useState(false);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -236,6 +239,16 @@ export default function InventarioPage() {
         }
       });
   }, [items, search, estadoFilter, talleFilter, marcaFilter, orden]);
+
+  // El SKU del ítem que se edita no cuenta como "en uso": si no, regenerarlo
+  // saltaría al siguiente número sin motivo.
+  const skusEnUso = useMemo(
+    () =>
+      items
+        .filter((i) => i.sku && i.id !== editing?.id)
+        .map((i) => i.sku as string),
+    [items, editing]
+  );
 
   const nombreMarca = useMemo(
     () => Object.fromEntries(marcas.map((m) => [m.id, m.nombre])),
@@ -316,6 +329,33 @@ export default function InventarioPage() {
       });
     } finally {
       setBulkSaving(false);
+    }
+  }
+
+  async function generarSkus() {
+    const ids = selectedVisibles.map((it) => it.id);
+    if (ids.length === 0) return;
+    setGenerandoSkus(true);
+    try {
+      const res = await fetcherPost<{ actualizados: number; message?: string }>(
+        "/api/inventario/skus",
+        { ids }
+      );
+      if (res.actualizados > 0) {
+        toast.success(
+          `${res.actualizados} ${res.actualizados === 1 ? "SKU generado" : "SKUs generados"}`
+        );
+        limpiarSeleccion();
+        await load();
+      } else {
+        toast.info(res.message || "No había nada para generar");
+      }
+    } catch (err: any) {
+      toast.error("No se pudieron generar los SKUs", {
+        description: err?.info?.error || err?.message,
+      });
+    } finally {
+      setGenerandoSkus(false);
     }
   }
 
@@ -676,6 +716,16 @@ export default function InventarioPage() {
               onClick={() => setBulkOpen(true)}
             >
               Editar
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              icon={<Hash className="h-3.5 w-3.5" />}
+              onClick={generarSkus}
+              loading={generandoSkus}
+              title="Genera el SKU de los que todavía no tienen"
+            >
+              Generar SKU
             </Button>
             <Button
               variant="outline"
@@ -1120,6 +1170,8 @@ export default function InventarioPage() {
         editing={Boolean(editing)}
         saving={saving}
         marcas={marcas}
+        nombreDeMarca={nombreMarca}
+        skusEnUso={skusEnUso}
         onSubmit={submitForm}
       />
 
@@ -1237,6 +1289,8 @@ function ItemFormDialog({
   editing,
   saving,
   marcas,
+  nombreDeMarca,
+  skusEnUso,
   onSubmit,
 }: {
   open: boolean;
@@ -1246,6 +1300,9 @@ function ItemFormDialog({
   editing: boolean;
   saving: boolean;
   marcas: Marca[];
+  nombreDeMarca: Record<string, string>;
+  /** SKUs ya usados, para que el generado no se repita. */
+  skusEnUso: string[];
   onSubmit: () => void;
 }) {
   const set = <K extends keyof FormState>(key: K, val: FormState[K]) =>
@@ -1290,12 +1347,31 @@ function ItemFormDialog({
               onChange={(e) => set("variante", e.target.value)}
               placeholder="Color, talle…"
             />
-            <Input
-              label="SKU"
-              value={form.sku}
-              onChange={(e) => set("sku", e.target.value)}
-              placeholder="Opcional"
-            />
+            <div className="flex items-end gap-2">
+              <Input
+                label="SKU"
+                value={form.sku}
+                onChange={(e) => set("sku", e.target.value)}
+                placeholder="Opcional"
+              />
+              <Button
+                type="button"
+                variant="outline"
+                icon={<Hash className="h-3.5 w-3.5" />}
+                title="Generar a partir de la marca y el talle"
+                onClick={() =>
+                  set(
+                    "sku",
+                    generarSku(
+                      { nombre: form.nombre, variante: form.variante, marcaId: form.marcaId || null },
+                      { nombreDeMarca, usados: new Set(skusEnUso) }
+                    )
+                  )
+                }
+              >
+                Generar
+              </Button>
+            </div>
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
