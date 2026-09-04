@@ -319,7 +319,7 @@ export default function InventarioPage() {
     try {
       const res = await fetcherPatch<{ items: InventoryItem[]; count: number }>(
         "/api/inventario/bulk",
-        { ids, patch: cambios.patch, precio: cambios.precio }
+        { ids, patch: cambios.patch, precio: cambios.precio, textos: cambios.textos }
       );
       toast.success(`${res.count} ${res.count === 1 ? "ítem actualizado" : "ítems actualizados"}`);
       setBulkOpen(false);

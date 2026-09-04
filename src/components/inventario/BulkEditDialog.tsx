@@ -3,7 +3,14 @@
 import { useMemo, useState } from "react";
 import { Layers, Check } from "lucide-react";
 import { InventoryItem, InventoryEstado, Marca } from "@/lib/types";
-import { calcInventoryItem, ESTADO_LABEL, type BulkPriceOp } from "@/lib/inventory";
+import {
+  calcInventoryItem,
+  ESTADO_LABEL,
+  aplicarTextOp,
+  type BulkPriceOp,
+  type BulkTextOp,
+  type CampoTexto,
+} from "@/lib/inventory";
 import { fmtARS } from "@/lib/utils";
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
@@ -21,7 +28,15 @@ type ModoPrecio = "sin_cambio" | "porcentaje" | "markup" | "fijo";
 export interface BulkChanges {
   patch: Partial<Pick<InventoryItem, "estado" | "ubicacion" | "marcaId">>;
   precio?: BulkPriceOp;
+  textos?: BulkTextOp[];
 }
+
+type ModoTexto = "sin_cambio" | "fijar" | "reemplazar" | "prefijo" | "sufijo";
+
+const ETIQUETA_CAMPO: Record<CampoTexto, string> = {
+  nombre: "Nombre",
+  notas: "Descripción corta",
+};
 
 export function BulkEditDialog({
   open,
@@ -43,6 +58,11 @@ export function BulkEditDialog({
   const [ubicacion, setUbicacion] = useState("");
   const [cambiarUbicacion, setCambiarUbicacion] = useState(false);
   const [marcaId, setMarcaId] = useState<string>("sin_cambio");
+  const [modoNombre, setModoNombre] = useState<ModoTexto>("sin_cambio");
+  const [valorNombre, setValorNombre] = useState("");
+  const [buscarNombre, setBuscarNombre] = useState("");
+  const [modoNotas, setModoNotas] = useState<ModoTexto>("sin_cambio");
+  const [valorNotas, setValorNotas] = useState("");
   const [modoPrecio, setModoPrecio] = useState<ModoPrecio>("sin_cambio");
   const [valorPrecio, setValorPrecio] = useState<number>(0);
 
@@ -66,10 +86,35 @@ export function BulkEditDialog({
     });
   }, [items, modoPrecio, valorPrecio]);
 
+  function opDe(campo: CampoTexto, modo: ModoTexto, valor: string, buscar: string): BulkTextOp | null {
+    if (modo === "sin_cambio") return null;
+    if (modo === "reemplazar") {
+      if (!buscar) return null;
+      return { campo, modo, buscar, valor };
+    }
+    if (!valor) return null;
+    if (campo === "nombre" && modo === "fijar" && !valor.trim()) return null;
+    return { campo, modo, valor };
+  }
+
+  const opNombre = opDe("nombre", modoNombre, valorNombre, buscarNombre);
+  const opNotas = opDe("notas", modoNotas, valorNotas, "");
+
+  /** Previsualiza el nombre resultante con la misma fórmula que corre el servidor. */
+  const previewNombre = useMemo(() => {
+    if (!opNombre) return null;
+    return items.slice(0, 3).map((it) => ({
+      antes: it.nombre,
+      despues: aplicarTextOp(it.nombre, opNombre),
+    }));
+  }, [items, opNombre]);
+
   const hayCambios =
     estado !== "sin_cambio" ||
     marcaId !== "sin_cambio" ||
     cambiarUbicacion ||
+    Boolean(opNombre) ||
+    Boolean(opNotas) ||
     (modoPrecio !== "sin_cambio" && valorPrecio !== 0);
 
   function aplicar() {
@@ -81,7 +126,9 @@ export function BulkEditDialog({
     const precio: BulkPriceOp | undefined =
       modoPrecio === "sin_cambio" ? undefined : { modo: modoPrecio, valor: valorPrecio };
 
-    onApply({ patch, precio });
+    const textos = [opNombre, opNotas].filter(Boolean) as BulkTextOp[];
+
+    onApply({ patch, precio, textos });
   }
 
   return (
@@ -98,6 +145,97 @@ export function BulkEditDialog({
         </DialogHeader>
 
         <div className="space-y-4 overflow-y-auto pr-1">
+          {/* Nombre */}
+          <div className="space-y-2">
+            <span className="block text-xs font-medium text-[var(--color-fg-muted)] tracking-wide uppercase">
+              {ETIQUETA_CAMPO.nombre}
+            </span>
+            <Segmented
+              size="sm"
+              value={modoNombre}
+              onChange={(v) => setModoNombre(v as ModoTexto)}
+              options={[
+                { value: "sin_cambio", label: "Sin cambio" },
+                { value: "fijar", label: "Reemplazar" },
+                { value: "reemplazar", label: "Buscar y reemplazar" },
+                { value: "prefijo", label: "Adelante" },
+                { value: "sufijo", label: "Al final" },
+              ]}
+            />
+
+            {modoNombre === "reemplazar" && (
+              <Input
+                placeholder="Texto a buscar"
+                value={buscarNombre}
+                onChange={(e) => setBuscarNombre(e.target.value)}
+                hint="Se reemplazan todas las apariciones en cada nombre"
+              />
+            )}
+            {modoNombre !== "sin_cambio" && (
+              <Input
+                placeholder={
+                  modoNombre === "fijar"
+                    ? "El mismo nombre para los seleccionados"
+                    : modoNombre === "reemplazar"
+                      ? "Texto nuevo (vacío = borrar lo buscado)"
+                      : modoNombre === "prefijo"
+                        ? "Texto a poner adelante"
+                        : "Texto a agregar al final"
+                }
+                value={valorNombre}
+                onChange={(e) => setValorNombre(e.target.value)}
+              />
+            )}
+
+            {previewNombre && (
+              <div className="rounded-[var(--radius)] bg-[var(--color-bg-subtle)] p-2.5 space-y-1.5">
+                <span className="block text-[11px] uppercase tracking-wide text-[var(--color-fg-muted)]">
+                  Cómo queda
+                </span>
+                {previewNombre.map((p, i) => (
+                  <div key={i} className="text-[11px] leading-snug">
+                    <span className="block text-[var(--color-fg-subtle)] line-through truncate">
+                      {p.antes}
+                    </span>
+                    <span className="block text-[var(--color-accent)] font-medium break-words">
+                      {p.despues || <em>(queda vacío)</em>}
+                    </span>
+                  </div>
+                ))}
+                {items.length > 3 && (
+                  <span className="block text-[11px] text-[var(--color-fg-subtle)]">
+                    …y {items.length - 3} más
+                  </span>
+                )}
+              </div>
+            )}
+          </div>
+
+          {/* Descripción corta, que además es el párrafo de venta de la ficha */}
+          <div className="space-y-2">
+            <span className="block text-xs font-medium text-[var(--color-fg-muted)] tracking-wide uppercase">
+              {ETIQUETA_CAMPO.notas}
+            </span>
+            <Segmented
+              size="sm"
+              value={modoNotas}
+              onChange={(v) => setModoNotas(v as ModoTexto)}
+              options={[
+                { value: "sin_cambio", label: "Sin cambio" },
+                { value: "fijar", label: "Reemplazar" },
+                { value: "sufijo", label: "Al final" },
+              ]}
+            />
+            {modoNotas !== "sin_cambio" && (
+              <Input
+                placeholder="Corte oversize, algodón pesado. Importada."
+                value={valorNotas}
+                onChange={(e) => setValorNotas(e.target.value)}
+                hint="Es el párrafo que aparece arriba de la tabla de talles en la ficha"
+              />
+            )}
+          </div>
+
           {/* Estado */}
           <div>
             <span className="block text-xs font-medium text-[var(--color-fg-muted)] tracking-wide uppercase mb-1.5">

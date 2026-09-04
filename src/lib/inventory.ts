@@ -137,3 +137,52 @@ export function isBulkPriceOp(v: unknown): v is BulkPriceOp {
 
 /** Umbral por defecto para avisar que a un ítem le queda poco stock. */
 export const STOCK_BAJO_DEFAULT = 2;
+
+/**
+ * Operación de texto en lote sobre un campo.
+ *
+ *   fijar       -> el mismo valor para todos (mismo producto, distinto talle)
+ *   reemplazar  -> buscar y reemplazar dentro del texto de cada uno
+ *   prefijo     -> anteponer (agregar la marca adelante, por ejemplo)
+ *   sufijo      -> agregar al final
+ *
+ * Se resuelve por fila porque salvo "fijar", el resultado depende del texto
+ * que ya tenía cada ítem.
+ */
+export type CampoTexto = "nombre" | "notas";
+
+export type BulkTextOp =
+  | { campo: CampoTexto; modo: "fijar"; valor: string }
+  | { campo: CampoTexto; modo: "reemplazar"; buscar: string; valor: string }
+  | { campo: CampoTexto; modo: "prefijo"; valor: string }
+  | { campo: CampoTexto; modo: "sufijo"; valor: string };
+
+const CAMPOS_TEXTO: CampoTexto[] = ["nombre", "notas"];
+const MODOS_TEXTO = ["fijar", "reemplazar", "prefijo", "sufijo"];
+
+export function isBulkTextOp(v: unknown): v is BulkTextOp {
+  if (!v || typeof v !== "object") return false;
+  const o = v as Record<string, unknown>;
+  if (typeof o.campo !== "string" || !CAMPOS_TEXTO.includes(o.campo as CampoTexto)) return false;
+  if (typeof o.modo !== "string" || !MODOS_TEXTO.includes(o.modo)) return false;
+  if (typeof o.valor !== "string") return false;
+  if (o.modo === "reemplazar" && (typeof o.buscar !== "string" || o.buscar === "")) return false;
+  // El nombre es obligatorio en la tabla: no se puede dejar vacío.
+  if (o.campo === "nombre" && o.modo === "fijar" && !o.valor.trim()) return false;
+  return true;
+}
+
+/** Aplica la operación en el cliente, para poder previsualizar el resultado. */
+export function aplicarTextOp(actual: string | null | undefined, op: BulkTextOp): string {
+  const base = actual ?? "";
+  switch (op.modo) {
+    case "fijar":
+      return op.valor;
+    case "reemplazar":
+      return base.split(op.buscar).join(op.valor);
+    case "prefijo":
+      return op.valor + base;
+    case "sufijo":
+      return base + op.valor;
+  }
+}

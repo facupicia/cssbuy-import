@@ -1,6 +1,12 @@
 import { Pool } from "pg";
 import type { InventoryItem, Marca } from "./types";
-import { isBulkPriceOp, type InventoryInput, type BulkPriceOp } from "./inventory";
+import {
+  isBulkPriceOp,
+  isBulkTextOp,
+  type InventoryInput,
+  type BulkPriceOp,
+  type BulkTextOp,
+} from "./inventory";
 
 let pool: Pool | null = null;
 
@@ -492,7 +498,8 @@ export async function getInventoryOrigenRefs(origen: string): Promise<string[]> 
 export async function bulkUpdateInventory(
   ids: string[],
   patch: InventoryInput,
-  precio?: BulkPriceOp
+  precio?: BulkPriceOp,
+  textos?: BulkTextOp[]
 ): Promise<InventoryItem[]> {
   await ensureSchema();
   if (ids.length === 0) return [];
@@ -517,6 +524,28 @@ export async function bulkUpdateInventory(
       sets.push(`precio_venta_ars = ROUND(costo_unit_ars * $${i}::numeric)`);
     } else {
       sets.push(`precio_venta_ars = GREATEST(0, $${i}::numeric)`);
+    }
+  }
+
+  // Texto: salvo "fijar", el resultado depende de lo que ya tenía cada fila,
+  // así que se expresa en SQL en vez de traer todo a Node y reescribirlo.
+  for (const op of textos ?? []) {
+    if (!isBulkTextOp(op)) continue;
+    const col = op.campo === "nombre" ? "nombre" : "notas";
+    // COALESCE porque notas puede ser NULL y en Postgres NULL || 'x' es NULL.
+    const actual = `COALESCE(${col}, '')`;
+    if (op.modo === "fijar") {
+      sets.push(`${col} = $${values.length + 1}`);
+      values.push(op.valor);
+    } else if (op.modo === "reemplazar") {
+      sets.push(`${col} = replace(${actual}, $${values.length + 1}, $${values.length + 2})`);
+      values.push(op.buscar, op.valor);
+    } else if (op.modo === "prefijo") {
+      sets.push(`${col} = $${values.length + 1} || ${actual}`);
+      values.push(op.valor);
+    } else {
+      sets.push(`${col} = ${actual} || $${values.length + 1}`);
+      values.push(op.valor);
     }
   }
 

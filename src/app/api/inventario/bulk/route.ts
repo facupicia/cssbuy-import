@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { isPgConfigured, bulkUpdateInventory, bulkDeleteInventory } from "@/lib/db";
-import { sanitizeInventoryInput, type BulkPriceOp } from "@/lib/inventory";
+import { sanitizeInventoryInput, type BulkPriceOp, type BulkTextOp } from "@/lib/inventory";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -35,12 +35,13 @@ export async function PATCH(request: Request) {
 
     const patch = body?.patch ? sanitizeInventoryInput(body.patch) : {};
     const precio: BulkPriceOp | undefined = body?.precio;
+    const textos: BulkTextOp[] = Array.isArray(body?.textos) ? body.textos : [];
 
-    if (Object.keys(patch).length === 0 && !precio) {
+    if (Object.keys(patch).length === 0 && !precio && textos.length === 0) {
       return NextResponse.json({ error: "Nada para actualizar" }, { status: 400 });
     }
 
-    const items = await bulkUpdateInventory(ids, patch, precio);
+    const items = await bulkUpdateInventory(ids, patch, precio, textos);
     return NextResponse.json({ items, count: items.length });
   } catch (err) {
     console.error("Error en edición masiva de inventario:", err);
