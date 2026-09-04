@@ -1,9 +1,11 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { Download, Store, AlertTriangle } from "lucide-react";
+import { Download, Store, AlertTriangle, Eye } from "lucide-react";
 import { InventoryItem, Marca } from "@/lib/types";
 import { buildTiendanubeCSV, TIENDANUBE_COLUMNS } from "@/lib/tiendanube";
+import { generarDescripcionHTML } from "@/lib/descripcion";
+import { tablaDeMarca } from "@/lib/tablas-talle";
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
 import { Switch } from "@/components/ui/Switch";
@@ -33,6 +35,8 @@ export function TiendanubeExportDialog({
   const [mostrarEnTienda, setMostrarEnTienda] = useState(false);
   const [redondearA, setRedondearA] = useState(0);
   const [incluirCosto, setIncluirCosto] = useState(true);
+  const [descripcionHTML, setDescripcionHTML] = useState(true);
+  const [verPreview, setVerPreview] = useState(false);
 
   const nombreDeMarca = useMemo(
     () => Object.fromEntries(marcas.map((m) => [m.id, m.nombre])),
@@ -48,9 +52,22 @@ export function TiendanubeExportDialog({
         mostrarEnTienda,
         redondearA,
         incluirCosto,
+        descripcionHTML,
       }),
-    [items, categoria, marca, nombreDeMarca, mostrarEnTienda, redondearA, incluirCosto]
+    [items, categoria, marca, nombreDeMarca, mostrarEnTienda, redondearA, incluirCosto, descripcionHTML]
   );
+
+  // Cuántos productos van a llevar tabla de talles de verdad
+  const conTabla = items.filter(
+    (i) => i.marcaId && tablaDeMarca(nombreDeMarca[i.marcaId])
+  ).length;
+
+  const ejemplo = items[0]
+    ? generarDescripcionHTML(items[0], {
+        marca: items[0].marcaId ? nombreDeMarca[items[0].marcaId] : null,
+        pitch: items[0].notas || undefined,
+      })
+    : "";
 
   const conMarcaPropia = items.filter((i) => i.marcaId && nombreDeMarca[i.marcaId]).length;
 
@@ -146,6 +163,43 @@ export function TiendanubeExportDialog({
             </span>
             <Switch checked={mostrarEnTienda} onCheckedChange={setMostrarEnTienda} />
           </label>
+
+          <label className="flex items-start justify-between gap-3 p-3 rounded-[var(--radius)] bg-[var(--color-bg-subtle)] cursor-pointer">
+            <span className="min-w-0">
+              <span className="block text-xs font-medium text-[var(--color-fg)]">
+                Descripción con tabla de talles
+              </span>
+              <span className="block text-[11px] text-[var(--color-fg-muted)] mt-0.5">
+                Genera la ficha en HTML con la tabla de la marca, cómo medir y cuidado de
+                la prenda.{" "}
+                {conTabla > 0
+                  ? `${conTabla} de ${items.length} tienen tabla cargada.`
+                  : "Ninguno tiene una marca con tabla: van sin tabla."}
+              </span>
+            </span>
+            <Switch checked={descripcionHTML} onCheckedChange={setDescripcionHTML} />
+          </label>
+
+          {descripcionHTML && ejemplo && (
+            <div>
+              <Button
+                variant="outline"
+                size="sm"
+                icon={<Eye className="h-3.5 w-3.5" />}
+                onClick={() => setVerPreview((v) => !v)}
+              >
+                {verPreview ? "Ocultar" : "Ver"} cómo queda
+              </Button>
+              {verPreview && (
+                <div
+                  className="mt-2 max-h-72 overflow-y-auto rounded-[var(--radius)] border border-[var(--color-border)] bg-white p-3"
+                  // Es HTML que genera la propia app a partir de datos propios,
+                  // no entra nada de afuera.
+                  dangerouslySetInnerHTML={{ __html: ejemplo }}
+                />
+              )}
+            </div>
+          )}
 
           <label className="flex items-center justify-between gap-3 cursor-pointer">
             <span className="text-xs text-[var(--color-fg)]">

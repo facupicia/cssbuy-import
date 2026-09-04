@@ -1,5 +1,6 @@
 import { InventoryItem } from "./types";
 import { calcInventoryItem } from "./inventory";
+import { generarDescripcionHTML } from "./descripcion";
 
 /**
  * Exportación al CSV de carga masiva de Tiendanube.
@@ -65,6 +66,11 @@ export interface TiendanubeOptions {
   redondearA?: number;
   /** Incluir el costo unitario en la columna Costo. */
   incluirCosto?: boolean;
+  /**
+   * Escribir la descripción como HTML (ficha + tabla de talles de la marca).
+   * Si se apaga, va el texto de las notas tal cual.
+   */
+  descripcionHTML?: boolean;
 }
 
 /**
@@ -168,6 +174,7 @@ export function buildTiendanubeCSV(
     mostrarEnTienda = false,
     redondearA = 0,
     incluirCosto = true,
+    descripcionHTML = true,
   } = opts;
 
   const omitidos: { nombre: string; motivo: string }[] = [];
@@ -217,7 +224,13 @@ export function buildTiendanubeCSV(
       "Código de barras": "",
       "Mostrar en tienda": mostrarEnTienda ? "SI" : "NO",
       "Envío sin cargo": "NO",
-      Descripción: it.notas ?? "",
+      Descripción: descripcionHTML
+        ? generarDescripcionHTML(it, {
+            marca: it.marcaId ? nombreDeMarca[it.marcaId] : null,
+            // Las notas del ítem funcionan como el párrafo de venta.
+            pitch: it.notas || undefined,
+          })
+        : it.notas ?? "",
       Tags: "",
       "Título para SEO": "",
       "Descripción para SEO": "",
