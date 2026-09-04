@@ -1,5 +1,5 @@
 import { Pool } from "pg";
-import type { InventoryItem } from "./types";
+import type { InventoryItem, Marca } from "./types";
 import { isBulkPriceOp, type InventoryInput, type BulkPriceOp } from "./inventory";
 
 let pool: Pool | null = null;
@@ -305,6 +305,7 @@ export async function ensureInventoryTable(): Promise<void> {
           notas TEXT,
           origen TEXT NOT NULL DEFAULT 'manual',
           origen_ref TEXT,
+          marca_id UUID,
           created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
           updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
         )
@@ -338,6 +339,7 @@ interface InventoryRow {
   notas: string | null;
   origen: string;
   origen_ref: string | null;
+  marca_id: string | null;
   created_at: Date;
   updated_at: Date;
 }
@@ -360,6 +362,7 @@ function mapInventoryRow(r: InventoryRow): InventoryItem {
     notas: r.notas,
     origen: (r.origen as InventoryItem["origen"]) || "manual",
     origenRef: r.origen_ref,
+    marcaId: r.marca_id,
     createdAt: new Date(r.created_at).toISOString(),
     updatedAt: new Date(r.updated_at).toISOString(),
   };
@@ -367,10 +370,10 @@ function mapInventoryRow(r: InventoryRow): InventoryItem {
 
 const INVENTORY_COLS = `id, nombre, sku, variante, imagen, link, cantidad_inicial,
   cantidad_vendida, costo_unit_usd, costo_unit_ars, precio_venta_ars, estado,
-  ubicacion, notas, origen, origen_ref, created_at, updated_at`;
+  ubicacion, notas, origen, origen_ref, marca_id, created_at, updated_at`;
 
 export async function getInventoryItems(): Promise<InventoryItem[]> {
-  await ensureInventoryTable();
+  await ensureSchema();
   const res = await getPool().query(
     `SELECT ${INVENTORY_COLS} FROM inventory_items ORDER BY created_at DESC`
   );
@@ -378,7 +381,7 @@ export async function getInventoryItems(): Promise<InventoryItem[]> {
 }
 
 export async function getInventoryItem(id: string): Promise<InventoryItem | null> {
-  await ensureInventoryTable();
+  await ensureSchema();
   const res = await getPool().query(
     `SELECT ${INVENTORY_COLS} FROM inventory_items WHERE id = $1`,
     [id]
@@ -403,10 +406,11 @@ const FIELD_TO_COL: Record<string, string> = {
   notas: "notas",
   origen: "origen",
   origenRef: "origen_ref",
+  marcaId: "marca_id",
 };
 
 export async function insertInventoryItem(input: InventoryInput): Promise<InventoryItem> {
-  await ensureInventoryTable();
+  await ensureSchema();
   const cols: string[] = [];
   const placeholders: string[] = [];
   const values: unknown[] = [];
@@ -436,7 +440,7 @@ export async function updateInventoryItem(
   id: string,
   input: InventoryInput
 ): Promise<InventoryItem | null> {
-  await ensureInventoryTable();
+  await ensureSchema();
   const sets: string[] = [];
   const values: unknown[] = [];
 
@@ -463,14 +467,14 @@ export async function updateInventoryItem(
 
 /** Devuelve false si el id no existía. */
 export async function deleteInventoryItem(id: string): Promise<boolean> {
-  await ensureInventoryTable();
+  await ensureSchema();
   const res = await getPool().query(`DELETE FROM inventory_items WHERE id = $1`, [id]);
   return (res.rowCount ?? 0) > 0;
 }
 
 /** oids de CSSBuy ya presentes en el inventario, para no importarlos dos veces. */
 export async function getInventoryOrigenRefs(origen: string): Promise<string[]> {
-  await ensureInventoryTable();
+  await ensureSchema();
   const res = await getPool().query(
     `SELECT DISTINCT origen_ref FROM inventory_items WHERE origen = $1 AND origen_ref IS NOT NULL`,
     [origen]
@@ -490,7 +494,7 @@ export async function bulkUpdateInventory(
   patch: InventoryInput,
   precio?: BulkPriceOp
 ): Promise<InventoryItem[]> {
-  await ensureInventoryTable();
+  await ensureSchema();
   if (ids.length === 0) return [];
 
   const sets: string[] = [];
@@ -532,7 +536,7 @@ export async function bulkUpdateInventory(
 
 /** Borrado masivo. Devuelve cuántas filas se borraron. */
 export async function bulkDeleteInventory(ids: string[]): Promise<number> {
-  await ensureInventoryTable();
+  await ensureSchema();
   if (ids.length === 0) return 0;
   const res = await getPool().query(
     `DELETE FROM inventory_items WHERE id = ANY($1::uuid[])`,
@@ -551,7 +555,7 @@ export async function bulkDeleteInventory(ids: string[]): Promise<number> {
 export async function applyInventoryPrices(
   cambios: { id: string; precioVentaARS: number; costoUnitARS: number; costoUnitUSD: number }[]
 ): Promise<number> {
-  await ensureInventoryTable();
+  await ensureSchema();
   if (cambios.length === 0) return 0;
 
   const values: unknown[] = [];
@@ -572,4 +576,147 @@ export async function applyInventoryPrices(
     values
   );
   return res.rowCount ?? 0;
+}
+
+/* ── Marcas ──────────────────────────────────────────────────────────── */
+
+let marcasTablePromise: Promise<void> | null = null;
+
+export async function ensureMarcasTable(): Promise<void> {
+  // El ALTER y la FK apuntan a inventory_items: tiene que existir primero.
+  await ensureInventoryTable();
+  if (!marcasTablePromise) {
+    marcasTablePromise = getPool()
+      .query(`
+        CREATE TABLE IF NOT EXISTS marcas (
+          id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+          nombre TEXT NOT NULL,
+          activa BOOLEAN NOT NULL DEFAULT true,
+          created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+        )
+      `)
+      .then(() =>
+        // Case-insensitive: evita que convivan "Amiri" y "amiri" como marcas
+        // distintas, que es justo lo que rompe un filtro por marca.
+        getPool().query(
+          `CREATE UNIQUE INDEX IF NOT EXISTS marcas_nombre_lower_idx ON marcas (lower(nombre))`
+        )
+      )
+      .then(() =>
+        // inventory_items ya existe en las bases viejas sin esta columna, y el
+        // CREATE TABLE IF NOT EXISTS no agrega columnas: hay que sumarla acá.
+        getPool().query(
+          `ALTER TABLE inventory_items ADD COLUMN IF NOT EXISTS marca_id UUID`
+        )
+      )
+      .then(() =>
+        // La FK se agrega aparte porque inventory_items ya existía sin ella.
+        // ON DELETE SET NULL: borrar una marca desasigna, nunca borra productos.
+        getPool().query(`
+          DO $$
+          BEGIN
+            IF NOT EXISTS (
+              SELECT 1 FROM information_schema.table_constraints
+              WHERE constraint_name = 'inventory_items_marca_id_fkey'
+            ) THEN
+              ALTER TABLE inventory_items
+                ADD CONSTRAINT inventory_items_marca_id_fkey
+                FOREIGN KEY (marca_id) REFERENCES marcas(id) ON DELETE SET NULL;
+            END IF;
+          END $$;
+        `)
+      )
+      .then(() => undefined)
+      .catch((err: unknown) => {
+        const code = (err as { code?: string })?.code;
+        if (code === "23505" || code === "42P07" || code === "42710") return;
+        marcasTablePromise = null;
+        throw err;
+      });
+  }
+  return marcasTablePromise;
+}
+
+function mapMarca(r: { id: string; nombre: string; activa: boolean; created_at: Date }): Marca {
+  return {
+    id: r.id,
+    nombre: r.nombre,
+    activa: r.activa,
+    createdAt: new Date(r.created_at).toISOString(),
+  };
+}
+
+export async function getMarcas(): Promise<Marca[]> {
+  await ensureMarcasTable();
+  const res = await getPool().query(
+    `SELECT id, nombre, activa, created_at FROM marcas ORDER BY lower(nombre)`
+  );
+  return res.rows.map(mapMarca);
+}
+
+/** Alta idempotente: si la marca ya existe (sin distinguir mayúsculas) la devuelve. */
+export async function insertMarca(nombre: string): Promise<Marca> {
+  await ensureMarcasTable();
+  const limpio = nombre.trim();
+  const res = await getPool().query(
+    `INSERT INTO marcas (nombre) VALUES ($1)
+     ON CONFLICT (lower(nombre)) DO UPDATE SET nombre = marcas.nombre
+     RETURNING id, nombre, activa, created_at`,
+    [limpio]
+  );
+  return mapMarca(res.rows[0]);
+}
+
+export async function updateMarca(
+  id: string,
+  campos: { nombre?: string; activa?: boolean }
+): Promise<Marca | null> {
+  await ensureMarcasTable();
+  const sets: string[] = [];
+  const values: unknown[] = [];
+  if (typeof campos.nombre === "string" && campos.nombre.trim()) {
+    sets.push(`nombre = $${values.length + 1}`);
+    values.push(campos.nombre.trim());
+  }
+  if (typeof campos.activa === "boolean") {
+    sets.push(`activa = $${values.length + 1}`);
+    values.push(campos.activa);
+  }
+  if (sets.length === 0) return null;
+  values.push(id);
+  const res = await getPool().query(
+    `UPDATE marcas SET ${sets.join(", ")} WHERE id = $${values.length}
+     RETURNING id, nombre, activa, created_at`,
+    values
+  );
+  return res.rows[0] ? mapMarca(res.rows[0]) : null;
+}
+
+/** Borra la marca. Los productos que la tenían quedan sin marca, no se borran. */
+export async function deleteMarca(id: string): Promise<boolean> {
+  await ensureMarcasTable();
+  const res = await getPool().query(`DELETE FROM marcas WHERE id = $1`, [id]);
+  return (res.rowCount ?? 0) > 0;
+}
+
+/** Cuántos ítems de inventario tiene asignada cada marca. */
+export async function contarItemsPorMarca(): Promise<Record<string, number>> {
+  await ensureMarcasTable();
+  const res = await getPool().query(
+    `SELECT marca_id, count(*)::int AS n FROM inventory_items
+     WHERE marca_id IS NOT NULL GROUP BY marca_id`
+  );
+  const out: Record<string, number> = {};
+  for (const r of res.rows) out[r.marca_id] = r.n;
+  return out;
+}
+
+/**
+ * Garantiza todo el esquema del inventario en el orden correcto: primero la
+ * tabla de ítems, después marcas con su columna y su FK. Todas las lecturas y
+ * escrituras del inventario pasan por acá, porque INVENTORY_COLS ya nombra
+ * marca_id y en una base vieja esa columna todavía no existe.
+ */
+export async function ensureSchema(): Promise<void> {
+  await ensureMarcasTable();
 }

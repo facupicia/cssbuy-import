@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from "react";
 import { Layers, Check } from "lucide-react";
-import { InventoryItem, InventoryEstado } from "@/lib/types";
+import { InventoryItem, InventoryEstado, Marca } from "@/lib/types";
 import { calcInventoryItem, ESTADO_LABEL, type BulkPriceOp } from "@/lib/inventory";
 import { fmtARS } from "@/lib/utils";
 import { Button } from "@/components/ui/Button";
@@ -19,7 +19,7 @@ import {
 type ModoPrecio = "sin_cambio" | "porcentaje" | "markup" | "fijo";
 
 export interface BulkChanges {
-  patch: Partial<Pick<InventoryItem, "estado" | "ubicacion">>;
+  patch: Partial<Pick<InventoryItem, "estado" | "ubicacion" | "marcaId">>;
   precio?: BulkPriceOp;
 }
 
@@ -27,6 +27,7 @@ export function BulkEditDialog({
   open,
   onOpenChange,
   items,
+  marcas,
   saving,
   onApply,
 }: {
@@ -34,12 +35,14 @@ export function BulkEditDialog({
   onOpenChange: (v: boolean) => void;
   /** Ítems seleccionados, para poder previsualizar el efecto. */
   items: InventoryItem[];
+  marcas: Marca[];
   saving: boolean;
   onApply: (cambios: BulkChanges) => void;
 }) {
   const [estado, setEstado] = useState<InventoryEstado | "sin_cambio">("sin_cambio");
   const [ubicacion, setUbicacion] = useState("");
   const [cambiarUbicacion, setCambiarUbicacion] = useState(false);
+  const [marcaId, setMarcaId] = useState<string>("sin_cambio");
   const [modoPrecio, setModoPrecio] = useState<ModoPrecio>("sin_cambio");
   const [valorPrecio, setValorPrecio] = useState<number>(0);
 
@@ -64,12 +67,16 @@ export function BulkEditDialog({
   }, [items, modoPrecio, valorPrecio]);
 
   const hayCambios =
-    estado !== "sin_cambio" || cambiarUbicacion || (modoPrecio !== "sin_cambio" && valorPrecio !== 0);
+    estado !== "sin_cambio" ||
+    marcaId !== "sin_cambio" ||
+    cambiarUbicacion ||
+    (modoPrecio !== "sin_cambio" && valorPrecio !== 0);
 
   function aplicar() {
     const patch: BulkChanges["patch"] = {};
     if (estado !== "sin_cambio") patch.estado = estado;
     if (cambiarUbicacion) patch.ubicacion = ubicacion.trim() || null;
+    if (marcaId !== "sin_cambio") patch.marcaId = marcaId === "ninguna" ? null : marcaId;
 
     const precio: BulkPriceOp | undefined =
       modoPrecio === "sin_cambio" ? undefined : { modo: modoPrecio, valor: valorPrecio };
@@ -108,6 +115,28 @@ export function BulkEditDialog({
               ]}
             />
           </div>
+
+          {/* Marca */}
+          {marcas.length > 0 && (
+            <label className="block">
+              <span className="block text-xs font-medium text-[var(--color-fg-muted)] tracking-wide uppercase mb-1.5">
+                Marca
+              </span>
+              <select
+                value={marcaId}
+                onChange={(e) => setMarcaId(e.target.value)}
+                className="w-full h-9 px-2 text-sm bg-[var(--color-bg-elevated)] border border-[var(--color-border)] rounded-[var(--radius)] text-[var(--color-fg)] cursor-pointer focus:outline-none focus:border-[var(--color-accent)]"
+              >
+                <option value="sin_cambio">Sin cambio</option>
+                <option value="ninguna">Quitar la marca</option>
+                {marcas.map((m) => (
+                  <option key={m.id} value={m.id}>
+                    {m.nombre}
+                  </option>
+                ))}
+              </select>
+            </label>
+          )}
 
           {/* Ubicación */}
           <div className="space-y-1.5">

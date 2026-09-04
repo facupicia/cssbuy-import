@@ -106,6 +106,7 @@ export function sanitizeInventoryInput(body: Record<string, unknown>): Inventory
     out.origen = body.origen as InventoryInput["origen"];
   }
   if ("origenRef" in body) out.origenRef = str(body.origenRef);
+  if ("marcaId" in body) out.marcaId = str(body.marcaId);
   return out;
 }
 

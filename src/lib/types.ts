@@ -178,6 +178,14 @@ export interface RecordSummary {
 
 /* ── Inventario ──────────────────────────────────────────────────────── */
 
+export interface Marca {
+  id: string;
+  nombre: string;
+  /** Las marcas inactivas no se ofrecen al asignar, pero no se pierden. */
+  activa: boolean;
+  createdAt: string;
+}
+
 export type InventoryEstado = "en_transito" | "en_deposito" | "agotado";
 export type InventoryOrigen = "manual" | "cssbuy" | "cotizacion";
 
@@ -201,6 +209,8 @@ export interface InventoryItem {
   estado: InventoryEstado;
   ubicacion?: string | null;
   notas?: string | null;
+  /** Marca asignada a mano. null = sin marca. */
+  marcaId?: string | null;
   origen: InventoryOrigen;
   /** oid de la orden CSSBuy o id de la cotización que originó el ítem. */
   origenRef?: string | null;

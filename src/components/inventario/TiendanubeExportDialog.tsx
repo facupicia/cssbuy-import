@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from "react";
 import { Download, Store, AlertTriangle } from "lucide-react";
-import { InventoryItem } from "@/lib/types";
+import { InventoryItem, Marca } from "@/lib/types";
 import { buildTiendanubeCSV, TIENDANUBE_COLUMNS } from "@/lib/tiendanube";
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
@@ -21,10 +21,12 @@ export function TiendanubeExportDialog({
   open,
   onOpenChange,
   items,
+  marcas,
 }: {
   open: boolean;
   onOpenChange: (v: boolean) => void;
   items: InventoryItem[];
+  marcas: Marca[];
 }) {
   const [categoria, setCategoria] = useState("");
   const [marca, setMarca] = useState("");
@@ -32,17 +34,25 @@ export function TiendanubeExportDialog({
   const [redondearA, setRedondearA] = useState(0);
   const [incluirCosto, setIncluirCosto] = useState(true);
 
+  const nombreDeMarca = useMemo(
+    () => Object.fromEntries(marcas.map((m) => [m.id, m.nombre])),
+    [marcas]
+  );
+
   const resultado = useMemo(
     () =>
       buildTiendanubeCSV(items, {
         categoria,
         marca,
+        nombreDeMarca,
         mostrarEnTienda,
         redondearA,
         incluirCosto,
       }),
-    [items, categoria, marca, mostrarEnTienda, redondearA, incluirCosto]
+    [items, categoria, marca, nombreDeMarca, mostrarEnTienda, redondearA, incluirCosto]
   );
+
+  const conMarcaPropia = items.filter((i) => i.marcaId && nombreDeMarca[i.marcaId]).length;
 
   function descargar() {
     if (resultado.filas === 0) {
@@ -94,10 +104,15 @@ export function TiendanubeExportDialog({
               hint="Se aplica a todos. Subcategorías con >"
             />
             <Input
-              label="Marca"
+              label="Marca por defecto"
               placeholder="Opcional"
               value={marca}
               onChange={(e) => setMarca(e.target.value)}
+              hint={
+                conMarcaPropia > 0
+                  ? `${conMarcaPropia} ya tienen la suya y no se pisan`
+                  : "Se aplica a todos los que no tengan marca"
+              }
             />
           </div>
 

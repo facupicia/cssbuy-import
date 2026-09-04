@@ -52,8 +52,10 @@ export const TIENDANUBE_COLUMNS = [
 export interface TiendanubeOptions {
   /** Categoría a asignar a todos los productos ("Ropa > Camperas"). */
   categoria?: string;
-  /** Marca a asignar a todos. */
+  /** Marca de respaldo, para los productos que no tengan una asignada. */
   marca?: string;
+  /** id de marca -> nombre, para escribir la marca real de cada producto. */
+  nombreDeMarca?: Record<string, string>;
   /**
    * Publicar de una. Por defecto NO, porque las fotos se cargan después y
    * conviene que el producto no aparezca vacío en la tienda.
@@ -162,6 +164,7 @@ export function buildTiendanubeCSV(
   const {
     categoria = "",
     marca = "",
+    nombreDeMarca = {},
     mostrarEnTienda = false,
     redondearA = 0,
     incluirCosto = true,
@@ -218,7 +221,8 @@ export function buildTiendanubeCSV(
       Tags: "",
       "Título para SEO": "",
       "Descripción para SEO": "",
-      Marca: marca,
+      // La marca del producto manda; el campo del diálogo es el respaldo.
+      Marca: (it.marcaId && nombreDeMarca[it.marcaId]) || marca,
       "Producto físico": "SI",
       MPN: "",
       Sexo: "",

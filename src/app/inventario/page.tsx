@@ -25,12 +25,14 @@ import {
   Store,
   X,
   FileText,
+  Tag,
 } from "lucide-react";
 import {
   InventoryItem,
   InventoryEstado,
   InventoryOrigen,
   CssbuyOrder,
+  Marca,
 } from "@/lib/types";
 import {
   calcInventoryItem,
@@ -64,6 +66,7 @@ import { InventoryCharts } from "@/components/InventoryCharts";
 import { TiendanubeExportDialog } from "@/components/inventario/TiendanubeExportDialog";
 import { BulkEditDialog, type BulkChanges } from "@/components/inventario/BulkEditDialog";
 import { SyncCotizacionDialog } from "@/components/inventario/SyncCotizacionDialog";
+import { MarcasDialog } from "@/components/inventario/MarcasDialog";
 
 /* ── Formulario de ítem ──────────────────────────────────────────────── */
 
@@ -81,6 +84,8 @@ interface FormState {
   estado: InventoryEstado;
   ubicacion: string;
   notas: string;
+  /** "" = sin marca. */
+  marcaId: string;
 }
 
 const EMPTY_FORM: FormState = {
@@ -97,6 +102,7 @@ const EMPTY_FORM: FormState = {
   estado: "en_deposito",
   ubicacion: "",
   notas: "",
+  marcaId: "",
 };
 
 function itemToForm(it: InventoryItem): FormState {
@@ -114,6 +120,7 @@ function itemToForm(it: InventoryItem): FormState {
     estado: it.estado ?? "en_deposito",
     ubicacion: it.ubicacion ?? "",
     notas: it.notas ?? "",
+    marcaId: it.marcaId ?? "",
   };
 }
 
@@ -161,13 +168,21 @@ export default function InventarioPage() {
   const [orden, setOrden] = useState<OrdenInventario>("reciente");
   const [syncCotOpen, setSyncCotOpen] = useState(false);
   const [talleFilter, setTalleFilter] = useState<string | "todos">("todos");
+  const [marcas, setMarcas] = useState<Marca[]>([]);
+  const [marcaFilter, setMarcaFilter] = useState<string | "todas">("todas");
+  const [marcasOpen, setMarcasOpen] = useState(false);
 
   const load = useCallback(async () => {
     setLoading(true);
     setError(null);
     try {
-      const data = await fetcher<{ items: InventoryItem[] }>("/api/inventario");
+      const [data, dm] = await Promise.all([
+        fetcher<{ items: InventoryItem[] }>("/api/inventario"),
+        // Las marcas son secundarias: si fallan, el inventario igual se muestra.
+        fetcher<{ marcas: Marca[] }>("/api/marcas").catch(() => ({ marcas: [] as Marca[] })),
+      ]);
       setItems(data.items || []);
+      setMarcas(dm.marcas || []);
     } catch (err: any) {
       setError(err?.info?.error || err?.message || "No se pudo cargar el inventario");
       setItems([]);
@@ -187,6 +202,13 @@ export default function InventarioPage() {
     return items
       .filter((it) => (estadoFilter === "todos" ? true : it.estado === estadoFilter))
       .filter((it) => (talleFilter === "todos" ? true : parseTalle(it.variante) === talleFilter))
+      .filter((it) =>
+        marcaFilter === "todas"
+          ? true
+          : marcaFilter === "sin_marca"
+            ? !it.marcaId
+            : it.marcaId === marcaFilter
+      )
       .filter((it) => {
         if (!q) return true;
         return (
@@ -213,7 +235,25 @@ export default function InventarioPage() {
             return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
         }
       });
-  }, [items, search, estadoFilter, talleFilter, orden]);
+  }, [items, search, estadoFilter, talleFilter, marcaFilter, orden]);
+
+  const nombreMarca = useMemo(
+    () => Object.fromEntries(marcas.map((m) => [m.id, m.nombre])),
+    [marcas]
+  );
+
+  // Solo se ofrecen marcas que tengan al menos un producto, más "sin marca"
+  // si hay alguno: ofrecer filtros vacíos es ruido.
+  const marcasConUso = useMemo(() => {
+    const usadas = new Set(items.map((i) => i.marcaId).filter(Boolean) as string[]);
+    return marcas.filter((m) => usadas.has(m.id));
+  }, [marcas, items]);
+  const haySinMarca = useMemo(() => items.some((i) => !i.marcaId), [items]);
+
+  useEffect(() => {
+    if (marcaFilter === "todas" || marcaFilter === "sin_marca") return;
+    if (!marcasConUso.some((m) => m.id === marcaFilter)) setMarcaFilter("todas");
+  }, [marcasConUso, marcaFilter]);
 
   // Solo se ofrecen los talles que existen en el inventario: una lista fija
   // mostraría filtros que no devuelven nada.
@@ -332,6 +372,8 @@ export default function InventarioPage() {
         estado:
           form.estado ??
           suggestEstado(form.cantidadInicial, form.cantidadVendida),
+        // La columna es UUID: "" no es un id válido, va null.
+        marcaId: form.marcaId || null,
       };
       if (editing) {
         await fetcherPatch(`/api/inventario/${editing.id}`, payload);
@@ -421,6 +463,15 @@ export default function InventarioPage() {
               onClick={() => setImportOpen(true)}
             >
               Importar de CSSBuy
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              icon={<Tag className="h-3.5 w-3.5" />}
+              onClick={() => setMarcasOpen(true)}
+              title="Cargar y asignar marcas"
+            >
+              Marcas
             </Button>
             <Button
               variant="outline"
@@ -534,6 +585,36 @@ export default function InventarioPage() {
                 { value: "agotado", label: "Agotado" },
               ]}
             />
+            {marcasConUso.length > 0 && (
+              <div className="flex items-center gap-1.5 flex-wrap shrink-0" role="group" aria-label="Filtrar por marca">
+                <span className="text-[11px] uppercase tracking-wide text-[var(--color-fg-muted)]">
+                  Marca
+                </span>
+                {[
+                  { id: "todas", label: "Todas" },
+                  ...marcasConUso.map((m) => ({ id: m.id, label: m.nombre })),
+                  ...(haySinMarca ? [{ id: "sin_marca", label: "Sin marca" }] : []),
+                ].map((op) => {
+                  const activo = marcaFilter === op.id;
+                  return (
+                    <button
+                      key={op.id}
+                      type="button"
+                      onClick={() => setMarcaFilter(op.id)}
+                      aria-pressed={activo}
+                      className={`h-8 px-2.5 rounded-[var(--radius-sm)] text-xs font-medium border transition-colors cursor-pointer ${
+                        activo
+                          ? "bg-[var(--color-accent)] text-[var(--color-accent-fg)] border-[var(--color-accent)]"
+                          : "bg-[var(--color-bg-elevated)] text-[var(--color-fg-muted)] border-[var(--color-border)] hover:text-[var(--color-fg)] hover:border-[var(--color-border-strong)]"
+                      }`}
+                    >
+                      {op.label}
+                    </button>
+                  );
+                })}
+              </div>
+            )}
+
             {talles.length > 1 && (
               <div className="flex items-center gap-1.5 shrink-0" role="group" aria-label="Filtrar por talle">
                 <span className="text-[11px] uppercase tracking-wide text-[var(--color-fg-muted)]">
@@ -751,7 +832,12 @@ export default function InventarioPage() {
                                 )}
                               </div>
                               <p className="text-[11px] text-[var(--color-fg-muted)] truncate max-w-[240px]">
-                                {[it.variante, it.sku && `SKU ${it.sku}`, ORIGEN_LABEL[it.origen]]
+                                {[
+                                  it.marcaId && nombreMarca[it.marcaId],
+                                  it.variante,
+                                  it.sku && `SKU ${it.sku}`,
+                                  ORIGEN_LABEL[it.origen],
+                                ]
                                   .filter(Boolean)
                                   .join(" · ")}
                               </p>
@@ -904,7 +990,12 @@ export default function InventarioPage() {
                           )}
                         </div>
                         <p className="text-[11px] text-[var(--color-fg-muted)] truncate">
-                          {[it.variante, it.sku && `SKU ${it.sku}`, ORIGEN_LABEL[it.origen]]
+                          {[
+                            it.marcaId && nombreMarca[it.marcaId],
+                            it.variante,
+                            it.sku && `SKU ${it.sku}`,
+                            ORIGEN_LABEL[it.origen],
+                          ]
                             .filter(Boolean)
                             .join(" · ")}
                         </p>
@@ -1028,6 +1119,7 @@ export default function InventarioPage() {
         setForm={setForm}
         editing={Boolean(editing)}
         saving={saving}
+        marcas={marcas}
         onSubmit={submitForm}
       />
 
@@ -1046,6 +1138,14 @@ export default function InventarioPage() {
         onDone={load}
       />
 
+      {/* Marcas */}
+      <MarcasDialog
+        open={marcasOpen}
+        onOpenChange={setMarcasOpen}
+        items={items}
+        onChanged={load}
+      />
+
       {/* Precios desde cotizaciones */}
       <SyncCotizacionDialog
         open={syncCotOpen}
@@ -1058,6 +1158,7 @@ export default function InventarioPage() {
         open={bulkOpen}
         onOpenChange={setBulkOpen}
         items={selectedVisibles}
+        marcas={marcas}
         saving={bulkSaving}
         onApply={aplicarBulk}
       />
@@ -1067,6 +1168,7 @@ export default function InventarioPage() {
         open={exportOpen}
         onOpenChange={setExportOpen}
         items={selectedVisibles.length > 0 ? selectedVisibles : filtered}
+        marcas={marcas}
       />
 
       {/* Confirmar borrado masivo */}
@@ -1134,6 +1236,7 @@ function ItemFormDialog({
   setForm,
   editing,
   saving,
+  marcas,
   onSubmit,
 }: {
   open: boolean;
@@ -1142,6 +1245,7 @@ function ItemFormDialog({
   setForm: Dispatch<SetStateAction<FormState>>;
   editing: boolean;
   saving: boolean;
+  marcas: Marca[];
   onSubmit: () => void;
 }) {
   const set = <K extends keyof FormState>(key: K, val: FormState[K]) =>
@@ -1250,6 +1354,29 @@ function ItemFormDialog({
               onChange={(e) => set("ubicacion", e.target.value)}
               placeholder="Estante, caja…"
             />
+            <label className="col-span-2 block space-y-1.5">
+              <span className="block text-xs font-medium text-[var(--color-fg-muted)] tracking-wide uppercase">
+                Marca
+              </span>
+              <select
+                value={form.marcaId}
+                onChange={(e) => set("marcaId", e.target.value)}
+                className="w-full h-9 px-2 text-sm bg-[var(--color-bg-elevated)] border border-[var(--color-border)] rounded-[var(--radius)] text-[var(--color-fg)] cursor-pointer focus:outline-none focus:border-[var(--color-accent)]"
+              >
+                <option value="">Sin marca</option>
+                {marcas.map((m) => (
+                  <option key={m.id} value={m.id}>
+                    {m.nombre}
+                  </option>
+                ))}
+              </select>
+              {marcas.length === 0 && (
+                <span className="block text-[11px] text-[var(--color-fg-subtle)]">
+                  Todavía no cargaste marcas. Se cargan desde el botón Marcas.
+                </span>
+              )}
+            </label>
+
             <div className="col-span-2 space-y-1.5">
               <label className="block text-xs font-medium text-[var(--color-fg-muted)] tracking-wide uppercase">
                 Estado
