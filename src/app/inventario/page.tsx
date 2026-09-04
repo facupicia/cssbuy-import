@@ -22,6 +22,8 @@ import {
   Wallet2,
   TrendingUp,
   Layers,
+  Store,
+  X,
 } from "lucide-react";
 import {
   InventoryItem,
@@ -56,6 +58,9 @@ import {
   DialogDescription,
 } from "@/components/ui/Dialog";
 import { toast } from "@/components/ui/Toast";
+import { InventoryCharts } from "@/components/InventoryCharts";
+import { TiendanubeExportDialog } from "@/components/inventario/TiendanubeExportDialog";
+import { BulkEditDialog, type BulkChanges } from "@/components/inventario/BulkEditDialog";
 
 /* ── Formulario de ítem ──────────────────────────────────────────────── */
 
@@ -121,6 +126,8 @@ const ORIGEN_LABEL: Record<InventoryOrigen, string> = {
   cotizacion: "Cotización",
 };
 
+type OrdenInventario = "reciente" | "ganancia" | "margen" | "capital" | "stock" | "nombre";
+
 /* ── Página ──────────────────────────────────────────────────────────── */
 
 export default function InventarioPage() {
@@ -141,6 +148,14 @@ export default function InventarioPage() {
   const [deleting, setDeleting] = useState(false);
 
   const [importOpen, setImportOpen] = useState(false);
+
+  // Selección múltiple para las acciones en lote
+  const [selected, setSelected] = useState<Set<string>>(new Set());
+  const [bulkOpen, setBulkOpen] = useState(false);
+  const [bulkSaving, setBulkSaving] = useState(false);
+  const [exportOpen, setExportOpen] = useState(false);
+  const [confirmBulkDelete, setConfirmBulkDelete] = useState(false);
+  const [orden, setOrden] = useState<OrdenInventario>("reciente");
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -173,8 +188,103 @@ export default function InventarioPage() {
           (it.sku || "").toLowerCase().includes(q) ||
           (it.variante || "").toLowerCase().includes(q)
         );
+      })
+      .sort((a, b) => {
+        const ca = calcInventoryItem(a);
+        const cb = calcInventoryItem(b);
+        switch (orden) {
+          case "ganancia":
+            return cb.gananciaRealizadaARS - ca.gananciaRealizadaARS;
+          case "margen":
+            return cb.margenUnitPct - ca.margenUnitPct;
+          case "capital":
+            return cb.capitalStockARS - ca.capitalStockARS;
+          case "stock":
+            return cb.stock - ca.stock;
+          case "nombre":
+            return a.nombre.localeCompare(b.nombre, "es");
+          default:
+            return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
+        }
       });
-  }, [items, search, estadoFilter]);
+  }, [items, search, estadoFilter, orden]);
+
+  // La selección solo tiene sentido sobre lo que se está viendo: si cambia el
+  // filtro, se descartan los ids que ya no están en pantalla.
+  const visibleIds = useMemo(() => new Set(filtered.map((it) => it.id)), [filtered]);
+  const selectedVisibles = useMemo(
+    () => filtered.filter((it) => selected.has(it.id)),
+    [filtered, selected]
+  );
+  const todosSeleccionados = filtered.length > 0 && selectedVisibles.length === filtered.length;
+
+  function toggleUno(id: string) {
+    setSelected((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }
+
+  function toggleTodos() {
+    setSelected((prev) => {
+      if (todosSeleccionados) {
+        const next = new Set(prev);
+        for (const id of visibleIds) next.delete(id);
+        return next;
+      }
+      return new Set([...prev, ...visibleIds]);
+    });
+  }
+
+  function limpiarSeleccion() {
+    setSelected(new Set());
+  }
+
+  async function aplicarBulk(cambios: BulkChanges) {
+    const ids = selectedVisibles.map((it) => it.id);
+    if (ids.length === 0) return;
+    setBulkSaving(true);
+    try {
+      const res = await fetcherPatch<{ items: InventoryItem[]; count: number }>(
+        "/api/inventario/bulk",
+        { ids, patch: cambios.patch, precio: cambios.precio }
+      );
+      toast.success(`${res.count} ${res.count === 1 ? "ítem actualizado" : "ítems actualizados"}`);
+      setBulkOpen(false);
+      limpiarSeleccion();
+      await load();
+    } catch (err: any) {
+      toast.error("No se pudo aplicar el cambio", {
+        description: err?.info?.error || err?.message,
+      });
+    } finally {
+      setBulkSaving(false);
+    }
+  }
+
+  async function borrarBulk() {
+    const ids = selectedVisibles.map((it) => it.id);
+    if (ids.length === 0) return;
+    setBulkSaving(true);
+    try {
+      const res = await fetcherPost<{ deleted: number }>("/api/inventario/bulk", {
+        action: "delete",
+        ids,
+      });
+      toast.success(`${res.deleted} ${res.deleted === 1 ? "ítem eliminado" : "ítems eliminados"}`);
+      setConfirmBulkDelete(false);
+      limpiarSeleccion();
+      await load();
+    } catch (err: any) {
+      toast.error("No se pudieron eliminar", {
+        description: err?.info?.error || err?.message,
+      });
+    } finally {
+      setBulkSaving(false);
+    }
+  }
 
   /* ── Acciones ─────────────────────────────────────────────────────── */
 
@@ -298,6 +408,16 @@ export default function InventarioPage() {
               Importar de CSSBuy
             </Button>
             <Button
+              variant="outline"
+              size="sm"
+              icon={<Store className="h-3.5 w-3.5" />}
+              onClick={() => setExportOpen(true)}
+              disabled={items.length === 0}
+              title="Generar el CSV de carga masiva de Tiendanube"
+            >
+              A Tiendanube
+            </Button>
+            <Button
               variant="primary"
               size="sm"
               icon={<Plus className="h-3.5 w-3.5" />}
@@ -362,6 +482,9 @@ export default function InventarioPage() {
           </div>
         )}
 
+        {/* Gráficos */}
+        {items.length > 0 && <InventoryCharts items={items} />}
+
         {/* Toolbar */}
         {items.length > 0 && (
           <div className="flex flex-col sm:flex-row sm:items-center gap-3">
@@ -385,6 +508,67 @@ export default function InventarioPage() {
                 { value: "en_transito", label: "En tránsito" },
                 { value: "agotado", label: "Agotado" },
               ]}
+            />
+            <label className="flex items-center gap-2 shrink-0">
+              <span className="text-[11px] uppercase tracking-wide text-[var(--color-fg-muted)]">
+                Ordenar
+              </span>
+              <select
+                value={orden}
+                onChange={(e) => setOrden(e.target.value as OrdenInventario)}
+                aria-label="Ordenar el inventario"
+                className="h-9 px-2 text-xs bg-[var(--color-bg-elevated)] border border-[var(--color-border)] rounded-[var(--radius)] text-[var(--color-fg)] cursor-pointer focus:outline-none focus:border-[var(--color-accent)]"
+              >
+                <option value="reciente">Más reciente</option>
+                <option value="ganancia">Ganancia realizada</option>
+                <option value="margen">Margen</option>
+                <option value="capital">Capital inmovilizado</option>
+                <option value="stock">Stock</option>
+                <option value="nombre">Nombre</option>
+              </select>
+            </label>
+          </div>
+        )}
+
+        {/* Acciones sobre la selección */}
+        {selectedVisibles.length > 0 && (
+          <div className="sticky top-16 sm:top-20 z-30 flex flex-wrap items-center gap-2 rounded-[var(--radius-lg)] border border-[var(--color-accent)]/40 bg-[var(--color-accent)]/8 backdrop-blur-md px-3 py-2.5">
+            <span className="text-xs font-semibold text-[var(--color-accent)]">
+              {selectedVisibles.length} {selectedVisibles.length === 1 ? "seleccionado" : "seleccionados"}
+            </span>
+            <div className="flex-1" />
+            <Button
+              variant="outline"
+              size="sm"
+              icon={<Pencil className="h-3.5 w-3.5" />}
+              onClick={() => setBulkOpen(true)}
+            >
+              Editar
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              icon={<Store className="h-3.5 w-3.5" />}
+              onClick={() => setExportOpen(true)}
+            >
+              A Tiendanube
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              icon={<Trash2 className="h-3.5 w-3.5" />}
+              className="text-[var(--color-danger)]"
+              onClick={() => setConfirmBulkDelete(true)}
+            >
+              Eliminar
+            </Button>
+            <Button
+              variant="ghost"
+              size="sm"
+              icon={<X className="h-4 w-4" />}
+              onClick={limpiarSeleccion}
+              title="Limpiar selección"
+              aria-label="Limpiar selección"
             />
           </div>
         )}
@@ -439,6 +623,15 @@ export default function InventarioPage() {
               <table className="w-full min-w-[900px] text-left text-xs">
                 <thead className="bg-[var(--color-bg-subtle)] border-b border-[var(--color-border)] text-[var(--color-fg-muted)] uppercase text-[11px]">
                   <tr>
+                    <th className="py-2.5 pl-3 pr-0 w-9">
+                      <input
+                        type="checkbox"
+                        checked={todosSeleccionados}
+                        onChange={toggleTodos}
+                        aria-label="Seleccionar todos los ítems visibles"
+                        className="accent-[var(--color-accent)] cursor-pointer"
+                      />
+                    </th>
                     <th className="py-2.5 px-3">Producto</th>
                     <th className="py-2.5 px-3">Estado</th>
                     <th className="py-2.5 px-3 text-right">Stock</th>
@@ -456,8 +649,21 @@ export default function InventarioPage() {
                     return (
                       <tr
                         key={it.id}
-                        className="hover:bg-[var(--color-bg-subtle)]/50 transition-colors"
+                        className={`transition-colors ${
+                          selected.has(it.id)
+                            ? "bg-[var(--color-accent)]/8"
+                            : "hover:bg-[var(--color-bg-subtle)]/50"
+                        }`}
                       >
+                        <td className="py-2.5 pl-3 pr-0">
+                          <input
+                            type="checkbox"
+                            checked={selected.has(it.id)}
+                            onChange={() => toggleUno(it.id)}
+                            aria-label={`Seleccionar ${it.nombre}`}
+                            className="accent-[var(--color-accent)] cursor-pointer"
+                          />
+                        </td>
                         <td className="py-2.5 px-3">
                           <div className="flex items-center gap-2.5 min-w-0">
                             {it.imagen ? (
@@ -594,9 +800,19 @@ export default function InventarioPage() {
               {filtered.map((it) => {
                 const c = calcInventoryItem(it);
                 return (
-                  <div key={it.id} className="p-4 space-y-3">
+                  <div
+                    key={it.id}
+                    className={`p-4 space-y-3 ${selected.has(it.id) ? "bg-[var(--color-accent)]/8" : ""}`}
+                  >
                     {/* Cabecera */}
                     <div className="flex items-start gap-3">
+                      <input
+                        type="checkbox"
+                        checked={selected.has(it.id)}
+                        onChange={() => toggleUno(it.id)}
+                        aria-label={`Seleccionar ${it.nombre}`}
+                        className="accent-[var(--color-accent)] cursor-pointer mt-1 shrink-0"
+                      />
                       {it.imagen ? (
                         // eslint-disable-next-line @next/next/no-img-element
                         <img
@@ -767,6 +983,34 @@ export default function InventarioPage() {
         onOpenChange={setImportOpen}
         existing={items}
         onDone={load}
+      />
+
+      {/* Edición masiva */}
+      <BulkEditDialog
+        open={bulkOpen}
+        onOpenChange={setBulkOpen}
+        items={selectedVisibles}
+        saving={bulkSaving}
+        onApply={aplicarBulk}
+      />
+
+      {/* Exportar a Tiendanube: lo seleccionado, o todo lo filtrado */}
+      <TiendanubeExportDialog
+        open={exportOpen}
+        onOpenChange={setExportOpen}
+        items={selectedVisibles.length > 0 ? selectedVisibles : filtered}
+      />
+
+      {/* Confirmar borrado masivo */}
+      <ConfirmDialog
+        open={confirmBulkDelete}
+        onOpenChange={setConfirmBulkDelete}
+        title={`¿Eliminar ${selectedVisibles.length} ${selectedVisibles.length === 1 ? "ítem" : "ítems"}?`}
+        description="Se borran del inventario junto con su historial de ventas. No se puede deshacer."
+        confirmText="Eliminar"
+        variant="danger"
+        loading={bulkSaving}
+        onConfirm={borrarBulk}
       />
 
       {/* Confirmar borrado */}

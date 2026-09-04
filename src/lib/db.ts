@@ -1,6 +1,6 @@
 import { Pool } from "pg";
 import type { InventoryItem } from "./types";
-import type { InventoryInput } from "./inventory";
+import { isBulkPriceOp, type InventoryInput, type BulkPriceOp } from "./inventory";
 
 let pool: Pool | null = null;
 
@@ -476,4 +476,67 @@ export async function getInventoryOrigenRefs(origen: string): Promise<string[]> 
     [origen]
   );
   return res.rows.map((r: { origen_ref: string }) => r.origen_ref);
+}
+
+/**
+ * Edición masiva. Aplica los campos fijos de `patch` y, si viene, la
+ * operación de precio, en una sola sentencia por lote.
+ *
+ * El precio se calcula en SQL porque el modo "markup" depende del costo de
+ * cada fila: traer todo a Node y volver a escribir sería N round-trips.
+ */
+export async function bulkUpdateInventory(
+  ids: string[],
+  patch: InventoryInput,
+  precio?: BulkPriceOp
+): Promise<InventoryItem[]> {
+  await ensureInventoryTable();
+  if (ids.length === 0) return [];
+
+  const sets: string[] = [];
+  const values: unknown[] = [];
+
+  for (const [field, col] of Object.entries(FIELD_TO_COL)) {
+    if (field in patch && (patch as Record<string, unknown>)[field] !== undefined) {
+      sets.push(`${col} = $${values.length + 1}`);
+      values.push((patch as Record<string, unknown>)[field]);
+    }
+  }
+
+  if (precio && isBulkPriceOp(precio)) {
+    const i = values.length + 1;
+    values.push(precio.valor);
+    if (precio.modo === "porcentaje") {
+      // GREATEST evita dejar precios negativos con un -150%
+      sets.push(`precio_venta_ars = GREATEST(0, ROUND(precio_venta_ars * (1 + $${i}::numeric / 100)))`);
+    } else if (precio.modo === "markup") {
+      sets.push(`precio_venta_ars = ROUND(costo_unit_ars * $${i}::numeric)`);
+    } else {
+      sets.push(`precio_venta_ars = GREATEST(0, $${i}::numeric)`);
+    }
+  }
+
+  if (sets.length === 0) return [];
+
+  sets.push("updated_at = now()");
+  values.push(ids);
+
+  const res = await getPool().query(
+    `UPDATE inventory_items SET ${sets.join(", ")}
+     WHERE id = ANY($${values.length}::uuid[])
+     RETURNING ${INVENTORY_COLS}`,
+    values
+  );
+  return res.rows.map(mapInventoryRow);
+}
+
+/** Borrado masivo. Devuelve cuántas filas se borraron. */
+export async function bulkDeleteInventory(ids: string[]): Promise<number> {
+  await ensureInventoryTable();
+  if (ids.length === 0) return 0;
+  const res = await getPool().query(
+    `DELETE FROM inventory_items WHERE id = ANY($1::uuid[])`,
+    [ids]
+  );
+  return res.rowCount ?? 0;
 }

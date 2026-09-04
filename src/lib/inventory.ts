@@ -108,3 +108,31 @@ export function sanitizeInventoryInput(body: Record<string, unknown>): Inventory
   if ("origenRef" in body) out.origenRef = str(body.origenRef);
   return out;
 }
+
+/**
+ * Operación de precio en lote. Se resuelve por ítem porque `markup` depende
+ * del costo de cada fila.
+ *   - porcentaje: sube o baja el precio actual un %  (ej. +10, -15)
+ *   - markup:     precio = costo unitario * factor   (ej. 2.5)
+ *   - fijo:       mismo precio para todos
+ */
+export type BulkPriceOp =
+  | { modo: "porcentaje"; valor: number }
+  | { modo: "markup"; valor: number }
+  | { modo: "fijo"; valor: number };
+
+export const BULK_PRICE_MODOS = ["porcentaje", "markup", "fijo"] as const;
+
+export function isBulkPriceOp(v: unknown): v is BulkPriceOp {
+  if (!v || typeof v !== "object") return false;
+  const o = v as { modo?: unknown; valor?: unknown };
+  return (
+    typeof o.modo === "string" &&
+    (BULK_PRICE_MODOS as readonly string[]).includes(o.modo) &&
+    typeof o.valor === "number" &&
+    Number.isFinite(o.valor)
+  );
+}
+
+/** Umbral por defecto para avisar que a un ítem le queda poco stock. */
+export const STOCK_BAJO_DEFAULT = 2;
