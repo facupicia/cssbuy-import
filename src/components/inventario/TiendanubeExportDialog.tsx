@@ -1,9 +1,11 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Download, Store, AlertTriangle, Eye } from "lucide-react";
 import { InventoryItem, Marca } from "@/lib/types";
-import { buildTiendanubeCSV, TIENDANUBE_COLUMNS } from "@/lib/tiendanube";
+import { buildTiendanubeCSV, precioPublicado, TIENDANUBE_COLUMNS } from "@/lib/tiendanube";
+import { calcInventoryItem } from "@/lib/inventory";
+import { fmtARS } from "@/lib/utils";
 import { generarDescripcionHTML } from "@/lib/descripcion";
 import { tablaDeMarca } from "@/lib/tablas-talle";
 import { Button } from "@/components/ui/Button";
@@ -18,6 +20,9 @@ import {
   DialogDescription,
 } from "@/components/ui/Dialog";
 import { toast } from "@/components/ui/Toast";
+
+// El descuento de la tienda cambia poco: se recuerda entre exportaciones.
+const CLAVE_DESCUENTO = "tiendanube-descuento-efectivo";
 
 export function TiendanubeExportDialog({
   open,
@@ -37,6 +42,25 @@ export function TiendanubeExportDialog({
   const [incluirCosto, setIncluirCosto] = useState(true);
   const [descripcionHTML, setDescripcionHTML] = useState(true);
   const [verPreview, setVerPreview] = useState(false);
+  const [descuentoEfectivo, setDescuentoEfectivo] = useState(10);
+
+  useEffect(() => {
+    try {
+      const guardado = localStorage.getItem(CLAVE_DESCUENTO);
+      if (guardado !== null) setDescuentoEfectivo(Number(guardado) || 0);
+    } catch {
+      // Sin storage (modo privado): queda el valor por defecto.
+    }
+  }, []);
+
+  function cambiarDescuento(pct: number) {
+    setDescuentoEfectivo(pct);
+    try {
+      localStorage.setItem(CLAVE_DESCUENTO, String(pct));
+    } catch {
+      // idem
+    }
+  }
 
   const nombreDeMarca = useMemo(
     () => Object.fromEntries(marcas.map((m) => [m.id, m.nombre])),
@@ -53,9 +77,34 @@ export function TiendanubeExportDialog({
         redondearA,
         incluirCosto,
         descripcionHTML,
+        descuentoEfectivoPct: descuentoEfectivo,
       }),
-    [items, categoria, marca, nombreDeMarca, mostrarEnTienda, redondearA, incluirCosto, descripcionHTML]
+    [
+      items,
+      categoria,
+      marca,
+      nombreDeMarca,
+      mostrarEnTienda,
+      redondearA,
+      incluirCosto,
+      descripcionHTML,
+      descuentoEfectivo,
+    ]
   );
+
+  // Un producto real para mostrar la cuenta del descuento.
+  const ejemploPrecio = useMemo(() => {
+    const it = items.find((i) => calcInventoryItem(i).precioVentaARS > 0);
+    if (!it) return null;
+    const precio = calcInventoryItem(it).precioVentaARS;
+    const publicado = precioPublicado(precio, redondearA, descuentoEfectivo);
+    return {
+      nombre: it.nombre,
+      precio,
+      publicado,
+      efectivo: publicado * (1 - descuentoEfectivo / 100),
+    };
+  }, [items, redondearA, descuentoEfectivo]);
 
   // Cuántos productos van a llevar tabla de talles de verdad
   const conTabla = items.filter(
@@ -148,6 +197,40 @@ export function TiendanubeExportDialog({
                 { value: "1000", label: "$1.000" },
               ]}
             />
+          </div>
+
+          <div>
+            <span className="block text-xs font-medium text-[var(--color-fg-muted)] tracking-wide uppercase mb-1.5">
+              Descuento por efectivo
+            </span>
+            <Segmented
+              size="sm"
+              value={String(descuentoEfectivo)}
+              onChange={(v) => cambiarDescuento(Number(v))}
+              options={[
+                { value: "0", label: "Sin descuento" },
+                { value: "5", label: "5%" },
+                { value: "10", label: "10%" },
+                { value: "15", label: "15%" },
+                { value: "20", label: "20%" },
+              ]}
+            />
+            <p className="mt-1.5 text-[11px] text-[var(--color-fg-muted)]">
+              {descuentoEfectivo > 0
+                ? `El precio se publica más alto para que, con el ${descuentoEfectivo}% de descuento que hace la tienda, en efectivo quede tu precio de venta.`
+                : "Se publica el precio de venta tal cual."}
+            </p>
+            {descuentoEfectivo > 0 && ejemploPrecio && (
+              <p className="mt-1 text-[11px] text-[var(--color-fg-subtle)]">
+                Ej.: {ejemploPrecio.nombre.slice(0, 32)} · tu precio{" "}
+                <span className="font-mono tnum">{fmtARS(ejemploPrecio.precio)}</span> → se publica{" "}
+                <span className="font-mono tnum font-semibold text-[var(--color-fg)]">
+                  {fmtARS(ejemploPrecio.publicado)}
+                </span>{" "}
+                · en efectivo{" "}
+                <span className="font-mono tnum">{fmtARS(ejemploPrecio.efectivo)}</span>
+              </p>
+            )}
           </div>
 
           <label className="flex items-start justify-between gap-3 p-3 rounded-[var(--radius)] bg-[var(--color-bg-subtle)] cursor-pointer">

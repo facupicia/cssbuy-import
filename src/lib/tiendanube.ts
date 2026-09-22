@@ -21,11 +21,11 @@ export const TIENDANUBE_COLUMNS = [
   "Identificador de URL",
   "Nombre",
   "Categorías",
-  "Nombre de la propiedad 1",
+  "Nombre de propiedad 1",
   "Valor de propiedad 1",
-  "Nombre de la propiedad 2",
+  "Nombre de propiedad 2",
   "Valor de propiedad 2",
-  "Nombre de la propiedad 3",
+  "Nombre de propiedad 3",
   "Valor de propiedad 3",
   "Precio",
   "Precio promocional",
@@ -72,6 +72,12 @@ export interface TiendanubeOptions {
    * Si se apaga, va el texto de las notas tal cual.
    */
   descripcionHTML?: boolean;
+  /**
+   * Descuento (%) que la tienda hace al pagar en efectivo o transferencia.
+   * El precio publicado se sube para que, con el descuento, el cliente pague
+   * justo el precio de venta del inventario: $45.000 al 10% se publica a $50.000.
+   */
+  descuentoEfectivoPct?: number;
 }
 
 /**
@@ -159,9 +165,22 @@ function propiedadesSinTalle(variante?: string | null): Propiedad[] {
   return props.filter((p) => p.nombre !== "Talle").slice(0, 2);
 }
 
-function redondear(n: number, a: number): number {
-  if (!a || a <= 0) return Math.round(n);
-  return Math.round(n / a) * a;
+function redondear(n: number, a: number, haciaArriba = false): number {
+  // El margen evita que un 50000.0000001 de coma flotante suba a 50001.
+  const f = haciaArriba ? (x: number) => Math.ceil(x - 1e-6) : Math.round;
+  if (!a || a <= 0) return f(n);
+  return f(n / a) * a;
+}
+
+/**
+ * Precio a publicar. Con descuento por efectivo se divide por (1 - %) y se
+ * redondea hacia arriba: redondeando al más cercano, el que paga en efectivo
+ * podría terminar pagando menos que el precio que querés cobrar.
+ */
+export function precioPublicado(precioVenta: number, redondearA = 0, descuentoPct = 0): number {
+  const pct = Math.min(Math.max(Number(descuentoPct) || 0, 0), 90);
+  if (pct === 0) return redondear(precioVenta, redondearA);
+  return redondear((precioVenta * 100) / (100 - pct), redondearA, true);
 }
 
 /** Escapa un campo para CSV: comillas dobles y separadores. */
@@ -188,6 +207,7 @@ export function buildTiendanubeCSV(
     nombreDeMarca = {},
     mostrarEnTienda = false,
     redondearA = 0,
+    descuentoEfectivoPct = 0,
     incluirCosto = true,
     descripcionHTML = true,
   } = opts;
@@ -216,17 +236,17 @@ export function buildTiendanubeCSV(
     const identificador = vistas === 0 ? base : `${base}-${vistas + 1}`;
 
     const props = parseVariante(it.variante);
-    const precio = redondear(c.precioVentaARS, redondearA);
+    const precio = precioPublicado(c.precioVentaARS, redondearA, descuentoEfectivoPct);
 
     const filaBase: Record<string, string | number> = {
       "Identificador de URL": identificador,
       Nombre: nombre,
       Categorías: categoria,
-      "Nombre de la propiedad 1": props[0]?.nombre ?? "",
+      "Nombre de propiedad 1": props[0]?.nombre ?? "",
       "Valor de propiedad 1": props[0]?.valor ?? "",
-      "Nombre de la propiedad 2": props[1]?.nombre ?? "",
+      "Nombre de propiedad 2": props[1]?.nombre ?? "",
       "Valor de propiedad 2": props[1]?.valor ?? "",
-      "Nombre de la propiedad 3": props[2]?.nombre ?? "",
+      "Nombre de propiedad 3": props[2]?.nombre ?? "",
       "Valor de propiedad 3": props[2]?.valor ?? "",
       Precio: precio > 0 ? precio : "",
       "Precio promocional": "",
@@ -272,7 +292,7 @@ export function buildTiendanubeCSV(
           SKU: t.sku || (it.sku ? `${it.sku}-${t.talle}` : ""),
         };
         for (let i = 0; i < 3; i++) {
-          filaVar[`Nombre de la propiedad ${i + 1}`] = propsTalle[i]?.nombre ?? "";
+          filaVar[`Nombre de propiedad ${i + 1}`] = propsTalle[i]?.nombre ?? "";
           filaVar[`Valor de propiedad ${i + 1}`] = propsTalle[i]?.valor ?? "";
         }
         filas.push(TIENDANUBE_COLUMNS.map((col) => csvCell(filaVar[col])).join(","));
