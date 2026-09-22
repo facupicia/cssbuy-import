@@ -72,9 +72,25 @@ export function generarSku(
   item: Pick<InventoryItem, "nombre" | "variante" | "marcaId">,
   opts: SkuOptions = {}
 ): string {
-  const usados = opts.usados ?? new Set<string>();
-  const base = baseSku(item, opts);
+  return siguienteLibre(baseSku(item, opts), opts.usados ?? new Set<string>());
+}
 
+/**
+ * SKU de un talle puntual de un ítem con varios talles: "AMI-XL-001".
+ * El talle viene aparte y no de la variante, que en esos ítems solo lleva el color.
+ */
+export function generarSkuParaTalle(
+  item: Pick<InventoryItem, "nombre" | "marcaId">,
+  talle: string,
+  opts: SkuOptions = {}
+): string {
+  const prefijo = baseSku({ ...item, variante: null }, opts);
+  const t = limpiar(talle).replace(/\s+/g, "");
+  return siguienteLibre(t ? `${prefijo}-${t}` : prefijo, opts.usados ?? new Set<string>());
+}
+
+/** Primer "BASE-NNN" que no esté en `usados`; lo agrega al set. */
+function siguienteLibre(base: string, usados: Set<string>): string {
   for (let n = 1; n < 1000; n++) {
     const candidato = `${base}-${String(n).padStart(3, "0")}`;
     if (!usados.has(candidato)) {

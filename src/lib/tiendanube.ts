@@ -1,6 +1,7 @@
 import { InventoryItem } from "./types";
 import { calcInventoryItem } from "./inventory";
 import { generarDescripcionHTML } from "./descripcion";
+import { varianteSinTalle } from "./variantes";
 
 /**
  * Exportación al CSV de carga masiva de Tiendanube.
@@ -144,6 +145,20 @@ export function parseVariante(variante?: string | null): Propiedad[] {
   return [{ nombre: "Variante", valor: texto }];
 }
 
+/**
+ * Propiedades de un ítem con varios talles, sin el talle (que sale de su lista).
+ * En esos ítems la variante se carga como "Color / detalle", así que el texto
+ * libre va como Color.
+ */
+function propiedadesSinTalle(variante?: string | null): Propiedad[] {
+  const props = parseVariante(variante);
+  if (props.length === 1 && props[0].nombre === "Variante") {
+    const resto = varianteSinTalle(variante);
+    return resto ? [{ nombre: "Color", valor: resto }] : [];
+  }
+  return props.filter((p) => p.nombre !== "Talle").slice(0, 2);
+}
+
 function redondear(n: number, a: number): number {
   if (!a || a <= 0) return Math.round(n);
   return Math.round(n / a) * a;
@@ -203,7 +218,7 @@ export function buildTiendanubeCSV(
     const props = parseVariante(it.variante);
     const precio = redondear(c.precioVentaARS, redondearA);
 
-    const fila: Record<string, string | number> = {
+    const filaBase: Record<string, string | number> = {
       "Identificador de URL": identificador,
       Nombre: nombre,
       Categorías: categoria,
@@ -244,7 +259,27 @@ export function buildTiendanubeCSV(
       Visibilidad: mostrarEnTienda ? "Visible" : "Oculto",
     };
 
-    filas.push(TIENDANUBE_COLUMNS.map((col) => csvCell(fila[col])).join(","));
+    if (c.tallesCalc) {
+      // Una fila por talle con stock y el mismo identificador: así Tiendanube
+      // las toma como variantes de un solo producto.
+      const extra = propiedadesSinTalle(it.variante);
+      for (const t of c.tallesCalc) {
+        if (t.stock <= 0) continue;
+        const propsTalle = [{ nombre: "Talle", valor: t.talle }, ...extra];
+        const filaVar: Record<string, string | number> = {
+          ...filaBase,
+          Stock: t.stock,
+          SKU: t.sku || (it.sku ? `${it.sku}-${t.talle}` : ""),
+        };
+        for (let i = 0; i < 3; i++) {
+          filaVar[`Nombre de la propiedad ${i + 1}`] = propsTalle[i]?.nombre ?? "";
+          filaVar[`Valor de propiedad ${i + 1}`] = propsTalle[i]?.valor ?? "";
+        }
+        filas.push(TIENDANUBE_COLUMNS.map((col) => csvCell(filaVar[col])).join(","));
+      }
+    } else {
+      filas.push(TIENDANUBE_COLUMNS.map((col) => csvCell(filaBase[col])).join(","));
+    }
   }
 
   // BOM para que Excel abra bien los acentos.

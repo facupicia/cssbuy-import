@@ -189,6 +189,17 @@ export interface Marca {
 export type InventoryEstado = "en_transito" | "en_deposito" | "agotado";
 export type InventoryOrigen = "manual" | "cssbuy" | "cotizacion";
 
+export interface InventoryTalle {
+  talle: string;
+  cantidadInicial: number;
+  cantidadVendida: number;
+  sku?: string | null;
+}
+
+export interface InventoryTalleCalc extends InventoryTalle {
+  stock: number;
+}
+
 export interface InventoryItem {
   id: string;
   nombre: string;
@@ -214,6 +225,8 @@ export interface InventoryItem {
   origen: InventoryOrigen;
   /** oid de la orden CSSBuy o id de la cotización que originó el ítem. */
   origenRef?: string | null;
+  /** Talles específicos si el artículo tiene múltiples talles / variantes. */
+  talles?: InventoryTalle[] | null;
   createdAt: string;
   updatedAt: string;
 }
@@ -221,6 +234,8 @@ export interface InventoryItem {
 export interface InventoryItemCalc extends InventoryItem {
   /** cantidadInicial - cantidadVendida. */
   stock: number;
+  /** Talles con su stock individual calculado. */
+  tallesCalc?: InventoryTalleCalc[];
   /** Capital total puesto en el ítem (costo * cantidadInicial), en ARS. */
   invertidoARS: number;
   /** Capital todavía inmovilizado en el stock sin vender, en ARS. */

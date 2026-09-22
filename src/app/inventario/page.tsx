@@ -34,6 +34,8 @@ import {
   InventoryOrigen,
   CssbuyOrder,
   Marca,
+  InventoryTalle,
+  InventoryTalleCalc,
 } from "@/lib/types";
 import {
   calcInventoryItem,
@@ -42,8 +44,15 @@ import {
   ESTADO_LABEL,
 } from "@/lib/inventory";
 import { fmtARS, fmtUSD, fmtPct } from "@/lib/utils";
-import { parseTalle, tallesDisponibles } from "@/lib/variantes";
-import { generarSku } from "@/lib/sku";
+import {
+  parseTalle,
+  varianteSinTalle,
+  canonizar,
+  compararTalles,
+  tallesDeItems,
+  itemTieneTalle,
+} from "@/lib/variantes";
+import { generarSku, generarSkuParaTalle } from "@/lib/sku";
 import { fetchLiveFx } from "@/lib/fx";
 import { fetcher, fetcherPost, fetcherPatch, fetcherDelete } from "@/lib/fetcher";
 import { Navbar } from "@/components/Navbar";
@@ -89,6 +98,9 @@ interface FormState {
   notas: string;
   /** "" = sin marca. */
   marcaId: string;
+  /** Si está activo, el stock se maneja individualmente por cada talle */
+  modoTalles: boolean;
+  talles: InventoryTalle[];
 }
 
 const EMPTY_FORM: FormState = {
@@ -106,9 +118,12 @@ const EMPTY_FORM: FormState = {
   ubicacion: "",
   notas: "",
   marcaId: "",
+  modoTalles: false,
+  talles: [],
 };
 
 function itemToForm(it: InventoryItem): FormState {
+  const tieneTalles = Array.isArray(it.talles) && it.talles.length > 0;
   return {
     nombre: it.nombre ?? "",
     variante: it.variante ?? "",
@@ -124,6 +139,8 @@ function itemToForm(it: InventoryItem): FormState {
     ubicacion: it.ubicacion ?? "",
     notas: it.notas ?? "",
     marcaId: it.marcaId ?? "",
+    modoTalles: tieneTalles,
+    talles: tieneTalles ? it.talles!.map((t) => ({ ...t })) : [],
   };
 }
 
@@ -206,7 +223,7 @@ export default function InventarioPage() {
     const q = search.trim().toLowerCase();
     return items
       .filter((it) => (estadoFilter === "todos" ? true : it.estado === estadoFilter))
-      .filter((it) => (talleFilter === "todos" ? true : parseTalle(it.variante) === talleFilter))
+      .filter((it) => (talleFilter === "todos" ? true : itemTieneTalle(it, talleFilter)))
       .filter((it) =>
         marcaFilter === "todas"
           ? true
@@ -219,7 +236,13 @@ export default function InventarioPage() {
         return (
           it.nombre.toLowerCase().includes(q) ||
           (it.sku || "").toLowerCase().includes(q) ||
-          (it.variante || "").toLowerCase().includes(q)
+          (it.variante || "").toLowerCase().includes(q) ||
+          (Array.isArray(it.talles) &&
+            it.talles.some(
+              (t) =>
+                t.talle.toLowerCase().includes(q) ||
+                (t.sku && t.sku.toLowerCase().includes(q))
+            ))
         );
       })
       .sort((a, b) => {
@@ -243,12 +266,14 @@ export default function InventarioPage() {
   }, [items, search, estadoFilter, talleFilter, marcaFilter, orden]);
 
   // El SKU del ítem que se edita no cuenta como "en uso": si no, regenerarlo
-  // saltaría al siguiente número sin motivo.
+  // saltaría al siguiente número sin motivo. Los SKU de cada talle sí cuentan:
+  // también van en etiquetas y no se pueden repetir.
   const skusEnUso = useMemo(
     () =>
       items
-        .filter((i) => i.sku && i.id !== editing?.id)
-        .map((i) => i.sku as string),
+        .filter((i) => i.id !== editing?.id)
+        .flatMap((i) => [i.sku, ...(i.talles ?? []).map((t) => t.sku)])
+        .filter(Boolean) as string[],
     [items, editing]
   );
 
@@ -272,7 +297,7 @@ export default function InventarioPage() {
 
   // Solo se ofrecen los talles que existen en el inventario: una lista fija
   // mostraría filtros que no devuelven nada.
-  const talles = useMemo(() => tallesDisponibles(items.map((i) => i.variante)), [items]);
+  const talles = useMemo(() => tallesDeItems(items), [items]);
 
   // Si el talle filtrado deja de existir (se borró el último ítem), se limpia.
   useEffect(() => {
@@ -402,7 +427,25 @@ export default function InventarioPage() {
       toast.error("El nombre es obligatorio");
       return;
     }
-    if (form.cantidadVendida > form.cantidadInicial) {
+    if (form.modoTalles && form.talles.length === 0) {
+      toast.error("Agregá al menos un talle o cambiá a talle único");
+      return;
+    }
+
+    const tallesPayload = form.modoTalles ? form.talles : null;
+    const pasado = tallesPayload?.find((t) => t.cantidadVendida > t.cantidadInicial);
+    if (pasado) {
+      toast.error(`En el talle ${pasado.talle} las vendidas superan a las compradas`);
+      return;
+    }
+    const cantInicial = tallesPayload
+      ? tallesPayload.reduce((s, t) => s + t.cantidadInicial, 0)
+      : form.cantidadInicial;
+    const cantVendida = tallesPayload
+      ? tallesPayload.reduce((s, t) => s + t.cantidadVendida, 0)
+      : form.cantidadVendida;
+
+    if (cantVendida > cantInicial) {
       toast.error("Las unidades vendidas no pueden superar a las compradas");
       return;
     }
@@ -411,9 +454,12 @@ export default function InventarioPage() {
       const payload = {
         ...form,
         nombre: form.nombre.trim(),
+        cantidadInicial: cantInicial,
+        cantidadVendida: cantVendida,
+        talles: tallesPayload,
         estado:
           form.estado ??
-          suggestEstado(form.cantidadInicial, form.cantidadVendida),
+          suggestEstado(cantInicial, cantVendida),
         // La columna es UUID: "" no es un id válido, va null.
         marcaId: form.marcaId || null,
       };
@@ -435,22 +481,42 @@ export default function InventarioPage() {
     }
   }
 
-  async function registrarVenta(it: InventoryItem, unidades: number, precioUnit: number) {
+  async function registrarVenta(
+    it: InventoryItem,
+    unidades: number,
+    precioUnit: number,
+    talleSeleccionado?: string
+  ) {
     const calc = calcInventoryItem(it);
-    if (unidades <= 0 || unidades > calc.stock) {
+    const patch: Record<string, unknown> = { precioVentaARS: precioUnit };
+
+    if (calc.tallesCalc) {
+      // Con talles, la venta se descuenta del talle: el servidor recalcula el
+      // total a partir de ellos, así que sumar solo al total se perdería.
+      const talle = calc.tallesCalc.find((t) => t.talle === talleSeleccionado);
+      if (!talle) {
+        toast.error("Elegí el talle vendido");
+        return;
+      }
+      if (unidades <= 0 || unidades > talle.stock) {
+        toast.error(`Solo hay ${talle.stock} unidades del talle ${talle.talle}`);
+        return;
+      }
+      patch.talles = calc.tallesCalc.map(({ stock: _stock, ...t }) =>
+        t.talle === talle.talle ? { ...t, cantidadVendida: t.cantidadVendida + unidades } : t
+      );
+    } else if (unidades <= 0 || unidades > calc.stock) {
       toast.error(`Solo hay ${calc.stock} unidades disponibles`);
       return;
     }
-    const nuevaVendida = it.cantidadVendida + unidades;
-    const patch: Record<string, unknown> = {
-      cantidadVendida: nuevaVendida,
-      precioVentaARS: precioUnit,
-    };
-    if (nuevaVendida >= it.cantidadInicial) patch.estado = "agotado";
+
+    const nuevaVendida = calc.cantidadVendida + unidades;
+    patch.cantidadVendida = nuevaVendida;
+    if (nuevaVendida >= calc.cantidadInicial) patch.estado = "agotado";
     try {
       await fetcherPatch(`/api/inventario/${it.id}`, patch);
       toast.success(
-        `Venta registrada: ${unidades} u. de "${it.nombre}"`,
+        `Venta registrada: ${unidades} u.${talleSeleccionado ? ` (${talleSeleccionado})` : ""} de "${it.nombre}"`,
         { description: `Ingreso ${fmtARS(precioUnit * unidades)}` }
       );
       setVentaFor(null);
@@ -867,7 +933,7 @@ export default function InventarioPage() {
                                 <span className="font-medium text-[var(--color-fg)] truncate max-w-[220px]">
                                   {it.nombre}
                                 </span>
-                                {parseTalle(it.variante) && (
+                                {!c.tallesCalc && parseTalle(it.variante) && (
                                   <span className="shrink-0 px-1.5 py-0.5 rounded-[var(--radius-xs)] bg-[var(--color-bg-muted)] text-[10px] font-mono font-semibold text-[var(--color-fg-muted)]">
                                     {parseTalle(it.variante)}
                                   </span>
@@ -886,13 +952,14 @@ export default function InventarioPage() {
                               <p className="text-[11px] text-[var(--color-fg-muted)] truncate max-w-[240px]">
                                 {[
                                   it.marcaId && nombreMarca[it.marcaId],
-                                  it.variante,
+                                  c.tallesCalc ? varianteSinTalle(it.variante) : it.variante,
                                   it.sku && `SKU ${it.sku}`,
                                   ORIGEN_LABEL[it.origen],
                                 ]
                                   .filter(Boolean)
                                   .join(" · ")}
                               </p>
+                              {c.tallesCalc && <TallesChips talles={c.tallesCalc} />}
                             </div>
                           </div>
                         </td>
@@ -1033,7 +1100,7 @@ export default function InventarioPage() {
                           <span className="font-medium text-sm text-[var(--color-fg)] truncate">
                             {it.nombre}
                           </span>
-                          {parseTalle(it.variante) && (
+                          {!c.tallesCalc && parseTalle(it.variante) && (
                             <span className="shrink-0 px-1.5 py-0.5 rounded-[var(--radius-xs)] bg-[var(--color-bg-muted)] text-[10px] font-mono font-semibold text-[var(--color-fg-muted)]">
                               {parseTalle(it.variante)}
                             </span>
@@ -1053,13 +1120,14 @@ export default function InventarioPage() {
                         <p className="text-[11px] text-[var(--color-fg-muted)] truncate">
                           {[
                             it.marcaId && nombreMarca[it.marcaId],
-                            it.variante,
+                            c.tallesCalc ? varianteSinTalle(it.variante) : it.variante,
                             it.sku && `SKU ${it.sku}`,
                             ORIGEN_LABEL[it.origen],
                           ]
                             .filter(Boolean)
                             .join(" · ")}
                         </p>
+                        {c.tallesCalc && <TallesChips talles={c.tallesCalc} />}
                       </div>
                       <Badge variant={ESTADO_VARIANT[it.estado]} size="sm" className="shrink-0">
                         {ESTADO_LABEL[it.estado]}
@@ -1308,6 +1376,38 @@ function NumberField({
   );
 }
 
+/** Stock por talle en la fila del inventario; los agotados quedan tachados. */
+function TallesChips({ talles }: { talles: InventoryTalleCalc[] }) {
+  return (
+    <div className="flex items-center gap-1 flex-wrap mt-1">
+      {talles.map((t) => (
+        <span
+          key={t.talle}
+          title={`${t.talle}: ${t.stock} disponibles (${t.cantidadVendida} vendidas de ${t.cantidadInicial})${t.sku ? ` · SKU ${t.sku}` : ""}`}
+          className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded-[var(--radius-xs)] text-[10px] font-mono border ${
+            t.stock > 0
+              ? "bg-[var(--color-bg-elevated)] border-[var(--color-border)] text-[var(--color-fg)]"
+              : "bg-[var(--color-bg-subtle)] border-dashed border-[var(--color-border)] text-[var(--color-fg-subtle)] line-through opacity-60"
+          }`}
+        >
+          <span className="font-semibold">{t.talle}</span>
+          <span className={t.stock > 0 ? "text-[var(--color-accent)] font-bold" : ""}>{t.stock}</span>
+        </span>
+      ))}
+    </div>
+  );
+}
+
+// En forma canónica (XXL, no 2XL) para que coincidan con el filtro por talle.
+const TALLES_ROPA_PRESETS = ["XS", "S", "M", "L", "XL", "XXL", "XXXL"];
+const TALLES_CALZADO_PRESETS = ["38", "39", "40", "41", "42", "43", "44", "45"];
+
+// Talle · compradas · vendidas · stock · SKU · quitar. Entra en un celular.
+const GRID_TALLES =
+  "grid grid-cols-[2.75rem_minmax(0,1fr)_minmax(0,1fr)_2.25rem_minmax(0,1.8fr)_1.75rem] items-center gap-1.5 sm:gap-2";
+const INPUT_TALLE =
+  "w-full h-7 px-1.5 text-xs bg-[var(--color-bg)] border border-[var(--color-border)] rounded-[var(--radius-sm)] focus:outline-none focus:border-[var(--color-accent)]";
+
 function ItemFormDialog({
   open,
   onOpenChange,
@@ -1335,6 +1435,77 @@ function ItemFormDialog({
   const set = <K extends keyof FormState>(key: K, val: FormState[K]) =>
     setForm((f) => ({ ...f, [key]: val }));
 
+  const [nuevoTalleTxt, setNuevoTalleTxt] = useState("");
+
+  // Con varios talles, los totales del ítem son la suma de los talles.
+  const setTalles = (fn: (talles: InventoryTalle[]) => InventoryTalle[]) =>
+    setForm((f) => {
+      const talles = fn(f.talles);
+      return {
+        ...f,
+        talles,
+        cantidadInicial: talles.reduce((s, t) => s + t.cantidadInicial, 0),
+        cantidadVendida: talles.reduce((s, t) => s + t.cantidadVendida, 0),
+      };
+    });
+
+  function agregarTalle(nombreTalle: string) {
+    // "2XL" y "XXL" son el mismo talle: se guarda la forma canónica.
+    const talle = canonizar(nombreTalle);
+    if (!talle) return;
+    if (form.talles.some((t) => canonizar(t.talle) === talle)) {
+      toast.info(`El talle ${talle} ya está en la lista`);
+      return;
+    }
+    setTalles((ts) =>
+      [...ts, { talle, cantidadInicial: 1, cantidadVendida: 0, sku: null }].sort((a, b) =>
+        compararTalles(a.talle, b.talle)
+      )
+    );
+    setNuevoTalleTxt("");
+  }
+
+  function actualizarTalle(index: number, patch: Partial<InventoryTalle>) {
+    setTalles((ts) => ts.map((t, i) => (i === index ? { ...t, ...patch } : t)));
+  }
+
+  function eliminarTalle(index: number) {
+    setTalles((ts) => ts.filter((_, i) => i !== index));
+  }
+
+  function cambiarModo(multi: boolean) {
+    setForm((f) => {
+      if (!multi || f.talles.length > 0) return { ...f, modoTalles: multi };
+      // Si la variante ya tenía talle, arranca la lista con las unidades cargadas
+      // y la variante se queda con el color: el talle ahora vive en la lista.
+      const talle = parseTalle(f.variante);
+      if (!talle) return { ...f, modoTalles: true };
+      return {
+        ...f,
+        modoTalles: true,
+        variante: varianteSinTalle(f.variante) ?? "",
+        talles: [
+          { talle, cantidadInicial: f.cantidadInicial, cantidadVendida: f.cantidadVendida, sku: f.sku || null },
+        ],
+      };
+    });
+  }
+
+  /** Completa el SKU de los talles que no tienen, sin repetir ninguno ya usado. */
+  function generarSkusTalles() {
+    const usados = new Set([
+      ...skusEnUso,
+      ...(form.talles.map((t) => t.sku).filter(Boolean) as string[]),
+    ]);
+    const item = { nombre: form.nombre, marcaId: form.marcaId || null };
+    setTalles((ts) =>
+      ts.map((t) =>
+        t.sku ? t : { ...t, sku: generarSkuParaTalle(item, t.talle, { nombreDeMarca, usados }) }
+      )
+    );
+  }
+
+  // calcInventoryItem deriva los totales de los talles cuando los hay.
   const preview = calcInventoryItem({
     id: "preview",
     nombre: form.nombre,
@@ -1344,6 +1515,7 @@ function ItemFormDialog({
     costoUnitARS: form.costoUnitARS,
     precioVentaARS: form.precioVentaARS,
     estado: form.estado,
+    talles: form.modoTalles ? form.talles : null,
     origen: "manual",
     createdAt: "",
     updatedAt: "",
@@ -1355,50 +1527,247 @@ function ItemFormDialog({
         <DialogHeader>
           <DialogTitle>{editing ? "Editar ítem" : "Nuevo ítem de inventario"}</DialogTitle>
           <DialogDescription>
-            El costo unitario en ARS es la base para la ganancia. El costo en USD es solo referencia.
+            Configurá el producto, sus talles disponibles, costos y precios de venta.
           </DialogDescription>
         </DialogHeader>
 
         <div className="space-y-4 overflow-y-auto pr-1">
           <Input
-            label="Nombre"
+            label="Nombre del producto"
             value={form.nombre}
             onChange={(e) => set("nombre", e.target.value)}
-            placeholder="Ej: Auriculares TWS X15"
+            placeholder="Ej: Remera Boxy Fit Heavyweight"
           />
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-            <Input
-              label="Variante"
-              value={form.variante}
-              onChange={(e) => set("variante", e.target.value)}
-              placeholder="Color, talle…"
-            />
-            <div className="flex items-end gap-2">
-              <Input
-                label="SKU"
-                value={form.sku}
-                onChange={(e) => set("sku", e.target.value)}
-                placeholder="Opcional"
+          {/* Talles: uno solo (con su variante) o varios con stock propio */}
+          <div className="rounded-[var(--radius)] border border-[var(--color-border)] p-3 space-y-3">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <div>
+                <p className="text-xs font-medium text-[var(--color-fg-muted)] tracking-wide uppercase">
+                  Talles
+                </p>
+                <p className="text-[11px] text-[var(--color-fg-subtle)]">
+                  {form.modoTalles
+                    ? "Cada talle lleva sus propias unidades; el total del ítem es la suma."
+                    : "Un solo talle o variante por ítem."}
+                </p>
+              </div>
+              <Segmented
+                size="sm"
+                value={form.modoTalles ? "multiples" : "unico"}
+                onChange={(v) => cambiarModo(v === "multiples")}
+                options={[
+                  { value: "unico", label: "Talle único" },
+                  { value: "multiples", label: "Varios talles" },
+                ]}
               />
-              <Button
-                type="button"
-                variant="outline"
-                icon={<Hash className="h-3.5 w-3.5" />}
-                title="Generar a partir de la marca y el talle"
-                onClick={() =>
-                  set(
-                    "sku",
-                    generarSku(
-                      { nombre: form.nombre, variante: form.variante, marcaId: form.marcaId || null },
-                      { nombreDeMarca, usados: new Set(skusEnUso) }
-                    )
-                  )
-                }
-              >
-                Generar
-              </Button>
             </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <Input
+                label={form.modoTalles ? "Color / detalle" : "Variante"}
+                value={form.variante}
+                onChange={(e) => set("variante", e.target.value)}
+                placeholder={form.modoTalles ? "Ej: Negro" : "Color, talle…"}
+              />
+              <div className="flex items-end gap-2">
+                <Input
+                  label={form.modoTalles ? "SKU base" : "SKU"}
+                  value={form.sku}
+                  onChange={(e) => set("sku", e.target.value)}
+                  placeholder="Opcional"
+                />
+                <Button
+                  type="button"
+                  variant="outline"
+                  icon={<Hash className="h-3.5 w-3.5" />}
+                  title="Generar a partir de la marca y el talle"
+                  onClick={() =>
+                    set(
+                      "sku",
+                      generarSku(
+                        {
+                          nombre: form.nombre,
+                          // Con varios talles, el SKU base no lleva talle.
+                          variante: form.modoTalles ? null : form.variante,
+                          marcaId: form.marcaId || null,
+                        },
+                        { nombreDeMarca, usados: new Set(skusEnUso) }
+                      )
+                    )
+                  }
+                >
+                  Generar
+                </Button>
+              </div>
+            </div>
+
+            {form.modoTalles ? (
+              <div className="space-y-3">
+                <div className="space-y-1.5">
+                  {[
+                    { etiqueta: "Ropa", presets: TALLES_ROPA_PRESETS },
+                    { etiqueta: "Calzado", presets: TALLES_CALZADO_PRESETS },
+                  ].map(({ etiqueta, presets }) => (
+                    <div key={etiqueta} className="flex flex-wrap items-center gap-1.5">
+                      <span className="w-14 text-[11px] text-[var(--color-fg-subtle)]">{etiqueta}</span>
+                      {presets.map((t) => {
+                        const yaEsta = form.talles.some((x) => canonizar(x.talle) === t);
+                        return (
+                          <button
+                            key={t}
+                            type="button"
+                            disabled={yaEsta}
+                            onClick={() => agregarTalle(t)}
+                            className="h-6 px-2 rounded-[var(--radius-xs)] text-[11px] font-mono font-medium border border-[var(--color-border)] bg-[var(--color-bg-elevated)] transition-colors cursor-pointer hover:border-[var(--color-accent)] hover:text-[var(--color-accent)] disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:border-[var(--color-border)] disabled:hover:text-inherit"
+                          >
+                            {t}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  ))}
+                  <div className="flex items-center gap-2 pt-1">
+                    <input
+                      type="text"
+                      aria-label="Otro talle"
+                      placeholder="Otro talle (42.5, Único…)"
+                      value={nuevoTalleTxt}
+                      onChange={(e) => setNuevoTalleTxt(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter") {
+                          e.preventDefault();
+                          agregarTalle(nuevoTalleTxt);
+                        }
+                      }}
+                      className="h-7 min-w-0 flex-1 sm:max-w-xs px-2.5 text-xs bg-[var(--color-bg-elevated)] border border-[var(--color-border)] rounded-[var(--radius-sm)] focus:outline-none focus:border-[var(--color-accent)]"
+                    />
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      icon={<Plus className="h-3 w-3" />}
+                      onClick={() => agregarTalle(nuevoTalleTxt)}
+                    >
+                      Agregar
+                    </Button>
+                  </div>
+                </div>
+
+                {form.talles.length === 0 ? (
+                  <p className="py-4 text-center text-xs text-[var(--color-fg-muted)] rounded-[var(--radius)] border border-dashed border-[var(--color-border)]">
+                    Sumá los talles que tenés con los botones de arriba.
+                  </p>
+                ) : (
+                  <div className="rounded-[var(--radius)] border border-[var(--color-border)] divide-y divide-[var(--color-border)] overflow-hidden">
+                    <div className={`${GRID_TALLES} px-2 sm:px-3 py-1.5 bg-[var(--color-bg-subtle)] text-[10px] font-semibold uppercase text-[var(--color-fg-muted)]`}>
+                      <span>Talle</span>
+                      <span>Compr.</span>
+                      <span>Vend.</span>
+                      <span className="text-right">Stock</span>
+                      <span className="flex items-center justify-between gap-1">
+                        SKU
+                        <button
+                          type="button"
+                          onClick={generarSkusTalles}
+                          title="Generar el SKU de los talles que no tienen"
+                          className="normal-case font-medium text-[var(--color-accent)] hover:underline cursor-pointer"
+                        >
+                          Generar
+                        </button>
+                      </span>
+                      <span />
+                    </div>
+                    {form.talles.map((t, idx) => {
+                      const stockTalle = Math.max(0, t.cantidadInicial - t.cantidadVendida);
+                      return (
+                        <div key={t.talle} className={`${GRID_TALLES} px-2 sm:px-3 py-1.5 text-xs`}>
+                          <span className="font-mono font-bold text-sm text-[var(--color-fg)] truncate">
+                            {t.talle}
+                          </span>
+                          <input
+                            type="number"
+                            inputMode="numeric"
+                            min={0}
+                            aria-label={`Compradas talle ${t.talle}`}
+                            value={t.cantidadInicial || ""}
+                            placeholder="0"
+                            onChange={(e) =>
+                              actualizarTalle(idx, { cantidadInicial: Math.max(0, Math.round(Number(e.target.value) || 0)) })
+                            }
+                            className={INPUT_TALLE}
+                          />
+                          <input
+                            type="number"
+                            inputMode="numeric"
+                            min={0}
+                            aria-label={`Vendidas talle ${t.talle}`}
+                            value={t.cantidadVendida || ""}
+                            placeholder="0"
+                            onChange={(e) =>
+                              actualizarTalle(idx, { cantidadVendida: Math.max(0, Math.round(Number(e.target.value) || 0)) })
+                            }
+                            className={INPUT_TALLE}
+                          />
+                          <span
+                            className={`text-right font-mono font-semibold ${
+                              t.cantidadVendida > t.cantidadInicial
+                                ? "text-[var(--color-danger)]"
+                                : stockTalle > 0
+                                  ? "text-[var(--color-fg)]"
+                                  : "text-[var(--color-fg-subtle)]"
+                            }`}
+                          >
+                            {stockTalle}
+                          </span>
+                          <input
+                            type="text"
+                            aria-label={`SKU talle ${t.talle}`}
+                            placeholder="SKU"
+                            value={t.sku || ""}
+                            onChange={(e) => actualizarTalle(idx, { sku: e.target.value || null })}
+                            className={`${INPUT_TALLE} font-mono text-[11px]`}
+                          />
+                          <button
+                            type="button"
+                            onClick={() => eliminarTalle(idx)}
+                            aria-label={`Quitar talle ${t.talle}`}
+                            title="Quitar talle"
+                            className="h-7 w-7 flex items-center justify-center text-[var(--color-fg-subtle)] hover:text-[var(--color-danger)] rounded transition-colors cursor-pointer"
+                          >
+                            <Trash2 className="h-3.5 w-3.5" />
+                          </button>
+                        </div>
+                      );
+                    })}
+                    <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1 px-2 sm:px-3 py-2 bg-[var(--color-bg-subtle)] text-[11px]">
+                      <span className="text-[var(--color-fg-muted)]">
+                        {form.talles.length} {form.talles.length === 1 ? "talle" : "talles"}
+                      </span>
+                      <span className="font-mono tnum text-[var(--color-fg-muted)]">
+                        {form.cantidadInicial} compradas · {form.cantidadVendida} vendidas ·{" "}
+                        <span className="font-semibold text-[var(--color-fg)]">
+                          {preview.stock} en stock
+                        </span>
+                      </span>
+                    </div>
+                  </div>
+                )}
+              </div>
+            ) : (
+              <div className="grid grid-cols-2 gap-3">
+                <NumberField
+                  label="Compradas"
+                  value={form.cantidadInicial}
+                  onChange={(n) => set("cantidadInicial", n)}
+                />
+                <NumberField
+                  label="Vendidas"
+                  value={form.cantidadVendida}
+                  onChange={(n) => set("cantidadVendida", n)}
+                />
+              </div>
+            )}
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
@@ -1416,17 +1785,7 @@ function ItemFormDialog({
             />
           </div>
 
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-            <NumberField
-              label="Compradas"
-              value={form.cantidadInicial}
-              onChange={(n) => set("cantidadInicial", n)}
-            />
-            <NumberField
-              label="Vendidas"
-              value={form.cantidadVendida}
-              onChange={(n) => set("cantidadVendida", n)}
-            />
+          <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
             <NumberField
               label="Costo unit. ARS"
               prefix="$"
@@ -1441,9 +1800,6 @@ function ItemFormDialog({
               value={form.costoUnitUSD}
               onChange={(n) => set("costoUnitUSD", n)}
             />
-          </div>
-
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
             <NumberField
               label="Precio venta ARS"
               prefix="$"
@@ -1451,13 +1807,16 @@ function ItemFormDialog({
               value={form.precioVentaARS}
               onChange={(n) => set("precioVentaARS", n)}
             />
+          </div>
+
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
             <Input
               label="Ubicación"
               value={form.ubicacion}
               onChange={(e) => set("ubicacion", e.target.value)}
               placeholder="Estante, caja…"
             />
-            <label className="col-span-2 block space-y-1.5">
+            <label className="block space-y-1.5">
               <span className="block text-xs font-medium text-[var(--color-fg-muted)] tracking-wide uppercase">
                 Marca
               </span>
@@ -1507,7 +1866,7 @@ function ItemFormDialog({
           {/* Preview */}
           <div className="grid grid-cols-3 gap-3 p-3 bg-[var(--color-bg-subtle)] rounded-[var(--radius)] text-xs">
             <div>
-              <span className="text-[11px] text-[var(--color-fg-muted)] uppercase">Stock</span>
+              <span className="text-[11px] text-[var(--color-fg-muted)] uppercase">Stock total</span>
               <p className="font-bold font-mono tnum text-sm">{preview.stock}</p>
             </div>
             <div>
@@ -1543,19 +1902,26 @@ function VentaDialog({
 }: {
   item: InventoryItem | null;
   onOpenChange: (open: boolean) => void;
-  onConfirm: (it: InventoryItem, unidades: number, precioUnit: number) => void;
+  onConfirm: (it: InventoryItem, unidades: number, precioUnit: number, talleSeleccionado?: string) => void;
 }) {
   const [unidades, setUnidades] = useState(1);
   const [precio, setPrecio] = useState(0);
+  const [talleElegido, setTalleElegido] = useState<string>("");
 
   useEffect(() => {
     if (item) {
       setUnidades(1);
       setPrecio(item.precioVentaARS || 0);
+      const calc = calcInventoryItem(item);
+      const conStock = (calc.tallesCalc || []).filter((t) => t.stock > 0);
+      setTalleElegido(conStock[0]?.talle || "");
     }
   }, [item]);
 
   const calc = item ? calcInventoryItem(item) : null;
+  const maxDisp = calc?.tallesCalc
+    ? calc.tallesCalc.find((t) => t.talle === talleElegido)?.stock ?? 0
+    : calc?.stock ?? 1;
 
   return (
     <Dialog open={Boolean(item)} onOpenChange={onOpenChange}>
@@ -1565,38 +1931,77 @@ function VentaDialog({
             <DialogTitle>Registrar venta</DialogTitle>
             <DialogDescription>
               {item.nombre}
-              {item.variante ? ` · ${item.variante}` : ""} — {calc.stock} unidades disponibles
+              {!calc.tallesCalc && item.variante ? ` · ${item.variante}` : ""} — {calc.stock} unidades disponibles
             </DialogDescription>
           </DialogHeader>
 
-          <div className="grid grid-cols-2 gap-3">
-            <NumberField
-              label="Unidades"
-              min={1}
-              value={unidades}
-              onChange={(n) => setUnidades(Math.max(1, Math.min(calc.stock, Math.round(n))))}
-            />
-            <NumberField
-              label="Precio unit. ARS"
-              prefix="$"
-              step="0.01"
-              value={precio}
-              onChange={setPrecio}
-            />
-          </div>
+          <div className="space-y-4">
+            {calc.tallesCalc && (
+              <div className="space-y-1.5">
+                <label className="block text-xs font-medium text-[var(--color-fg-muted)] tracking-wide uppercase">
+                  Talle vendido
+                </label>
+                <div className="flex flex-wrap gap-1.5">
+                  {calc.tallesCalc.map((t) => {
+                    const disponible = t.stock > 0;
+                    const seleccionado = talleElegido === t.talle;
+                    return (
+                      <button
+                        key={t.talle}
+                        type="button"
+                        disabled={!disponible}
+                        onClick={() => {
+                          setTalleElegido(t.talle);
+                          setUnidades(1);
+                        }}
+                        className={`px-3 py-1.5 rounded-[var(--radius-sm)] text-xs font-medium border transition-all cursor-pointer flex items-center gap-1.5 ${
+                          seleccionado
+                            ? "bg-[var(--color-accent)] text-[var(--color-accent-fg)] border-[var(--color-accent)] shadow-sm font-semibold"
+                            : disponible
+                              ? "bg-[var(--color-bg-elevated)] text-[var(--color-fg)] border-[var(--color-border)] hover:border-[var(--color-border-strong)]"
+                              : "opacity-40 bg-[var(--color-bg-subtle)] text-[var(--color-fg-subtle)] border-dashed border-[var(--color-border)] cursor-not-allowed line-through"
+                        }`}
+                      >
+                        <span>{t.talle}</span>
+                        <span className={`text-[10px] font-mono ${seleccionado ? "opacity-90" : "text-[var(--color-fg-muted)]"}`}>
+                          ({t.stock} disp.)
+                        </span>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
 
-          <div className="grid grid-cols-2 gap-3 p-3 bg-[var(--color-bg-subtle)] rounded-[var(--radius)] text-xs">
-            <div>
-              <span className="text-[11px] text-[var(--color-fg-muted)] uppercase">Ingreso</span>
-              <p className="font-bold font-mono tnum text-sm text-[var(--color-accent)]">
-                {fmtARS(precio * unidades)}
-              </p>
+            <div className="grid grid-cols-2 gap-3">
+              <NumberField
+                label="Unidades"
+                min={1}
+                value={unidades}
+                onChange={(n) => setUnidades(Math.max(1, Math.min(maxDisp, Math.round(n))))}
+              />
+              <NumberField
+                label="Precio unit. ARS"
+                prefix="$"
+                step="0.01"
+                value={precio}
+                onChange={setPrecio}
+              />
             </div>
-            <div>
-              <span className="text-[11px] text-[var(--color-fg-muted)] uppercase">Ganancia</span>
-              <p className="font-bold font-mono tnum text-sm text-[var(--color-success)]">
-                {fmtARS((precio - calc.costoUnitARS) * unidades)}
-              </p>
+
+            <div className="grid grid-cols-2 gap-3 p-3 bg-[var(--color-bg-subtle)] rounded-[var(--radius)] text-xs">
+              <div>
+                <span className="text-[11px] text-[var(--color-fg-muted)] uppercase">Ingreso</span>
+                <p className="font-bold font-mono tnum text-sm text-[var(--color-accent)]">
+                  {fmtARS(precio * unidades)}
+                </p>
+              </div>
+              <div>
+                <span className="text-[11px] text-[var(--color-fg-muted)] uppercase">Ganancia</span>
+                <p className="font-bold font-mono tnum text-sm text-[var(--color-success)]">
+                  {fmtARS((precio - calc.costoUnitARS) * unidades)}
+                </p>
+              </div>
             </div>
           </div>
 
@@ -1607,7 +2012,7 @@ function VentaDialog({
             <Button
               variant="primary"
               icon={<ShoppingCart className="h-3.5 w-3.5" />}
-              onClick={() => onConfirm(item, unidades, precio)}
+              onClick={() => onConfirm(item, unidades, precio, talleElegido || undefined)}
             >
               Registrar venta
             </Button>

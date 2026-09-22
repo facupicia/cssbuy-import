@@ -1,5 +1,5 @@
 import { InventoryItem } from "./types";
-import { parseTalle, parseColor } from "./variantes";
+import { parseTalle, parseColor, varianteSinTalle, compararTalles } from "./variantes";
 import {
   tablaDeMarca,
   columnasDe,
@@ -111,7 +111,7 @@ const COMO_MEDIR = [
 ];
 
 export function generarDescripcionHTML(
-  item: Pick<InventoryItem, "nombre" | "variante" | "notas">,
+  item: Pick<InventoryItem, "nombre" | "variante" | "notas" | "talles">,
   opts: OpcionesDescripcion = {}
 ): string {
   const {
@@ -123,8 +123,17 @@ export function generarDescripcionHTML(
     incluirCuidado = true,
   } = opts;
 
-  const talle = parseTalle(item.variante);
-  const color = parseColor(item.variante);
+  // Con varios talles se listan los que tienen stock y no se resalta ninguno;
+  // la variante queda solo para el color.
+  const conTalles = Array.isArray(item.talles) && item.talles.length > 0;
+  const talle = conTalles ? null : parseTalle(item.variante);
+  const disponibles = conTalles
+    ? item
+        .talles!.filter((t) => t.cantidadInicial - t.cantidadVendida > 0)
+        .map((t) => t.talle)
+        .sort(compararTalles)
+    : [];
+  const color = parseColor(item.variante) ?? (conTalles ? varianteSinTalle(item.variante) : null);
   const tabla = tablaDeMarca(marca);
 
   const p = `margin:0 0 12px;font-size:14px;line-height:1.65;color:${TINTA};`;
@@ -150,6 +159,7 @@ export function generarDescripcionHTML(
   const ficha: [string, string][] = [];
   if (color) ficha.push(["Color", color]);
   if (talle) ficha.push(["Talle", talle]);
+  if (disponibles.length > 0) ficha.push(["Talles", disponibles.join(" · ")]);
   if (marca) ficha.push(["Marca", marca]);
   if (ficha.length > 0) {
     const chips = ficha

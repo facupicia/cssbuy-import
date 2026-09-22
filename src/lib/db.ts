@@ -312,10 +312,14 @@ export async function ensureInventoryTable(): Promise<void> {
           origen TEXT NOT NULL DEFAULT 'manual',
           origen_ref TEXT,
           marca_id UUID,
+          talles JSONB DEFAULT '[]'::jsonb,
           created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
           updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
         )
       `)
+      .then(() =>
+        getPool().query(`ALTER TABLE inventory_items ADD COLUMN IF NOT EXISTS talles JSONB DEFAULT '[]'::jsonb`)
+      )
       .then(() => undefined)
       .catch((err: unknown) => {
         // 23505/42P07: otra conexión creó la tabla al mismo tiempo. No es error.
@@ -346,6 +350,8 @@ interface InventoryRow {
   origen: string;
   origen_ref: string | null;
   marca_id: string | null;
+  /** JSONB: pg ya lo devuelve parseado. */
+  talles: InventoryItem["talles"];
   created_at: Date;
   updated_at: Date;
 }
@@ -369,6 +375,7 @@ function mapInventoryRow(r: InventoryRow): InventoryItem {
     origen: (r.origen as InventoryItem["origen"]) || "manual",
     origenRef: r.origen_ref,
     marcaId: r.marca_id,
+    talles: Array.isArray(r.talles) && r.talles.length > 0 ? r.talles : null,
     createdAt: new Date(r.created_at).toISOString(),
     updatedAt: new Date(r.updated_at).toISOString(),
   };
@@ -376,7 +383,7 @@ function mapInventoryRow(r: InventoryRow): InventoryItem {
 
 const INVENTORY_COLS = `id, nombre, sku, variante, imagen, link, cantidad_inicial,
   cantidad_vendida, costo_unit_usd, costo_unit_ars, precio_venta_ars, estado,
-  ubicacion, notas, origen, origen_ref, marca_id, created_at, updated_at`;
+  ubicacion, notas, origen, origen_ref, marca_id, talles, created_at, updated_at`;
 
 export async function getInventoryItems(): Promise<InventoryItem[]> {
   await ensureSchema();
@@ -413,7 +420,13 @@ const FIELD_TO_COL: Record<string, string> = {
   origen: "origen",
   origenRef: "origen_ref",
   marcaId: "marca_id",
+  talles: "talles",
 };
+
+/** Valor para la columna: talles va como JSON (pg mandaría un array de Postgres). */
+function colValue(field: string, val: unknown): unknown {
+  return field === "talles" ? JSON.stringify(val ?? []) : val;
+}
 
 export async function insertInventoryItem(input: InventoryInput): Promise<InventoryItem> {
   await ensureSchema();
@@ -425,7 +438,7 @@ export async function insertInventoryItem(input: InventoryInput): Promise<Invent
     if (field in input && (input as Record<string, unknown>)[field] !== undefined) {
       cols.push(col);
       placeholders.push(`$${values.length + 1}`);
-      values.push((input as Record<string, unknown>)[field]);
+      values.push(colValue(field, (input as Record<string, unknown>)[field]));
     }
   }
 
@@ -453,7 +466,7 @@ export async function updateInventoryItem(
   for (const [field, col] of Object.entries(FIELD_TO_COL)) {
     if (field in input && (input as Record<string, unknown>)[field] !== undefined) {
       sets.push(`${col} = $${values.length + 1}`);
-      values.push((input as Record<string, unknown>)[field]);
+      values.push(colValue(field, (input as Record<string, unknown>)[field]));
     }
   }
 
@@ -510,7 +523,7 @@ export async function bulkUpdateInventory(
   for (const [field, col] of Object.entries(FIELD_TO_COL)) {
     if (field in patch && (patch as Record<string, unknown>)[field] !== undefined) {
       sets.push(`${col} = $${values.length + 1}`);
-      values.push((patch as Record<string, unknown>)[field]);
+      values.push(colValue(field, (patch as Record<string, unknown>)[field]));
     }
   }
 

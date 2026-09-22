@@ -3,18 +3,40 @@ import {
   InventoryItemCalc,
   InventorySummary,
   InventoryEstado,
+  InventoryTalle,
 } from "./types";
+import { canonizar } from "./variantes";
 
 /**
  * Deriva los números de un ítem de inventario (stock, capital inmovilizado,
  * ganancia realizada y potencial). Función pura: sirve en cliente y servidor.
  */
 export function calcInventoryItem(it: InventoryItem): InventoryItemCalc {
-  const cantidadInicial = Math.max(0, Number(it.cantidadInicial) || 0);
-  const cantidadVendida = Math.min(
+  let cantidadInicial = Math.max(0, Number(it.cantidadInicial) || 0);
+  let cantidadVendida = Math.min(
     cantidadInicial,
     Math.max(0, Number(it.cantidadVendida) || 0)
   );
+
+  let tallesCalc: InventoryItemCalc["tallesCalc"] = undefined;
+  if (Array.isArray(it.talles) && it.talles.length > 0) {
+    tallesCalc = it.talles.map((t) => {
+      const cIni = Math.max(0, Number(t.cantidadInicial) || 0);
+      const cVen = Math.min(cIni, Math.max(0, Number(t.cantidadVendida) || 0));
+      return {
+        talle: t.talle,
+        cantidadInicial: cIni,
+        cantidadVendida: cVen,
+        sku: t.sku || null,
+        stock: cIni - cVen,
+      };
+    });
+    // Si tiene talles estructurados, la cantidad inicial y vendida del item
+    // se derivan de la suma de sus talles para mantener coherencia total.
+    cantidadInicial = tallesCalc.reduce((s, t) => s + t.cantidadInicial, 0);
+    cantidadVendida = tallesCalc.reduce((s, t) => s + t.cantidadVendida, 0);
+  }
+
   const stock = cantidadInicial - cantidadVendida;
 
   const costoUnitUSD = Number(it.costoUnitUSD) || 0;
@@ -31,6 +53,7 @@ export function calcInventoryItem(it: InventoryItem): InventoryItemCalc {
     costoUnitARS,
     precioVentaARS,
     stock,
+    tallesCalc,
     invertidoARS: costoUnitARS * cantidadInicial,
     capitalStockARS: costoUnitARS * stock,
     gananciaRealizadaARS: gananciaUnitARS * cantidadVendida,
@@ -107,6 +130,34 @@ export function sanitizeInventoryInput(body: Record<string, unknown>): Inventory
   }
   if ("origenRef" in body) out.origenRef = str(body.origenRef);
   if ("marcaId" in body) out.marcaId = str(body.marcaId);
+
+  if ("talles" in body) {
+    // Talles canónicos y sin repetir ("2XL" y "XXL" son uno). Con talles, los
+    // totales del ítem son su suma: así el listado y los reportes que leen
+    // cantidad_inicial/vendida siguen sirviendo sin conocer los talles.
+    const vistos = new Set<string>();
+    const talles: InventoryTalle[] = [];
+    for (const x of Array.isArray(body.talles) ? body.talles : []) {
+      if (!x || typeof x !== "object") continue;
+      const raw = x as Record<string, unknown>;
+      const talle = canonizar(String(raw.talle ?? ""));
+      if (!talle || vistos.has(talle)) continue;
+      vistos.add(talle);
+      const cantidadInicial = Math.round(num(raw.cantidadInicial));
+      talles.push({
+        talle,
+        cantidadInicial,
+        cantidadVendida: Math.min(cantidadInicial, Math.round(num(raw.cantidadVendida))),
+        sku: str(raw.sku),
+      });
+    }
+    out.talles = talles.length > 0 ? talles : null;
+    if (out.talles) {
+      out.cantidadInicial = talles.reduce((s, t) => s + t.cantidadInicial, 0);
+      out.cantidadVendida = talles.reduce((s, t) => s + t.cantidadVendida, 0);
+    }
+  }
+
   return out;
 }
 

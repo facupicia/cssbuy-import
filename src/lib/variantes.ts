@@ -19,7 +19,7 @@ const ORDEN_TALLE = [
 ];
 
 /** "2XL" y "XXL" son lo mismo; se unifica a la forma con X repetidas. */
-function canonizar(valor: string): string {
+export function canonizar(valor: string): string {
   const v = valor.trim().toUpperCase().replace(/\s+/g, "");
   const m = v.match(/^([2-6])X{1,2}L$/);
   if (m) return "X".repeat(Number(m[1])) + "L";
@@ -56,11 +56,37 @@ export function parseTalle(variante?: string | null): string | null {
   // Texto libre: un token que sea un talle conocido o un número de calzado.
   const tokens = texto.split(/[/,·|\s]+/).map((t) => t.trim()).filter(Boolean);
   for (const t of tokens) {
-    const c = canonizar(t);
-    if (ORDEN_TALLE.includes(c)) return c;
-    if (/^\d{2}(\.5)?$/.test(c)) return c; // 38, 40.5
+    if (esTalle(t)) return canonizar(t);
   }
   return null;
+}
+
+/** Un talle conocido o un número de calzado (38, 40.5). */
+function esTalle(token: string): boolean {
+  const c = canonizar(token);
+  return ORDEN_TALLE.includes(c) || /^\d{2}(\.5)?$/.test(c);
+}
+
+/**
+ * La variante sin el talle: en los ítems con varios talles, el talle va en su
+ * propia lista y la variante queda para el color o el detalle.
+ *   "Color:Negro;Size:L" -> "Negro"      "negro / L" -> "negro"
+ */
+export function varianteSinTalle(variante?: string | null): string | null {
+  const texto = (variante || "").trim();
+  if (!texto) return null;
+
+  const ps = pares(texto);
+  if (ps.length > 0) {
+    const resto = ps.filter((p) => !CLAVES_TALLE.includes(p.clave)).map((p) => p.valor);
+    return resto.length > 0 ? resto.join(" · ") : null;
+  }
+
+  const resto = texto
+    .split(/[/,·|]/)
+    .map((parte) => parte.trim().split(/\s+/).filter((t) => t && !esTalle(t)).join(" "))
+    .filter(Boolean);
+  return resto.length > 0 ? resto.join(" / ") : null;
 }
 
 /** Color del ítem, o null. */
@@ -92,12 +118,35 @@ export function compararTalles(bruto1: string, bruto2: string): number {
   return a.localeCompare(b, "es");
 }
 
-/** Talles presentes en una lista, únicos y ordenados. */
-export function tallesDisponibles(variantes: (string | null | undefined)[]): string[] {
+/**
+ * Talles presentes en el inventario, únicos y ordenados: los de la lista de
+ * talles si el ítem la tiene, o el de la variante si no.
+ */
+export function tallesDeItems(
+  items: { variante?: string | null; talles?: { talle: string }[] | null }[]
+): string[] {
   const set = new Set<string>();
-  for (const v of variantes) {
-    const t = parseTalle(v);
-    if (t) set.add(t);
+  for (const it of items) {
+    if (Array.isArray(it.talles) && it.talles.length > 0) {
+      for (const t of it.talles) {
+        if (t.talle) set.add(canonizar(t.talle));
+      }
+    } else {
+      const t = parseTalle(it.variante);
+      if (t) set.add(t);
+    }
   }
   return [...set].sort(compararTalles);
+}
+
+/** Verifica si un ítem posee un talle específico (por talles estructurados o variante). */
+export function itemTieneTalle(
+  item: { variante?: string | null; talles?: { talle: string }[] | null },
+  talleBuscado: string
+): boolean {
+  const buscado = canonizar(talleBuscado);
+  if (Array.isArray(item.talles) && item.talles.length > 0) {
+    return item.talles.some((t) => canonizar(t.talle) === buscado);
+  }
+  return parseTalle(item.variante) === buscado;
 }
