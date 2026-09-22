@@ -1,0 +1,2 @@
+# Los scripts de shell corren en el server Linux: con CRLF bash no los ejecuta.
+*.sh text eol=lf
