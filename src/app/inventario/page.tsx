@@ -47,6 +47,8 @@ import { fmtARS, fmtUSD, fmtPct } from "@/lib/utils";
 import {
   parseTalle,
   varianteSinTalle,
+  resumenVariante,
+  parseColor,
   canonizar,
   compararTalles,
   tallesDeItems,
@@ -246,6 +248,7 @@ export default function InventarioPage() {
           it.nombre.toLowerCase().includes(q) ||
           (it.sku || "").toLowerCase().includes(q) ||
           (it.variante || "").toLowerCase().includes(q) ||
+          (parseColor(it.variante) || "").toLowerCase().includes(q) ||
           (Array.isArray(it.talles) &&
             it.talles.some(
               (t) =>
@@ -961,7 +964,7 @@ export default function InventarioPage() {
                               <p className="text-[11px] text-[var(--color-fg-muted)] truncate max-w-[240px]">
                                 {[
                                   it.marcaId && nombreMarca[it.marcaId],
-                                  c.tallesCalc ? varianteSinTalle(it.variante) : it.variante,
+                                  resumenVariante(it.variante),
                                   it.sku && `SKU ${it.sku}`,
                                   ORIGEN_LABEL[it.origen],
                                 ]
@@ -1129,7 +1132,7 @@ export default function InventarioPage() {
                         <p className="text-[11px] text-[var(--color-fg-muted)] truncate">
                           {[
                             it.marcaId && nombreMarca[it.marcaId],
-                            c.tallesCalc ? varianteSinTalle(it.variante) : it.variante,
+                            resumenVariante(it.variante),
                             it.sku && `SKU ${it.sku}`,
                             ORIGEN_LABEL[it.origen],
                           ]
@@ -1324,6 +1327,7 @@ export default function InventarioPage() {
         open={exportOpen}
         onOpenChange={setExportOpen}
         items={selectedVisibles.length > 0 ? selectedVisibles : filtered}
+        inventario={items}
         marcas={marcas}
       />
 

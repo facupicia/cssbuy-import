@@ -1,7 +1,8 @@
 import { InventoryItem } from "./types";
 import { calcInventoryItem } from "./inventory";
 import { generarDescripcionHTML } from "./descripcion";
-import { varianteSinTalle } from "./variantes";
+import { varianteSinTalle, parseColor, parseModelo, canonizar } from "./variantes";
+import { normalizarColor } from "./colores";
 
 /**
  * Exportación al CSV de carga masiva de Tiendanube.
@@ -78,6 +79,17 @@ export interface TiendanubeOptions {
    * justo el precio de venta del inventario: $45.000 al 10% se publica a $50.000.
    */
   descuentoEfectivoPct?: number;
+  /**
+   * Suma color y modelo a los productos que se llaman igual (ver
+   * nombresParaTienda). Por defecto sí.
+   */
+  diferenciarNombres?: boolean;
+  /**
+   * Todo el inventario, para decidir qué nombres se repiten. Si solo se mirara
+   * lo que se exporta, un producto se llamaría distinto según qué se haya
+   * seleccionado, y al reimportar se duplicaría en vez de actualizarse.
+   */
+  inventarioCompleto?: InventoryItem[];
 }
 
 /**
@@ -142,7 +154,10 @@ export function parseVariante(variante?: string | null): Propiedad[] {
     if (i > 0) {
       const crudo = parte.slice(0, i).trim();
       const nombre = NOMBRE_CANONICO[crudo.toLowerCase()] ?? crudo;
-      const valor = parte.slice(i + 1).trim();
+      let valor: string | null = parte.slice(i + 1).trim();
+      // "194 negro", "581黑" y "578 black" son el mismo color para el cliente.
+      if (nombre === "Color") valor = normalizarColor(valor);
+      else if (nombre === "Talle" && valor) valor = canonizar(valor);
       if (nombre && valor) props.push({ nombre, valor });
     }
   }
@@ -163,6 +178,65 @@ function propiedadesSinTalle(variante?: string | null): Propiedad[] {
     return resto ? [{ nombre: "Color", valor: resto }] : [];
   }
   return props.filter((p) => p.nombre !== "Talle").slice(0, 2);
+}
+
+/** Color para el nombre: el normalizado, o el que se tipeó en "Color / detalle". */
+function colorParaNombre(it: InventoryItem): string | null {
+  const color = parseColor(it.variante);
+  if (color) return color;
+  return Array.isArray(it.talles) && it.talles.length > 0 ? varianteSinTalle(it.variante) : null;
+}
+
+/**
+ * Nombres para la tienda sin repetidos, por id de ítem.
+ *
+ * En el inventario muchos productos se llaman igual (13 "Buzo Sp5der VVS" de
+ * modelos y precios distintos) y en la tienda quedaban idénticos. A los que se
+ * repiten se les suma el color; si todavía chocan, el modelo del vendedor
+ * ("Buzo Sp5der VVS Negro (581)"), y recién si no hay modelo, un número.
+ * El modelo va antes que el número porque no depende del orden: el nombre, y
+ * con él el identificador de URL, sale igual en cada exportación y reimportar
+ * actualiza el producto en vez de duplicarlo.
+ */
+export function nombresParaTienda(items: InventoryItem[]): Map<string, string> {
+  const clave = (n: string) => n.toLowerCase();
+  const repetidos = (nombres: Map<string, string>) => {
+    const cuenta = new Map<string, number>();
+    for (const n of nombres.values()) cuenta.set(clave(n), (cuenta.get(clave(n)) ?? 0) + 1);
+    return (n: string) => (cuenta.get(clave(n)) ?? 0) > 1;
+  };
+
+  const nombres = new Map<string, string>();
+  for (const it of items) {
+    const n = (it.nombre || "").trim().replace(/\s+/g, " ");
+    if (n) nombres.set(it.id, n);
+  }
+
+  let repite = repetidos(nombres);
+  for (const it of items) {
+    const n = nombres.get(it.id);
+    const color = n && repite(n) ? colorParaNombre(it) : null;
+    if (n && color) nombres.set(it.id, `${n} ${color}`);
+  }
+
+  repite = repetidos(nombres);
+  for (const it of items) {
+    const n = nombres.get(it.id);
+    const modelo = n && repite(n) ? parseModelo(it.variante) : null;
+    if (n && modelo) nombres.set(it.id, `${n} (${modelo})`);
+  }
+
+  repite = repetidos(nombres);
+  const vistos = new Map<string, number>();
+  for (const it of items) {
+    const n = nombres.get(it.id);
+    if (!n || !repite(n)) continue;
+    const k = (vistos.get(clave(n)) ?? 0) + 1;
+    vistos.set(clave(n), k);
+    if (k > 1) nombres.set(it.id, `${n} ${k}`);
+  }
+
+  return nombres;
 }
 
 function redondear(n: number, a: number, haciaArriba = false): number {
@@ -210,7 +284,13 @@ export function buildTiendanubeCSV(
     descuentoEfectivoPct = 0,
     incluirCosto = true,
     descripcionHTML = true,
+    diferenciarNombres = true,
+    inventarioCompleto,
   } = opts;
+
+  const nombresTienda = diferenciarNombres
+    ? nombresParaTienda(inventarioCompleto ?? items)
+    : new Map<string, string>();
 
   const omitidos: { nombre: string; motivo: string }[] = [];
   const filas: string[] = [];
@@ -228,9 +308,10 @@ export function buildTiendanubeCSV(
       omitidos.push({ nombre, motivo: "sin stock" });
       continue;
     }
+    const nombreTienda = nombresTienda.get(it.id) ?? nombre;
 
     // El identificador tiene que ser único en el archivo.
-    const base = slugify(nombre) || "producto";
+    const base = slugify(nombreTienda) || "producto";
     const vistas = usados.get(base) ?? 0;
     usados.set(base, vistas + 1);
     const identificador = vistas === 0 ? base : `${base}-${vistas + 1}`;
@@ -240,7 +321,7 @@ export function buildTiendanubeCSV(
 
     const filaBase: Record<string, string | number> = {
       "Identificador de URL": identificador,
-      Nombre: nombre,
+      Nombre: nombreTienda,
       Categorías: categoria,
       "Nombre de propiedad 1": props[0]?.nombre ?? "",
       "Valor de propiedad 1": props[0]?.valor ?? "",
@@ -262,6 +343,7 @@ export function buildTiendanubeCSV(
       Descripción: descripcionHTML
         ? generarDescripcionHTML(it, {
             marca: it.marcaId ? nombreDeMarca[it.marcaId] : null,
+            titulo: nombreTienda,
             // Las notas del ítem funcionan como el párrafo de venta.
             pitch: it.notas || undefined,
           })

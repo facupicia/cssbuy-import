@@ -7,8 +7,11 @@
  *
  * El talle se deriva en lectura en vez de guardarse en su propia columna: la
  * variante es la fuente, así que si se edita, el talle acompaña sin migración
- * ni backfill que se pueda desincronizar.
+ * ni backfill que se pueda desincronizar. Lo mismo el color: se normaliza al
+ * leerlo (ver colores.ts), así que la variante guarda lo que mandó el vendedor.
  */
+
+import { normalizarColor, codigoDeModelo } from "./colores";
 
 const CLAVES_TALLE = ["size", "talla", "talle", "tamaño", "tamano", "尺码", "尺寸"];
 const CLAVES_COLOR = ["color", "colores", "colour", "颜色"];
@@ -78,7 +81,10 @@ export function varianteSinTalle(variante?: string | null): string | null {
 
   const ps = pares(texto);
   if (ps.length > 0) {
-    const resto = ps.filter((p) => !CLAVES_TALLE.includes(p.clave)).map((p) => p.valor);
+    const resto = ps
+      .filter((p) => !CLAVES_TALLE.includes(p.clave))
+      .map((p) => (CLAVES_COLOR.includes(p.clave) ? normalizarColor(p.valor) : p.valor))
+      .filter((v): v is string => Boolean(v));
     return resto.length > 0 ? resto.join(" · ") : null;
   }
 
@@ -89,14 +95,39 @@ export function varianteSinTalle(variante?: string | null): string | null {
   return resto.length > 0 ? resto.join(" / ") : null;
 }
 
-/** Color del ítem, o null. */
+/** Color del ítem en español ("194 negro", "581黑" -> "Negro"), o null. */
 export function parseColor(variante?: string | null): string | null {
   const texto = (variante || "").trim();
   if (!texto) return null;
   for (const { clave, valor } of pares(texto)) {
-    if (CLAVES_COLOR.includes(clave)) return valor;
+    if (CLAVES_COLOR.includes(clave)) return normalizarColor(valor);
   }
   return null;
+}
+
+/**
+ * Código de modelo del vendedor, que CSSBuy manda pegado al color:
+ * "Color:S285 white" -> "S285", "颜色:0079白" -> "0079". Distingue productos
+ * que en la tienda se llaman igual.
+ */
+export function parseModelo(variante?: string | null): string | null {
+  const texto = (variante || "").trim();
+  if (!texto) return null;
+  const ps = pares(texto);
+  if (ps.length === 0) return codigoDeModelo(texto);
+  const color = ps.find((p) => CLAVES_COLOR.includes(p.clave));
+  return codigoDeModelo((color ?? ps[0]).valor);
+}
+
+/**
+ * La variante para mostrar, sin el talle (que va aparte): "Negro · mod. 581".
+ * Si no se reconoce ni color ni modelo, el texto sin el talle.
+ */
+export function resumenVariante(variante?: string | null): string | null {
+  const color = parseColor(variante);
+  const modelo = parseModelo(variante);
+  if (color || modelo) return [color, modelo && `mod. ${modelo}`].filter(Boolean).join(" · ");
+  return varianteSinTalle(variante);
 }
 
 /** Ordena talles de menor a mayor; los desconocidos van al final, alfabéticos. */

@@ -3,7 +3,12 @@
 import { useEffect, useMemo, useState } from "react";
 import { Download, Store, AlertTriangle, Eye } from "lucide-react";
 import { InventoryItem, Marca } from "@/lib/types";
-import { buildTiendanubeCSV, precioPublicado, TIENDANUBE_COLUMNS } from "@/lib/tiendanube";
+import {
+  buildTiendanubeCSV,
+  nombresParaTienda,
+  precioPublicado,
+  TIENDANUBE_COLUMNS,
+} from "@/lib/tiendanube";
 import { calcInventoryItem } from "@/lib/inventory";
 import { fmtARS } from "@/lib/utils";
 import { generarDescripcionHTML } from "@/lib/descripcion";
@@ -28,11 +33,14 @@ export function TiendanubeExportDialog({
   open,
   onOpenChange,
   items,
+  inventario,
   marcas,
 }: {
   open: boolean;
   onOpenChange: (v: boolean) => void;
   items: InventoryItem[];
+  /** Todo el inventario: define qué nombres se repiten, exportes lo que exportes. */
+  inventario: InventoryItem[];
   marcas: Marca[];
 }) {
   const [categoria, setCategoria] = useState("");
@@ -43,6 +51,7 @@ export function TiendanubeExportDialog({
   const [descripcionHTML, setDescripcionHTML] = useState(true);
   const [verPreview, setVerPreview] = useState(false);
   const [descuentoEfectivo, setDescuentoEfectivo] = useState(10);
+  const [diferenciarNombres, setDiferenciarNombres] = useState(true);
 
   useEffect(() => {
     try {
@@ -78,6 +87,8 @@ export function TiendanubeExportDialog({
         incluirCosto,
         descripcionHTML,
         descuentoEfectivoPct: descuentoEfectivo,
+        diferenciarNombres,
+        inventarioCompleto: inventario,
       }),
     [
       items,
@@ -89,8 +100,18 @@ export function TiendanubeExportDialog({
       incluirCosto,
       descripcionHTML,
       descuentoEfectivo,
+      diferenciarNombres,
+      inventario,
     ]
   );
+
+  // Los que salen con otro nombre que el del inventario, para mostrar cuántos.
+  const renombrados = useMemo(() => {
+    const nombres = nombresParaTienda(inventario);
+    return items
+      .map((it) => ({ antes: (it.nombre || "").trim(), despues: nombres.get(it.id) }))
+      .filter((r): r is { antes: string; despues: string } => Boolean(r.despues && r.despues !== r.antes));
+  }, [items, inventario]);
 
   // Un producto real para mostrar la cuenta del descuento.
   const ejemploPrecio = useMemo(() => {
@@ -102,7 +123,7 @@ export function TiendanubeExportDialog({
       nombre: it.nombre,
       precio,
       publicado,
-      efectivo: publicado * (1 - descuentoEfectivo / 100),
+      efectivo: Math.round(publicado * (1 - descuentoEfectivo / 100)),
     };
   }, [items, redondearA, descuentoEfectivo]);
 
@@ -232,6 +253,20 @@ export function TiendanubeExportDialog({
               </p>
             )}
           </div>
+
+          <label className="flex items-start justify-between gap-3 p-3 rounded-[var(--radius)] bg-[var(--color-bg-subtle)] cursor-pointer">
+            <span className="min-w-0">
+              <span className="block text-xs font-medium text-[var(--color-fg)]">
+                Diferenciar productos con el mismo nombre
+              </span>
+              <span className="block text-[11px] text-[var(--color-fg-muted)] mt-0.5">
+                {renombrados.length > 0
+                  ? `A ${renombrados.length} se les suma el color y, si hace falta, el modelo. Ej.: "${renombrados[0].despues}".`
+                  : "No hay nombres repetidos: salen tal cual."}
+              </span>
+            </span>
+            <Switch checked={diferenciarNombres} onCheckedChange={setDiferenciarNombres} />
+          </label>
 
           <label className="flex items-start justify-between gap-3 p-3 rounded-[var(--radius)] bg-[var(--color-bg-subtle)] cursor-pointer">
             <span className="min-w-0">
