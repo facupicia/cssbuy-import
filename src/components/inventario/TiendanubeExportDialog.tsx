@@ -261,7 +261,7 @@ export function TiendanubeExportDialog({
               </span>
               <span className="block text-[11px] text-[var(--color-fg-muted)] mt-0.5">
                 {renombrados.length > 0
-                  ? `A ${renombrados.length} se les suma el color y, si hace falta, el modelo. Ej.: "${renombrados[0].despues}".`
+                  ? `A ${renombrados.length} se les suma el color y, si hace falta, un número. Ej.: "${renombrados[0].despues}".`
                   : "No hay nombres repetidos: salen tal cual."}
               </span>
             </span>

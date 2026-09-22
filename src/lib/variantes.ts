@@ -11,7 +11,7 @@
  * leerlo (ver colores.ts), así que la variante guarda lo que mandó el vendedor.
  */
 
-import { normalizarColor, codigoDeModelo } from "./colores";
+import { normalizarColor } from "./colores";
 
 const CLAVES_TALLE = ["size", "talla", "talle", "tamaño", "tamano", "尺码", "尺寸"];
 const CLAVES_COLOR = ["color", "colores", "colour", "颜色"];
@@ -106,28 +106,12 @@ export function parseColor(variante?: string | null): string | null {
 }
 
 /**
- * Código de modelo del vendedor, que CSSBuy manda pegado al color:
- * "Color:S285 white" -> "S285", "颜色:0079白" -> "0079". Distingue productos
- * que en la tienda se llaman igual.
- */
-export function parseModelo(variante?: string | null): string | null {
-  const texto = (variante || "").trim();
-  if (!texto) return null;
-  const ps = pares(texto);
-  if (ps.length === 0) return codigoDeModelo(texto);
-  const color = ps.find((p) => CLAVES_COLOR.includes(p.clave));
-  return codigoDeModelo((color ?? ps[0]).valor);
-}
-
-/**
- * La variante para mostrar, sin el talle (que va aparte): "Negro · mod. 581".
- * Si no se reconoce ni color ni modelo, el texto sin el talle.
+ * La variante para mostrar, sin el talle (que va aparte): el color en español
+ * ("颜色:EM102黑（白膜直喷;尺码:L" -> "Negro"), o el texto sin el talle si no
+ * se reconoce un color. El código del vendedor no se muestra.
  */
 export function resumenVariante(variante?: string | null): string | null {
-  const color = parseColor(variante);
-  const modelo = parseModelo(variante);
-  if (color || modelo) return [color, modelo && `mod. ${modelo}`].filter(Boolean).join(" · ");
-  return varianteSinTalle(variante);
+  return parseColor(variante) ?? varianteSinTalle(variante);
 }
 
 /** Ordena talles de menor a mayor; los desconocidos van al final, alfabéticos. */

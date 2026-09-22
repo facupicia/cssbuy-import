@@ -1,7 +1,7 @@
 import { InventoryItem } from "./types";
 import { calcInventoryItem } from "./inventory";
 import { generarDescripcionHTML } from "./descripcion";
-import { varianteSinTalle, parseColor, parseModelo, canonizar } from "./variantes";
+import { varianteSinTalle, parseColor, canonizar } from "./variantes";
 import { normalizarColor } from "./colores";
 
 /**
@@ -80,8 +80,8 @@ export interface TiendanubeOptions {
    */
   descuentoEfectivoPct?: number;
   /**
-   * Suma color y modelo a los productos que se llaman igual (ver
-   * nombresParaTienda). Por defecto sí.
+   * Suma el color, y si hace falta un número, a los productos que se llaman
+   * igual (ver nombresParaTienda). Por defecto sí.
    */
   diferenciarNombres?: boolean;
   /**
@@ -190,13 +190,15 @@ function colorParaNombre(it: InventoryItem): string | null {
 /**
  * Nombres para la tienda sin repetidos, por id de ítem.
  *
- * En el inventario muchos productos se llaman igual (13 "Buzo Sp5der VVS" de
- * modelos y precios distintos) y en la tienda quedaban idénticos. A los que se
- * repiten se les suma el color; si todavía chocan, el modelo del vendedor
- * ("Buzo Sp5der VVS Negro (581)"), y recién si no hay modelo, un número.
- * El modelo va antes que el número porque no depende del orden: el nombre, y
- * con él el identificador de URL, sale igual en cada exportación y reimportar
- * actualiza el producto en vez de duplicarlo.
+ * En el inventario muchos productos se llaman igual (varias "Remera Valley
+ * Dreams" de modelos distintos) y en la tienda quedaban idénticos. A los que se
+ * repiten se les suma el color; si todavía chocan, un número: "Remera Valley
+ * Dreams Negro", "… Negro 2", "… Negro 3". El código del vendedor (581, EM102)
+ * no se usa: no le dice nada al cliente.
+ *
+ * El número se asigna ordenando por variante e id, no por el orden de la
+ * lista: así cada producto recibe el mismo nombre (y el mismo identificador de
+ * URL) en cada exportación, y reimportar lo actualiza en vez de duplicarlo.
  */
 export function nombresParaTienda(items: InventoryItem[]): Map<string, string> {
   const clave = (n: string) => n.toLowerCase();
@@ -220,15 +222,11 @@ export function nombresParaTienda(items: InventoryItem[]): Map<string, string> {
   }
 
   repite = repetidos(nombres);
-  for (const it of items) {
-    const n = nombres.get(it.id);
-    const modelo = n && repite(n) ? parseModelo(it.variante) : null;
-    if (n && modelo) nombres.set(it.id, `${n} (${modelo})`);
-  }
-
-  repite = repetidos(nombres);
+  const orden = [...items].sort(
+    (a, b) => (a.variante ?? "").localeCompare(b.variante ?? "") || a.id.localeCompare(b.id)
+  );
   const vistos = new Map<string, number>();
-  for (const it of items) {
+  for (const it of orden) {
     const n = nombres.get(it.id);
     if (!n || !repite(n)) continue;
     const k = (vistos.get(clave(n)) ?? 0) + 1;

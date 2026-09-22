@@ -108,7 +108,7 @@ const PATRON = new RegExp(
   "g"
 );
 
-/** Código de modelo al principio: "S285", "EM102", "0079", "V560". */
+/** Código del vendedor al principio ("S285", "EM102", "0079"): se descarta. */
 const CODIGO = /^\s*([A-Za-z]{0,3}\d{2,5}[A-Za-z]?)(?=[\s\u3400-\u9fff（(]|$)/;
 
 function sinTildes(texto: string): string {
@@ -138,10 +138,4 @@ export function normalizarColor(valor?: string | null): string | null {
   if (vistos.length === 0) return null;
   // Más de dos colores ya es un estampado: con los dos primeros alcanza.
   return vistos.slice(0, 2).join(" y ");
-}
-
-/** Código de modelo del vendedor que va antes del color, o null. */
-export function codigoDeModelo(valor?: string | null): string | null {
-  const m = (valor || "").match(CODIGO);
-  return m ? m[1].toUpperCase() : null;
 }
