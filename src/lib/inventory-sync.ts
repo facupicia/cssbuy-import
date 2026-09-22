@@ -34,49 +34,68 @@ export interface SyncPlan {
   sinMatch: { id: string; nombre: string; motivo: string }[];
 }
 
-interface ProductoCotizado {
+export interface ProductoCotizado {
+  /** "" si el producto se cargó a mano en la cotización. */
   oid: string;
+  nombre: string;
+  imagen: string | null;
   precioARS: number;
   costoARS: number;
   costoUSD: number;
   cotizacionId: string;
   cotizacionNombre: string;
+  fecha: string;
 }
 
 /**
- * Arma el índice oid -> producto cotizado. Si un oid aparece en varias
- * cotizaciones gana la más reciente, que es la decisión vigente.
+ * Todos los productos cotizados, de la cotización más nueva a la más vieja.
+ * Si un oid aparece en varias cotizaciones queda solo el de la más reciente,
+ * que es la decisión vigente. Los que no tienen ni precio ni costo no sirven
+ * para nada y se saltean.
  */
-export function indexarCotizaciones(cotizaciones: Cotizacion[]): Map<string, ProductoCotizado> {
+export function productosCotizados(cotizaciones: Cotizacion[]): ProductoCotizado[] {
   const porFecha = [...cotizaciones].sort(
     (a, b) => new Date(b.fecha || 0).getTime() - new Date(a.fecha || 0).getTime()
   );
 
-  const idx = new Map<string, ProductoCotizado>();
+  const vistos = new Set<string>();
+  const out: ProductoCotizado[] = [];
 
   for (const cot of porFecha) {
     const calcs = cot.resultados?.productosCalc ?? [];
     for (const pc of calcs) {
-      const oid = pc.oid;
-      if (!oid) continue;
-      if (idx.has(oid)) continue; // ya lo tomó una cotización más nueva
+      const oid = (pc.oid || "").trim();
+      if (oid && vistos.has(oid)) continue; // ya lo tomó una cotización más nueva
 
       // ventaUnitARS ya resuelve la precedencia precio manual > sugerido.
       const precioARS = Number(pc.ventaUnitARS) || 0;
       const costoARS = Number(pc.costoUnitARS) || 0;
       if (precioARS <= 0 && costoARS <= 0) continue;
 
-      idx.set(oid, {
+      if (oid) vistos.add(oid);
+      out.push({
         oid,
+        nombre: pc.nombre || "Sin nombre",
+        imagen: pc.imgURL || null,
         precioARS,
         costoARS,
         costoUSD: Number(pc.costoUnitUSD) || 0,
         cotizacionId: cot.id,
         cotizacionNombre: cot.nombre || "Sin nombre",
+        fecha: cot.fecha,
       });
     }
   }
 
+  return out;
+}
+
+/** Índice oid -> producto cotizado vigente. */
+export function indexarCotizaciones(cotizaciones: Cotizacion[]): Map<string, ProductoCotizado> {
+  const idx = new Map<string, ProductoCotizado>();
+  for (const p of productosCotizados(cotizaciones)) {
+    if (p.oid) idx.set(p.oid, p);
+  }
   return idx;
 }
 

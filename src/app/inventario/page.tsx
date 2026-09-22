@@ -76,6 +76,8 @@ import { toast } from "@/components/ui/Toast";
 import { InventoryCharts } from "@/components/InventoryCharts";
 import { TiendanubeExportDialog } from "@/components/inventario/TiendanubeExportDialog";
 import { BulkEditDialog, type BulkChanges } from "@/components/inventario/BulkEditDialog";
+import { CotizacionPrecioPicker } from "@/components/inventario/CotizacionPrecioPicker";
+import type { ProductoCotizado } from "@/lib/inventory-sync";
 import { SyncCotizacionDialog } from "@/components/inventario/SyncCotizacionDialog";
 import { MarcasDialog } from "@/components/inventario/MarcasDialog";
 import { DescripcionDialog } from "@/components/inventario/DescripcionDialog";
@@ -101,6 +103,11 @@ interface FormState {
   /** Si está activo, el stock se maneja individualmente por cada talle */
   modoTalles: boolean;
   talles: InventoryTalle[];
+  /**
+   * oid de CSSBuy que vincula el ítem con su producto en las cotizaciones.
+   * Un ítem cargado a mano lo toma al traerle el precio de una cotización.
+   */
+  origenRef: string;
 }
 
 const EMPTY_FORM: FormState = {
@@ -120,6 +127,7 @@ const EMPTY_FORM: FormState = {
   marcaId: "",
   modoTalles: false,
   talles: [],
+  origenRef: "",
 };
 
 function itemToForm(it: InventoryItem): FormState {
@@ -141,6 +149,7 @@ function itemToForm(it: InventoryItem): FormState {
     marcaId: it.marcaId ?? "",
     modoTalles: tieneTalles,
     talles: tieneTalles ? it.talles!.map((t) => ({ ...t })) : [],
+    origenRef: it.origenRef ?? "",
   };
 }
 
@@ -1436,6 +1445,31 @@ function ItemFormDialog({
     setForm((f) => ({ ...f, [key]: val }));
 
   const [nuevoTalleTxt, setNuevoTalleTxt] = useState("");
+  const [cotizacionAbierta, setCotizacionAbierta] = useState(false);
+
+  useEffect(() => {
+    if (!open) setCotizacionAbierta(false);
+  }, [open]);
+
+  /**
+   * Trae precio y costo del producto cotizado. El costo va junto porque la
+   * cotización ya prorratea flete, impuestos y depósito: dejar el costo viejo
+   * inflaría el margen. Si el ítem no tenía oid, toma el del producto para que
+   * "Precios de cotización" lo mantenga al día después.
+   */
+  function traerDeCotizacion(p: ProductoCotizado) {
+    setForm((f) => ({
+      ...f,
+      precioVentaARS: p.precioARS > 0 ? Math.round(p.precioARS) : f.precioVentaARS,
+      costoUnitARS: p.costoARS > 0 ? Math.round(p.costoARS) : f.costoUnitARS,
+      costoUnitUSD: p.costoUSD > 0 ? p.costoUSD : f.costoUnitUSD,
+      origenRef: f.origenRef || p.oid,
+    }));
+    setCotizacionAbierta(false);
+    toast.success(`Precio traído de "${p.cotizacionNombre}"`, {
+      description: `Venta ${fmtARS(p.precioARS)} · costo ${fmtARS(p.costoARS)}`,
+    });
+  }
 
   // Con varios talles, los totales del ítem son la suma de los talles.
   const setTalles = (fn: (talles: InventoryTalle[]) => InventoryTalle[]) =>
@@ -1784,6 +1818,32 @@ function ItemFormDialog({
               placeholder="https://…"
             />
           </div>
+
+          <div className="flex items-center justify-between gap-2 -mb-1">
+            <span className="text-xs font-medium text-[var(--color-fg-muted)] tracking-wide uppercase">
+              Costo y precio
+            </span>
+            {!cotizacionAbierta && (
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                icon={<FileText className="h-3.5 w-3.5" />}
+                onClick={() => setCotizacionAbierta(true)}
+              >
+                Traer de cotización
+              </Button>
+            )}
+          </div>
+
+          {cotizacionAbierta && (
+            <CotizacionPrecioPicker
+              nombreItem={form.nombre}
+              oidItem={form.origenRef}
+              onPick={traerDeCotizacion}
+              onClose={() => setCotizacionAbierta(false)}
+            />
+          )}
 
           <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
             <NumberField

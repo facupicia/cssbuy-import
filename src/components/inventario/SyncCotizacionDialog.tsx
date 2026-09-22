@@ -172,7 +172,8 @@ export function SyncCotizacionDialog({
                   <AlertTriangle className="h-4 w-4 shrink-0 mt-px" />
                   <span>
                     Ningún ítem del inventario matchea con una cotización. El vínculo es el
-                    número de orden de CSSBuy: los ítems cargados a mano no lo tienen.
+                    número de orden de CSSBuy: los ítems cargados a mano lo toman cuando les
+                    traés el precio con &quot;Traer de cotización&quot; al editarlos.
                   </span>
                 </p>
               )}
