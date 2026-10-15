@@ -1,0 +1,170 @@
+{
+  "schemaVersion": 2,
+  "generatedAt": "2026-10-15T13:27:40.534150+00:00",
+  "title": "Design System: PLUG / CSSBuy Calculator",
+  "extensions": {
+    "shadows": [
+      {
+        "name": "shadow-xs",
+        "value": "0 1px 2px 0 rgba(12, 10, 9, 0.04)",
+        "purpose": "Existing CSS token; Tailwind shadow utilities are separate."
+      },
+      {
+        "name": "shadow-sm",
+        "value": "0 1px 3px 0 rgba(12, 10, 9, 0.06), 0 1px 2px -1px rgba(12, 10, 9, 0.04)",
+        "purpose": "Existing CSS token; Tailwind shadow utilities are separate."
+      },
+      {
+        "name": "shadow-md",
+        "value": "0 4px 6px -1px rgba(12, 10, 9, 0.07), 0 2px 4px -2px rgba(12, 10, 9, 0.04)",
+        "purpose": "Existing CSS token; Tailwind shadow utilities are separate."
+      },
+      {
+        "name": "shadow-lg",
+        "value": "0 10px 15px -3px rgba(12, 10, 9, 0.08), 0 4px 6px -4px rgba(12, 10, 9, 0.03)",
+        "purpose": "Existing CSS token; Tailwind shadow utilities are separate."
+      },
+      {
+        "name": "shadow-xl",
+        "value": "0 20px 25px -5px rgba(12, 10, 9, 0.09), 0 8px 10px -6px rgba(12, 10, 9, 0.03)",
+        "purpose": "Existing CSS token; Tailwind shadow utilities are separate."
+      },
+      {
+        "name": "shadow-sticky",
+        "value": "6px 0 8px -6px rgba(12, 10, 9, 0.18)",
+        "purpose": "Existing CSS token; Tailwind shadow utilities are separate."
+      }
+    ],
+    "motion": [
+      {
+        "name": "transition-fast",
+        "value": "120ms cubic-bezier(0.4, 0, 0.2, 1)",
+        "purpose": "Existing CSS transition token."
+      },
+      {
+        "name": "transition-normal",
+        "value": "180ms cubic-bezier(0.4, 0, 0.2, 1)",
+        "purpose": "Existing CSS transition token."
+      },
+      {
+        "name": "transition-slow",
+        "value": "260ms cubic-bezier(0.4, 0, 0.2, 1)",
+        "purpose": "Existing CSS transition token."
+      }
+    ],
+    "breakpoints": [
+      {
+        "name": "sm",
+        "value": "640px"
+      },
+      {
+        "name": "md",
+        "value": "768px"
+      },
+      {
+        "name": "lg",
+        "value": "1024px"
+      }
+    ]
+  },
+  "components": [
+    {
+      "name": "Primary Button",
+      "kind": "button",
+      "refersTo": "button-primary",
+      "description": "Existing Button variant, medium size.",
+      "html": "<button class=\"ds-btn ds-primary\">Actualizar reporte</button>",
+      "css": ".ds-btn{display:inline-flex;align-items:center;justify-content:center;gap:.5rem;font-family:var(--font-sans);font-size:.875rem;line-height:1.25rem;font-weight:500;height:2.25rem;padding:0 .875rem;border-radius:var(--radius);cursor:pointer;transition:all 150ms cubic-bezier(.4,0,.2,1)}.ds-btn:focus-visible{outline:2px solid var(--color-border-focus);outline-offset:2px;border-radius:var(--radius-sm)}.ds-btn:disabled{opacity:.5;pointer-events:none}.ds-primary{background:var(--color-fg);color:var(--color-bg);border:0;box-shadow:0 1px 3px 0 rgb(0 0 0 / .1),0 1px 2px -1px rgb(0 0 0 / .1)}.ds-primary:hover{opacity:.9}.ds-primary:active{transform:scale(.98)}"
+    },
+    {
+      "name": "Secondary Button",
+      "kind": "button",
+      "refersTo": "button-secondary",
+      "description": "Existing Button variant, medium size.",
+      "html": "<button class=\"ds-btn ds-secondary\">Actualizar reporte</button>",
+      "css": ".ds-btn{display:inline-flex;align-items:center;justify-content:center;gap:.5rem;font-family:var(--font-sans);font-size:.875rem;line-height:1.25rem;font-weight:500;height:2.25rem;padding:0 .875rem;border-radius:var(--radius);cursor:pointer;transition:all 150ms cubic-bezier(.4,0,.2,1)}.ds-btn:focus-visible{outline:2px solid var(--color-border-focus);outline-offset:2px;border-radius:var(--radius-sm)}.ds-btn:disabled{opacity:.5;pointer-events:none}.ds-secondary{background:var(--color-bg-subtle);color:var(--color-fg);border:1px solid var(--color-border)}.ds-secondary:hover{background:var(--color-bg-muted)}.ds-secondary:active{transform:scale(.98)}"
+    },
+    {
+      "name": "Danger Button",
+      "kind": "button",
+      "refersTo": "button-danger",
+      "description": "Existing Button variant, medium size.",
+      "html": "<button class=\"ds-btn ds-danger\">Actualizar reporte</button>",
+      "css": ".ds-btn{display:inline-flex;align-items:center;justify-content:center;gap:.5rem;font-family:var(--font-sans);font-size:.875rem;line-height:1.25rem;font-weight:500;height:2.25rem;padding:0 .875rem;border-radius:var(--radius);cursor:pointer;transition:all 150ms cubic-bezier(.4,0,.2,1)}.ds-btn:focus-visible{outline:2px solid var(--color-border-focus);outline-offset:2px;border-radius:var(--radius-sm)}.ds-btn:disabled{opacity:.5;pointer-events:none}.ds-danger{background:var(--color-danger);color:white;border:0}.ds-danger:hover{opacity:.9}.ds-danger:active{transform:scale(.98)}"
+    },
+    {
+      "name": "Ghost Button",
+      "kind": "button",
+      "refersTo": "button-ghost",
+      "description": "Existing Button variant, medium size.",
+      "html": "<button class=\"ds-btn ds-ghost\">Actualizar reporte</button>",
+      "css": ".ds-btn{display:inline-flex;align-items:center;justify-content:center;gap:.5rem;font-family:var(--font-sans);font-size:.875rem;line-height:1.25rem;font-weight:500;height:2.25rem;padding:0 .875rem;border-radius:var(--radius);cursor:pointer;transition:all 150ms cubic-bezier(.4,0,.2,1)}.ds-btn:focus-visible{outline:2px solid var(--color-border-focus);outline-offset:2px;border-radius:var(--radius-sm)}.ds-btn:disabled{opacity:.5;pointer-events:none}.ds-ghost{background:transparent;color:var(--color-fg-muted);border:0}.ds-ghost:hover{background:var(--color-bg-subtle);color:var(--color-fg)}"
+    },
+    {
+      "name": "Outline Button",
+      "kind": "button",
+      "refersTo": "button-outline",
+      "description": "Existing Button variant, medium size.",
+      "html": "<button class=\"ds-btn ds-outline\">Actualizar reporte</button>",
+      "css": ".ds-btn{display:inline-flex;align-items:center;justify-content:center;gap:.5rem;font-family:var(--font-sans);font-size:.875rem;line-height:1.25rem;font-weight:500;height:2.25rem;padding:0 .875rem;border-radius:var(--radius);cursor:pointer;transition:all 150ms cubic-bezier(.4,0,.2,1)}.ds-btn:focus-visible{outline:2px solid var(--color-border-focus);outline-offset:2px;border-radius:var(--radius-sm)}.ds-btn:disabled{opacity:.5;pointer-events:none}.ds-outline{background:transparent;color:var(--color-fg);border:1px solid var(--color-border)}.ds-outline:hover{background:var(--color-bg-subtle)}"
+    },
+    {
+      "name": "Text Field",
+      "kind": "input",
+      "refersTo": "input",
+      "description": "Existing Input with uppercase label and border-only focus.",
+      "html": "<label class=\"ds-field\">Desde<input class=\"ds-input\" type=\"date\" value=\"2026-10-01\"></label>",
+      "css": ".ds-field{display:block;font:500 .75rem/1rem var(--font-sans);letter-spacing:.025em;text-transform:uppercase;color:var(--color-fg-muted)}.ds-input{display:block;margin-top:.375rem;width:100%;height:2.25rem;padding:0 .75rem;border:1px solid var(--color-border);border-radius:var(--radius);background:var(--color-bg-elevated);color:var(--color-fg);font:400 .875rem/1.25rem var(--font-sans);transition:color 150ms,border-color 150ms,background-color 150ms}.ds-input:focus{outline:none;border-color:var(--color-border-focus)}.ds-input:disabled{opacity:.5;background:var(--color-bg-subtle)}"
+    },
+    {
+      "name": "Default Card",
+      "kind": "card",
+      "refersTo": "card",
+      "description": "Existing medium-padding bordered card.",
+      "html": "<div class=\"ds-card\">Abrir panel privado</div>",
+      "css": ".ds-card{padding:1.25rem;border:1px solid var(--color-border);border-radius:var(--radius-lg);background:var(--color-bg-elevated);color:var(--color-fg);font:400 .9375rem/1.55 var(--font-sans);box-shadow:0 1px 2px 0 rgb(0 0 0 / .05)}"
+    },
+    {
+      "name": "Default Badge",
+      "kind": "chip",
+      "refersTo": "badge",
+      "description": "Existing non-interactive status pill.",
+      "html": "<span class=\"ds-badge\">Estado</span>",
+      "css": ".ds-badge{display:inline-flex;align-items:center;gap:.375rem;padding:.125rem .625rem;border:1px solid var(--color-border);border-radius:9999px;background:var(--color-bg-muted);color:var(--color-fg);font:500 .75rem/1rem var(--font-sans)}"
+    },
+    {
+      "name": "Desktop Navigation",
+      "kind": "nav",
+      "description": "Existing muted active destination and subtle hover surface.",
+      "html": "<nav class=\"ds-nav\" aria-label=\"Principal\"><a class=\"ds-link\" href=\"#inventario\">Inventario</a><a class=\"ds-link ds-current\" aria-current=\"page\" href=\"#publicidad\">Publicidad</a></nav>",
+      "css": ".ds-nav{display:flex;align-items:center;gap:.25rem}.ds-link{display:flex;align-items:center;gap:.5rem;padding:.375rem .75rem;border-radius:var(--radius-sm);font:500 .75rem/1rem var(--font-sans);color:var(--color-fg-muted);text-decoration:none;transition:color 150ms,background-color 150ms}.ds-link:hover{color:var(--color-fg);background:var(--color-bg-subtle)}.ds-current{background:var(--color-bg-muted);color:var(--color-fg);font-weight:600}.ds-link:focus-visible{outline:2px solid var(--color-border-focus);outline-offset:2px}"
+    }
+  ],
+  "narrative": {
+    "overview": "This is a code-derived record of the incumbent interface, not a new visual identity. Warm neutral surfaces, compact controls, restrained emerald accents, and dense numeric tables support the owner's daily operational work. No creative metaphor or brand adjectives have been independently approved.",
+    "keyCharacteristics": [
+      "Compact system typography and small uppercase field labels.",
+      "Bordered, softly rounded surfaces with low elevation.",
+      "Shared desktop navigation and fixed mobile navigation.",
+      "Light and dark themes driven by the existing CSS custom properties."
+    ],
+    "rules": [
+      {
+        "name": "The Utility Scale Rule",
+        "body": "The custom `--text-*` and `--space-*` scales coexist with Tailwind defaults; they are not interchangeable. For example, the page heading's `text-3xl` resolves to the headline role above, while `--text-3xl` is a different, unused value here. Card `p-5` is 1.25rem, not `--space-5`.",
+        "section": "typography"
+      }
+    ],
+    "dos": [
+      "Do reuse existing UI primitives and theme variables.",
+      "Do retain compact labels, tabular figures, and horizontal table scrolling.",
+      "Do reserve bottom space for the fixed mobile navigation.",
+      "Do preserve explicit error, loading, and empty states."
+    ],
+    "donts": [
+      "Don't substitute custom type or spacing tokens for similarly named Tailwind utilities without checking values.",
+      "Don't use emerald as a replacement for the incumbent dark primary button.",
+      "Don't imply inventory-based planning limits are attributed campaign results or net business profit."
+    ]
+  }
+}

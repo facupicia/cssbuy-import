@@ -16,3 +16,6 @@ Thumbs.db
 # Symlinks que genera el CLI de skills: apuntan a rutas absolutas de cada
 # máquina. Los skills en sí viven en .agents/ y se re-enlazan con `skills install`.
 .claude/skills/
+
+# Capturas locales de validación; no son assets de la aplicación.
+.impeccable/review/

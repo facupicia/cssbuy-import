@@ -12,6 +12,7 @@ import {
   Sun,
   RefreshCw,
   MoreHorizontal,
+  ChartNoAxesCombined,
 } from "lucide-react";
 import { Button } from "./ui/Button";
 import { Menu, MenuTrigger, MenuContent, MenuItem, MenuLabel } from "./ui/Menu";
@@ -23,6 +24,7 @@ const links = [
   { href: "/cotizaciones", label: "Cotizaciones", icon: FileText },
   { href: "/inventario", label: "Inventario", icon: Boxes },
   { href: "/records", label: "Balance", icon: Receipt },
+  { href: "/publicidad", label: "Publicidad", icon: ChartNoAxesCombined },
 ];
 
 export function Navbar({
@@ -189,7 +191,7 @@ export function Navbar({
 
       {/* Navegación inferior en mobile: alcanzable con el pulgar */}
       <nav className="md:hidden fixed bottom-0 inset-x-0 z-40 border-t border-[var(--color-border)] bg-[var(--color-bg-elevated)]/95 backdrop-blur-md">
-        <div className="grid grid-cols-4">
+        <div className="grid grid-cols-5">
           {links.map((link) => {
             const active = pathname === link.href;
             const Icon = link.icon;

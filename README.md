@@ -25,6 +25,10 @@ npm run dev
 
 La app estará disponible en [http://localhost:3001](http://localhost:3001).
 
+## Publicidad y rentabilidad
+
+El panel `/publicidad` consulta Meta y calcula límites de adquisición con el inventario. Requiere configuración privada en el servidor; no atribuye las ventas acumuladas a campañas. Ver [configuración, API de lectura y límites del análisis](docs/publicidad.md).
+
 ## Variables de Entorno (Opcionales)
 
 Para sincronizar las cotizaciones con Supabase, creá un archivo `.env.local`:

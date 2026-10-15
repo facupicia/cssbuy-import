@@ -1,0 +1,56 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "PLUG: costos y publicidad",
+    "version": "1.0.0",
+    "description": "Lectura de costos actuales y reportes atribuidos de Meta. No asigna ventas acumuladas a campañas ni calcula ganancia neta."
+  },
+  "servers": [{ "url": "https://db.vidaeventofiesta.site" }],
+  "security": [{ "businessReadKey": [] }],
+  "components": {
+    "securitySchemes": {
+      "businessReadKey": { "type": "http", "scheme": "bearer" }
+    }
+  },
+  "paths": {
+    "/api/integraciones/costos": {
+      "get": {
+        "operationId": "getProductAdEconomics",
+        "summary": "Consultar costos actuales y límites de adquisición por producto en ARS",
+        "description": "Una unidad por pedido. Los gastos omitidos son cero y no se descuentan. No representa rentabilidad histórica ni ventas atribuidas.",
+        "parameters": [
+          { "in": "query", "name": "feePercent", "schema": { "type": "number", "minimum": 0, "maximum": 100, "default": 0 } },
+          { "in": "query", "name": "shippingARS", "schema": { "type": "number", "minimum": 0, "maximum": 1000000000, "default": 0 } },
+          { "in": "query", "name": "packagingARS", "schema": { "type": "number", "minimum": 0, "maximum": 1000000000, "default": 0 } },
+          { "in": "query", "name": "targetProfitARS", "schema": { "type": "number", "minimum": 0, "maximum": 1000000000, "default": 0 } }
+        ],
+        "responses": {
+          "200": { "description": "Foto actual del inventario, supuestos y límites. Los costos incompletos devuelven límites nulos.", "content": { "application/json": { "schema": { "type": "object", "properties": { "currency": { "type": "string" }, "generatedAt": { "type": "string", "format": "date-time" }, "assumptions": { "type": "object", "additionalProperties": { "type": "number" } }, "scope": { "type": "string" }, "products": { "type": "array", "items": { "type": "object", "additionalProperties": true } } } } } } },
+          "400": { "description": "Parámetros inválidos" },
+          "401": { "description": "Clave de lectura inválida" },
+          "429": { "description": "Límite de consultas alcanzado" },
+          "502": { "description": "Inventario no disponible" },
+          "503": { "description": "Integración sin configurar" }
+        }
+      }
+    },
+    "/api/integraciones/meta": {
+      "get": {
+        "operationId": "getMetaCampaignReport",
+        "summary": "Consultar campañas con actividad en el período, gasto y compras web atribuidas de Meta",
+        "parameters": [
+          { "in": "query", "name": "since", "required": true, "schema": { "type": "string", "format": "date" } },
+          { "in": "query", "name": "until", "required": true, "schema": { "type": "string", "format": "date" } }
+        ],
+        "responses": {
+          "200": { "description": "Reporte en la moneda de cada campaña. Evento ausente se representa como null. No sumar ni convertir monedas sin un tipo de cambio explícito.", "content": { "application/json": { "schema": { "type": "object", "properties": { "range": { "type": "object", "properties": { "since": { "type": "string" }, "until": { "type": "string" } } }, "generatedAt": { "type": "string", "format": "date-time" }, "campaigns": { "type": "array", "items": { "type": "object", "additionalProperties": true } }, "attribution": { "type": "string" }, "warning": { "type": "string" } } } } } },
+          "400": { "description": "Fechas inválidas o intervalo excesivo" },
+          "401": { "description": "Clave de lectura inválida" },
+          "429": { "description": "Límite de consultas alcanzado" },
+          "502": { "description": "No se pudo obtener un reporte completo" },
+          "503": { "description": "Integración sin configurar" }
+        }
+      }
+    }
+  }
+}
