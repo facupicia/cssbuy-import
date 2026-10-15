@@ -1316,6 +1316,7 @@ function NumberField({
   prefix,
   step,
   min = 0,
+  decimals,
 }: {
   label: string;
   value: number;
@@ -1323,7 +1324,12 @@ function NumberField({
   prefix?: string;
   step?: string;
   min?: number;
+  decimals?: number;
 }) {
+  const [draft, setDraft] = useState<string | null>(null);
+  const displayValue = value === 0 || !Number.isFinite(value)
+    ? ""
+    : decimals === undefined ? String(value) : value.toFixed(decimals);
   return (
     <Input
       label={label}
@@ -1332,9 +1338,14 @@ function NumberField({
       min={min}
       step={step}
       prefix={prefix}
-      value={value === 0 || !Number.isFinite(value) ? "" : value}
+      value={draft ?? displayValue}
       placeholder="0"
-      onChange={(e) => onChange(e.target.value === "" ? 0 : Number(e.target.value))}
+      onFocus={() => { if (decimals !== undefined) setDraft(displayValue); }}
+      onBlur={() => setDraft(null)}
+      onChange={(e) => {
+        if (decimals !== undefined) setDraft(e.target.value);
+        onChange(e.target.value === "" ? 0 : Number(e.target.value));
+      }}
     />
   );
 }
@@ -1812,6 +1823,7 @@ function ItemFormDialog({
               label="Costo unit. USD"
               prefix="$"
               step="0.01"
+              decimals={2}
               value={form.costoUnitUSD}
               onChange={(n) => set("costoUnitUSD", n)}
             />
