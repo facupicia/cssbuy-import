@@ -1,4 +1,5 @@
 import path from "path";
+import { isValidCssbuyOrder } from "./cssbuy-status";
 import fs from "fs";
 import crypto from "crypto";
 import { ensureCssbuyOrdersTable, upsertCssbuyOrders, type CssbuyOrderRow } from "./db";
@@ -27,86 +28,7 @@ type LogFn = (msg: string) => void;
 const ID_KEYS = ["oid", "order_sn", "ordersn", "orderSn", "order_no", "orderNo", "orderid", "order_id", "id"];
 
 export function isValidOrder(item: RawItem): boolean {
-  if (!item || typeof item !== "object") return false;
-  const s = item.state ?? item.status ?? item.orderState ?? item.order_state ?? item.goods_status ?? item.order_status ?? item.pay_status ?? item.cancel_status ?? item.refund_status;
-  const sStr = s != null ? String(s).trim() : "";
-  if (sStr === "0" || sStr === "-1" || sStr === "7" || sStr === "8" || sStr === "9" || sStr === "10") return false;
-
-  const isDel = item.is_del ?? item.isdel ?? item.is_delete ?? item.deleted;
-  if (String(isDel) === "1" || String(isDel) === "true") return false;
-
-  const cancelStatus = item.cancel_status ?? item.cancelStatus;
-  if (String(cancelStatus) === "1" || String(cancelStatus) === "2") return false;
-
-  const refundStatus = item.refund_status ?? item.refundStatus;
-  if (String(refundStatus) === "1" || String(refundStatus) === "2") return false;
-
-  const stateName = toStr(
-    getPath(item, [
-      "statename", "status_name", "statusName", "state_name", "stateName", "status", "state", "orderState", "order_state", "remark",
-    ])
-  )?.toLowerCase() || "";
-
-  if (
-    !stateName ||
-    stateName === "0" ||
-    stateName === "-1" ||
-    stateName === "7" ||
-    stateName === "8" ||
-    stateName === "9" ||
-    stateName === "10" ||
-    stateName.includes("invalid") ||
-    stateName.includes("inválid") ||
-    stateName.includes("invalida") ||
-    stateName.includes("invalido") ||
-    stateName.includes("cancel") ||
-    stateName.includes("cancelled") ||
-    stateName.includes("canceled") ||
-    stateName.includes("cancelado") ||
-    stateName.includes("cancelada") ||
-    stateName.includes("refund") ||
-    stateName.includes("refunded") ||
-    stateName.includes("reembols") ||
-    stateName.includes("return") ||
-    stateName.includes("returned") ||
-    stateName.includes("devuelto") ||
-    stateName.includes("devoluc") ||
-    stateName.includes("close") ||
-    stateName.includes("closed") ||
-    stateName.includes("cerrado") ||
-    stateName.includes("cerrada") ||
-    stateName.includes("reject") ||
-    stateName.includes("unpaid") ||
-    stateName.includes("non-payment") ||
-    stateName.includes("out of stock") ||
-    stateName.includes("sin stock") ||
-    stateName.includes("agotado") ||
-    stateName.includes("expired") ||
-    stateName.includes("fail") ||
-    stateName.includes("problem") ||
-    stateName.includes("after sales") ||
-    stateName.includes("after-sales") ||
-    stateName.includes("无效") ||
-    stateName.includes("已取消") ||
-    stateName.includes("取消") ||
-    stateName.includes("退款") ||
-    stateName.includes("已退款") ||
-    stateName.includes("退货") ||
-    stateName.includes("已退货") ||
-    stateName.includes("关闭") ||
-    stateName.includes("已关闭") ||
-    stateName.includes("失效") ||
-    stateName.includes("已失效") ||
-    stateName.includes("缺货") ||
-    stateName.includes("未付款") ||
-    stateName.includes("异常") ||
-    stateName.includes("删除") ||
-    stateName.includes("拒绝") ||
-    stateName.includes("失败")
-  ) {
-    return false;
-  }
-  return true;
+  return isValidCssbuyOrder(item);
 }
 
 function isInDateRange(date: Date | null, startDate?: string, endDate?: string): boolean {

@@ -2,6 +2,7 @@
 
 import { useState, useMemo, useCallback, useEffect, useRef } from "react";
 import Link from "next/link";
+import { isValidCssbuyOrder, cssbuyOrderGroup, normalizeCssbuyOrders } from "@/lib/cssbuy-status";
 import {
   Plus,
   Trash2,
@@ -90,7 +91,7 @@ export default function CalculatorPage() {
   // CSSBuy Orders & Records
   const [orders, setOrders] = useState<CssbuyOrder[]>([]);
   const [ordersSearch, setOrdersSearch] = useState("");
-  const [ordersFilter, setOrdersFilter] = useState<"all" | "process" | "warehouse" | "other">("all");
+  const [ordersFilter, setOrdersFilter] = useState<"all" | "process" | "warehouse" | "shipped">("all");
   const [ordersStartDate, setOrdersStartDate] = useState<string>("");
   const [ordersEndDate, setOrdersEndDate] = useState<string>("");
   const [records, setRecords] = useState<CssbuyTransaction[]>([]);
@@ -143,17 +144,18 @@ export default function CalculatorPage() {
     try {
       const localOrders = JSON.parse(localStorage.getItem("cssbuy-orders") || "[]");
       if (Array.isArray(localOrders) && localOrders.length > 0) {
-        const valid = localOrders.filter((o: any) => !isInvalidOrder(o));
+        const valid = normalizeCssbuyOrders(localOrders);
         setOrders(valid);
         if (valid.length !== localOrders.length) {
           localStorage.setItem("cssbuy-orders", JSON.stringify(valid));
         }
-      } else {
+      }
+      {
         fetch("/api/cssbuy/sync")
           .then((r) => r.json())
           .then((data) => {
             if (data.ok && Array.isArray(data.orders) && data.orders.length > 0) {
-              const valid = data.orders.filter((o: any) => !isInvalidOrder(o));
+              const valid = normalizeCssbuyOrders(data.orders);
               setOrders(valid);
               localStorage.setItem("cssbuy-orders", JSON.stringify(valid));
             }
@@ -352,130 +354,9 @@ export default function CalculatorPage() {
     [productos]
   );
 
-  const isWarehouseOrder = (val: string | CssbuyOrder) => {
-    const status = typeof val === "string" ? val : val?.estado || "";
-    const s = status.toLowerCase();
-    return s.includes("warehouse") || s.includes("almac") || s.includes("arrived") || s.includes("入库") || s.includes("到仓");
-  };
-
-  const isInvalidOrder = (val: string | CssbuyOrder | any): boolean => {
-    if (!val) return true;
-    if (typeof val === "string") {
-      const s = val.toLowerCase().trim();
-      if (!s || s === "0" || s === "-1" || s === "7" || s === "8" || s === "9" || s === "10" || s === "null" || s === "undefined") return true;
-      return (
-        s.includes("invalid") ||
-        s.includes("inválid") ||
-        s.includes("invalida") ||
-        s.includes("invalido") ||
-        s.includes("cancel") ||
-        s.includes("cancelled") ||
-        s.includes("canceled") ||
-        s.includes("cancelado") ||
-        s.includes("cancelada") ||
-        s.includes("refund") ||
-        s.includes("refunded") ||
-        s.includes("reembols") ||
-        s.includes("return") ||
-        s.includes("returned") ||
-        s.includes("devuelto") ||
-        s.includes("devoluc") ||
-        s.includes("close") ||
-        s.includes("closed") ||
-        s.includes("cerrado") ||
-        s.includes("cerrada") ||
-        s.includes("reject") ||
-        s.includes("unpaid") ||
-        s.includes("non-payment") ||
-        s.includes("out of stock") ||
-        s.includes("sin stock") ||
-        s.includes("agotado") ||
-        s.includes("expired") ||
-        s.includes("fail") ||
-        s.includes("problem") ||
-        s.includes("after sales") ||
-        s.includes("after-sales") ||
-        s.includes("无效") ||
-        s.includes("已取消") ||
-        s.includes("取消") ||
-        s.includes("退款") ||
-        s.includes("已退款") ||
-        s.includes("退货") ||
-        s.includes("已退货") ||
-        s.includes("关闭") ||
-        s.includes("已关闭") ||
-        s.includes("失效") ||
-        s.includes("已失效") ||
-        s.includes("缺货") ||
-        s.includes("未付款") ||
-        s.includes("异常") ||
-        s.includes("删除") ||
-        s.includes("拒绝") ||
-        s.includes("失败")
-      );
-    }
-
-    const raw = val.raw || val;
-    const rawState = val.state ?? val.status ?? val.orderState ?? val.order_state ?? val.goods_status ?? val.order_status ?? val.pay_status ?? val.cancel_status ?? val.refund_status ??
-                     raw.state ?? raw.status ?? raw.orderState ?? raw.order_state ?? raw.goods_status ?? raw.order_status ?? raw.pay_status ?? raw.cancel_status ?? raw.refund_status;
-    const rawStateStr = String(rawState ?? "").trim();
-    if (rawStateStr === "0" || rawStateStr === "-1" || rawStateStr === "7" || rawStateStr === "8" || rawStateStr === "9" || rawStateStr === "10") {
-      return true;
-    }
-
-    const isDel = val.is_del ?? val.isdel ?? val.is_delete ?? val.deleted ?? raw.is_del ?? raw.isdel ?? raw.is_delete ?? raw.deleted;
-    if (String(isDel) === "1" || String(isDel) === "true") return true;
-
-    const cancelStatus = val.cancel_status ?? val.cancelStatus ?? raw.cancel_status ?? raw.cancelStatus;
-    if (String(cancelStatus) === "1" || String(cancelStatus) === "2") return true;
-
-    const refundStatus = val.refund_status ?? val.refundStatus ?? raw.refund_status ?? raw.refundStatus;
-    if (String(refundStatus) === "1" || String(refundStatus) === "2") return true;
-
-    const estadoStr = String(
-      val.estado ??
-      val.statename ??
-      val.status_name ??
-      val.statusName ??
-      val.state_name ??
-      val.stateName ??
-      val.status ??
-      val.state ??
-      raw.statename ??
-      raw.status_name ??
-      raw.statusName ??
-      raw.state_name ??
-      raw.stateName ??
-      raw.status ??
-      raw.state ??
-      ""
-    );
-
-    if (isInvalidOrder(estadoStr)) return true;
-
-    return false;
-  };
-
-  const isProcessOrder = (val: string | CssbuyOrder) => {
-    const status = typeof val === "string" ? val : val?.estado || "";
-    if (isInvalidOrder(status)) return false;
-    const s = status.toLowerCase();
-    return (
-      s.includes("order") ||
-      s.includes("paid") ||
-      s.includes("pago") ||
-      s.includes("dispatch") ||
-      s.includes("ship") ||
-      s.includes("process") ||
-      s.includes("submit") ||
-      s.includes("pending") ||
-      s.includes("en camino") ||
-      s.includes("订购") ||
-      s.includes("发货") ||
-      s.includes("付款") ||
-      s.includes("待")
-    );
-  };
+  const isWarehouseOrder = (value: unknown) => isValidCssbuyOrder(value) && cssbuyOrderGroup(value) === "warehouse";
+  const isProcessOrder = (value: unknown) => isValidCssbuyOrder(value) && cssbuyOrderGroup(value) === "process";
+  const isInvalidOrder = (value: unknown) => !isValidCssbuyOrder(value);
 
   const filteredOrders = useMemo(() => {
     return orders.filter((o) => {
@@ -485,7 +366,7 @@ export default function CalculatorPage() {
       // Filter by category
       if (ordersFilter === "warehouse" && !isWarehouseOrder(o.estado)) return false;
       if (ordersFilter === "process" && (!isProcessOrder(o.estado) || isWarehouseOrder(o.estado))) return false;
-      if (ordersFilter === "other" && (isWarehouseOrder(o.estado) || isProcessOrder(o.estado))) return false;
+      if (ordersFilter === "shipped" && cssbuyOrderGroup(o) !== "shipped") return false;
 
       // Filter by date range
       if (ordersStartDate) {
@@ -662,7 +543,7 @@ export default function CalculatorPage() {
           .then((r) => r.json())
           .then((data) => {
             if (data.ok && Array.isArray(data.orders) && data.orders.length > 0) {
-              const valid = data.orders.filter((o: any) => !isInvalidOrder(o));
+              const valid = normalizeCssbuyOrders(data.orders);
               setOrders(valid);
               localStorage.setItem("cssbuy-orders", JSON.stringify(valid));
               toast.success("Órdenes guardadas en base de datos", {
@@ -1204,14 +1085,14 @@ export default function CalculatorPage() {
                     <PackageCheck className="h-3 w-3" /> En Almacén ({orders.filter(isWarehouseOrder).length})
                   </button>
                   <button
-                    onClick={() => setOrdersFilter("other")}
+                    onClick={() => setOrdersFilter("shipped")}
                     className={`px-2.5 py-1 rounded text-xs font-medium transition-colors cursor-pointer whitespace-nowrap ${
-                      ordersFilter === "other"
+                      ordersFilter === "shipped"
                         ? "bg-[var(--color-fg)] text-[var(--color-bg)] font-semibold shadow-xs"
                         : "bg-[var(--color-bg-elevated)] text-[var(--color-fg-muted)] hover:text-[var(--color-fg)] border border-[var(--color-border)]"
                     }`}
                   >
-                    Otros ({orders.filter((o) => !isWarehouseOrder(o.estado) && !isProcessOrder(o.estado)).length})
+                    Enviados ({orders.filter(o => cssbuyOrderGroup(o) === "shipped").length})
                   </button>
                 </div>
 
@@ -1783,7 +1664,7 @@ export default function CalculatorPage() {
         onOpenChange={setCssbuyConnectionOpen}
         onBusyChange={setSyncingCssbuy}
         onSynced={data => {
-          const valid = data.orders.filter(o => !isInvalidOrder(o));
+          const valid = normalizeCssbuyOrders(data.orders);
           setOrders(valid);
           localStorage.setItem("cssbuy-orders", JSON.stringify(valid));
           if (!data.warning) {

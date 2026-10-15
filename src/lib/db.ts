@@ -1,6 +1,7 @@
 import { Pool } from "pg";
 import { fillInventoryWeights } from "./inventory-weight";
 import { withStoreCategory } from "./store-category";
+import { isValidCssbuyOrder, cssbuyStateLabel } from "./cssbuy-status";
 import type { InventoryItem, Marca } from "./types";
 import {
   isBulkPriceOp,
@@ -110,7 +111,7 @@ export async function getCssbuyOrders(): Promise<CssbuyOrderRow[]> {
   const res = await db.query(
     `SELECT id, order_no, status, title, total_cny, currency, tracking, order_date, raw, synced_at
      FROM cssbuy_orders
-     WHERE status NOT IN ('0', '-1', '7', '8', '9', '10')
+     WHERE status NOT IN ('0', '-1', '6', '8', '9', '10')
        AND LOWER(COALESCE(status, '')) NOT LIKE '%invalid%'
        AND LOWER(COALESCE(status, '')) NOT LIKE '%cancel%'
        AND LOWER(COALESCE(status, '')) NOT LIKE '%refund%'
@@ -125,7 +126,7 @@ export async function getCssbuyOrders(): Promise<CssbuyOrderRow[]> {
        AND COALESCE(status, '') NOT LIKE '%关闭%'
      ORDER BY order_date DESC NULLS LAST, id DESC`
   );
-  return res.rows;
+  return res.rows.filter(r => isValidCssbuyOrder({ ...r.raw, estado: r.status }));
 }
 
 export function rowToCssbuyOrder(r: CssbuyOrderRow) {
@@ -197,7 +198,7 @@ export function rowToCssbuyOrder(r: CssbuyOrderRow) {
     envio_local_cny: envioLocal,
     envio_china_cny: envioChina,
     cantidad,
-    estado: r.status || String(raw.statename ?? raw.status_name ?? raw.state ?? "Procesando"),
+    estado: cssbuyStateLabel({ ...raw, estado: r.status || raw.statename || raw.status_name || raw.state }),
     peso_g: pesoG,
     tracking: r.tracking || String(raw.expressno ?? raw.express_no ?? raw.tracking ?? ""),
     fecha_pedido: fecha,
