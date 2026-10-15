@@ -36,6 +36,7 @@ import {
   Marca,
   InventoryTalle,
   InventoryTalleCalc,
+  StoreProductProfile,
 } from "@/lib/types";
 import {
   calcInventoryItem,
@@ -83,6 +84,9 @@ import type { ProductoCotizado } from "@/lib/inventory-sync";
 import { SyncCotizacionDialog } from "@/components/inventario/SyncCotizacionDialog";
 import { MarcasDialog } from "@/components/inventario/MarcasDialog";
 import { DescripcionDialog } from "@/components/inventario/DescripcionDialog";
+import { StoreProductFields } from "@/components/inventario/StoreProductFields";
+import { StorePublishDialog } from "@/components/inventario/StorePublishDialog";
+import { EMPTY_STORE_PROFILE, sanitizeStoreProfile } from "@/lib/store-product";
 
 /* ── Formulario de ítem ──────────────────────────────────────────────── */
 
@@ -92,6 +96,7 @@ interface FormState {
   sku: string;
   link: string;
   imagen: string;
+  tienda: StoreProductProfile;
   cantidadInicial: number;
   cantidadVendida: number;
   costoUnitARS: number;
@@ -118,6 +123,7 @@ const EMPTY_FORM: FormState = {
   sku: "",
   link: "",
   imagen: "",
+  tienda: { ...EMPTY_STORE_PROFILE, fotos: [] },
   cantidadInicial: 1,
   cantidadVendida: 0,
   costoUnitARS: 0,
@@ -140,6 +146,7 @@ function itemToForm(it: InventoryItem): FormState {
     sku: it.sku ?? "",
     link: it.link ?? "",
     imagen: it.imagen ?? "",
+    tienda: it.tienda ?? { ...EMPTY_STORE_PROFILE, fotos: [] },
     cantidadInicial: it.cantidadInicial ?? 0,
     cantidadVendida: it.cantidadVendida ?? 0,
     costoUnitARS: it.costoUnitARS ?? 0,
@@ -195,6 +202,8 @@ export default function InventarioPage() {
   const [bulkOpen, setBulkOpen] = useState(false);
   const [bulkSaving, setBulkSaving] = useState(false);
   const [exportOpen, setExportOpen] = useState(false);
+  const [publishOpen, setPublishOpen] = useState(false);
+  const [returnToPublish, setReturnToPublish] = useState(false);
   const [confirmBulkDelete, setConfirmBulkDelete] = useState(false);
   const [orden, setOrden] = useState<OrdenInventario>("reciente");
   const [syncCotOpen, setSyncCotOpen] = useState(false);
@@ -421,6 +430,7 @@ export default function InventarioPage() {
   /* ── Acciones ─────────────────────────────────────────────────────── */
 
   function openNew() {
+    setReturnToPublish(false);
     setEditing(null);
     setForm(EMPTY_FORM);
     setFormOpen(true);
@@ -433,6 +443,8 @@ export default function InventarioPage() {
   }
 
   async function submitForm() {
+    try { sanitizeStoreProfile(form.tienda); }
+    catch (e) { toast.error(e instanceof Error ? e.message : "Revisá la ficha de tienda"); return; }
     if (!form.nombre.trim()) {
       toast.error("El nombre es obligatorio");
       return;
@@ -482,6 +494,7 @@ export default function InventarioPage() {
       }
       setFormOpen(false);
       await load();
+      if (returnToPublish) { setReturnToPublish(false); setPublishOpen(true); }
     } catch (err: any) {
       toast.error("No se pudo guardar", {
         description: err?.info?.error || err?.message,
@@ -605,6 +618,9 @@ export default function InventarioPage() {
                 </MenuItem>
                 <MenuItem icon={<Store className="h-3.5 w-3.5" />} disabled={items.length === 0} onSelect={() => setExportOpen(true)}>
                   Exportar a Tiendanube
+                </MenuItem>
+                <MenuItem icon={<Store className="h-3.5 w-3.5" />} disabled={items.length === 0} onSelect={() => setPublishOpen(true)}>
+                  Preparar y publicar productos
                 </MenuItem>
               </MenuContent>
             </Menu>
@@ -1246,6 +1262,14 @@ export default function InventarioPage() {
       />
 
       {/* Exportar a Tiendanube: lo seleccionado, o todo lo filtrado */}
+      <StorePublishDialog
+        open={publishOpen}
+        onOpenChange={setPublishOpen}
+        items={selectedVisibles.length > 0 ? selectedVisibles : filtered}
+        marcas={marcas}
+        onChanged={load}
+        onEdit={(item) => { setReturnToPublish(true); openEdit(item); }}
+      />
       <TiendanubeExportDialog
         open={exportOpen}
         onOpenChange={setExportOpen}
@@ -1372,6 +1396,7 @@ function ItemFormDialog({
     setForm((f) => ({ ...f, [key]: val }));
 
   const [nuevoTalleTxt, setNuevoTalleTxt] = useState("");
+  const [processingPhotos, setProcessingPhotos] = useState(false);
   const [cotizacionAbierta, setCotizacionAbierta] = useState(false);
 
   useEffect(() => {
@@ -1483,7 +1508,7 @@ function ItemFormDialog({
   });
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
+    <Dialog open={open} onOpenChange={next => { if (!processingPhotos && !saving) onOpenChange(next); }}>
       <DialogContent className="max-w-2xl max-h-[88vh] flex flex-col">
         <DialogHeader>
           <DialogTitle>{editing ? "Editar ítem" : "Nuevo ítem de inventario"}</DialogTitle>
@@ -1843,8 +1868,18 @@ function ItemFormDialog({
             </div>
           </div>
 
+          <StoreProductFields
+            value={form.tienda}
+            image={form.imagen}
+            onBusyChange={setProcessingPhotos}
+            onChange={(update) => setForm(f => {
+              const tienda = typeof update === "function" ? update(f.tienda) : update;
+              return { ...f, tienda, imagen: tienda.fotos[0] ?? "" };
+            })}
+          />
+
           <Input
-            label="Notas"
+            label="Notas internas"
             value={form.notas}
             onChange={(e) => set("notas", e.target.value)}
             placeholder="Opcional"
@@ -1870,10 +1905,10 @@ function ItemFormDialog({
         </div>
 
         <div className="mt-4 flex items-center justify-end gap-2 pt-3 border-t border-[var(--color-border)]">
-          <Button variant="outline" onClick={() => onOpenChange(false)} disabled={saving}>
+          <Button variant="outline" onClick={() => onOpenChange(false)} disabled={saving || processingPhotos}>
             Cancelar
           </Button>
-          <Button variant="primary" loading={saving} onClick={onSubmit}>
+          <Button variant="primary" loading={saving} disabled={processingPhotos} onClick={onSubmit}>
             {editing ? "Guardar cambios" : "Agregar al inventario"}
           </Button>
         </div>

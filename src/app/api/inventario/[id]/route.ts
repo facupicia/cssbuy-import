@@ -6,6 +6,7 @@ import {
   deleteInventoryItem,
 } from "@/lib/db";
 import { sanitizeInventoryInput } from "@/lib/inventory";
+import { readStoreJson } from "@/lib/store-auth";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -31,8 +32,9 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
   const { id } = await params;
   if (!isPgConfigured()) return NextResponse.json(NO_DB, { status: 500 });
   try {
-    const body = await request.json();
-    const input = sanitizeInventoryInput(body ?? {});
+    let input;
+    try { input = sanitizeInventoryInput(await readStoreJson(request, 7 * 1024 * 1024)); }
+    catch (e) { return NextResponse.json({ error: e instanceof Error ? e.message : "Solicitud inválida" }, { status: 400 }); }
     if (Object.keys(input).length === 0) {
       return NextResponse.json({ error: "Nada para actualizar" }, { status: 400 });
     }

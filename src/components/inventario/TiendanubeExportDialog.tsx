@@ -12,6 +12,7 @@ import {
 import { calcInventoryItem } from "@/lib/inventory";
 import { fmtARS } from "@/lib/utils";
 import { generarDescripcionHTML } from "@/lib/descripcion";
+import { publicDescription } from "@/lib/store-product";
 import { tablaDeMarca } from "@/lib/tablas-talle";
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
@@ -118,12 +119,13 @@ export function TiendanubeExportDialog({
     const it = items.find((i) => calcInventoryItem(i).precioVentaARS > 0);
     if (!it) return null;
     const precio = calcInventoryItem(it).precioVentaARS;
-    const publicado = precioPublicado(precio, redondearA, descuentoEfectivo);
+    const pct = it.tienda?.descuentoPct ?? descuentoEfectivo;
+    const publicado = precioPublicado(precio, it.tienda?.redondearA ?? redondearA, pct);
     return {
       nombre: it.nombre,
       precio,
       publicado,
-      efectivo: Math.round(publicado * (1 - descuentoEfectivo / 100)),
+      efectivo: Math.round(publicado * (1 - pct / 100)),
     };
   }, [items, redondearA, descuentoEfectivo]);
 
@@ -133,9 +135,8 @@ export function TiendanubeExportDialog({
   ).length;
 
   const ejemplo = items[0]
-    ? generarDescripcionHTML(items[0], {
+    ? items[0].tienda ? publicDescription(items[0].tienda.descripcion) : generarDescripcionHTML(items[0], {
         marca: items[0].marcaId ? nombreDeMarca[items[0].marcaId] : null,
-        pitch: items[0].notas || undefined,
       })
     : "";
 
@@ -180,6 +181,7 @@ export function TiendanubeExportDialog({
             plantilla oficial. Se importa desde Productos → Lista de productos → Importar.
           </DialogDescription>
         </DialogHeader>
+        <p className="text-xs text-[var(--color-fg-muted)]">Los productos con ficha de tienda usan su descripción, categoría, peso y ajustes de precio. Los valores de este diálogo se aplican a los productos sin ficha. El CSV no incluye fotos.</p>
 
         <div className="space-y-4 overflow-y-auto pr-1">
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">

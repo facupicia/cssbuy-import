@@ -3,6 +3,7 @@ import { calcInventoryItem } from "./inventory";
 import { generarDescripcionHTML } from "./descripcion";
 import { varianteSinTalle, parseColor, canonizar } from "./variantes";
 import { normalizarColor } from "./colores";
+import { publicDescription } from "./store-product";
 
 /**
  * Exportación al CSV de carga masiva de Tiendanube.
@@ -315,12 +316,12 @@ export function buildTiendanubeCSV(
     const identificador = vistas === 0 ? base : `${base}-${vistas + 1}`;
 
     const props = parseVariante(it.variante);
-    const precio = precioPublicado(c.precioVentaARS, redondearA, descuentoEfectivoPct);
+    const precio = precioPublicado(c.precioVentaARS, it.tienda?.redondearA ?? redondearA, it.tienda?.descuentoPct ?? descuentoEfectivoPct);
 
     const filaBase: Record<string, string | number> = {
       "Identificador de URL": identificador,
       Nombre: nombreTienda,
-      Categorías: categoria,
+      Categorías: it.tienda?.categoria || categoria,
       "Nombre de propiedad 1": props[0]?.nombre ?? "",
       "Valor de propiedad 1": props[0]?.valor ?? "",
       "Nombre de propiedad 2": props[1]?.nombre ?? "",
@@ -329,7 +330,7 @@ export function buildTiendanubeCSV(
       "Valor de propiedad 3": props[2]?.valor ?? "",
       Precio: precio > 0 ? precio : "",
       "Precio promocional": "",
-      Peso: "", // el inventario no guarda peso todavía
+      Peso: it.tienda?.pesoKg || "",
       Alto: "",
       Ancho: "",
       Profundidad: "",
@@ -338,14 +339,12 @@ export function buildTiendanubeCSV(
       "Código de barras": "",
       "Mostrar en tienda": mostrarEnTienda ? "SI" : "NO",
       "Envío sin cargo": "NO",
-      Descripción: descripcionHTML
+      Descripción: it.tienda ? (descripcionHTML ? publicDescription(it.tienda.descripcion) : it.tienda.descripcion) : descripcionHTML
         ? generarDescripcionHTML(it, {
             marca: it.marcaId ? nombreDeMarca[it.marcaId] : null,
             titulo: nombreTienda,
-            // Las notas del ítem funcionan como el párrafo de venta.
-            pitch: it.notas || undefined,
           })
-        : it.notas ?? "",
+        : "",
       Tags: "",
       "Título para SEO": "",
       "Descripción para SEO": "",

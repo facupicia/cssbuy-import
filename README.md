@@ -25,6 +25,10 @@ npm run dev
 
 La app estará disponible en [http://localhost:3001](http://localhost:3001).
 
+## Productos y Tiendanube
+
+El inventario incluye ficha pública, galería de fotos, validaciones, vista previa y envío manual a Tiendanube. Ver [configuración, flujo de publicación y límites del stock](docs/tiendanube.md).
+
 ## Publicidad y rentabilidad
 
 El panel `/publicidad` consulta Meta y calcula límites de adquisición con el inventario. Requiere configuración privada en el servidor; no atribuye las ventas acumuladas a campañas. Ver [configuración, API de lectura y límites del análisis](docs/publicidad.md).

@@ -153,7 +153,6 @@ export function generarDescripcionHTML(
   );
 
   if (pitch) partes.push(`<p style="${p}">${esc(pitch)}</p>`);
-  else if (item.notas) partes.push(`<p style="${p}">${esc(item.notas)}</p>`);
 
   // Ficha rápida: solo lo que realmente sabemos del producto
   const ficha: [string, string][] = [];

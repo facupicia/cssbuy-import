@@ -320,6 +320,7 @@ export async function ensureInventoryTable(): Promise<void> {
       .then(() =>
         getPool().query(`ALTER TABLE inventory_items ADD COLUMN IF NOT EXISTS talles JSONB DEFAULT '[]'::jsonb`)
       )
+      .then(() => getPool().query(`ALTER TABLE inventory_items ADD COLUMN IF NOT EXISTS tienda JSONB`))
       .then(() => undefined)
       .catch((err: unknown) => {
         // 23505/42P07: otra conexión creó la tabla al mismo tiempo. No es error.
@@ -352,6 +353,7 @@ interface InventoryRow {
   marca_id: string | null;
   /** JSONB: pg ya lo devuelve parseado. */
   talles: InventoryItem["talles"];
+  tienda: InventoryItem["tienda"];
   created_at: Date;
   updated_at: Date;
 }
@@ -376,6 +378,7 @@ function mapInventoryRow(r: InventoryRow): InventoryItem {
     origenRef: r.origen_ref,
     marcaId: r.marca_id,
     talles: Array.isArray(r.talles) && r.talles.length > 0 ? r.talles : null,
+    tienda: r.tienda ?? null,
     createdAt: new Date(r.created_at).toISOString(),
     updatedAt: new Date(r.updated_at).toISOString(),
   };
@@ -383,7 +386,7 @@ function mapInventoryRow(r: InventoryRow): InventoryItem {
 
 const INVENTORY_COLS = `id, nombre, sku, variante, imagen, link, cantidad_inicial,
   cantidad_vendida, costo_unit_usd, costo_unit_ars, precio_venta_ars, estado,
-  ubicacion, notas, origen, origen_ref, marca_id, talles, created_at, updated_at`;
+  ubicacion, notas, origen, origen_ref, marca_id, talles, tienda, created_at, updated_at`;
 
 export async function getInventoryItems(): Promise<InventoryItem[]> {
   await ensureSchema();
@@ -421,11 +424,12 @@ const FIELD_TO_COL: Record<string, string> = {
   origenRef: "origen_ref",
   marcaId: "marca_id",
   talles: "talles",
+  tienda: "tienda",
 };
 
 /** Valor para la columna: talles va como JSON (pg mandaría un array de Postgres). */
 function colValue(field: string, val: unknown): unknown {
-  return field === "talles" ? JSON.stringify(val ?? []) : val;
+  return field === "talles" ? JSON.stringify(val ?? []) : field === "tienda" ? JSON.stringify(val ?? null) : val;
 }
 
 export async function insertInventoryItem(input: InventoryInput): Promise<InventoryItem> {

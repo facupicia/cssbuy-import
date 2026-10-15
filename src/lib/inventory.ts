@@ -6,6 +6,7 @@ import {
   InventoryTalle,
 } from "./types";
 import { canonizar } from "./variantes";
+import { sanitizeStoreProfile } from "./store-product";
 
 /**
  * Deriva los números de un ítem de inventario (stock, capital inmovilizado,
@@ -130,6 +131,7 @@ export function sanitizeInventoryInput(body: Record<string, unknown>): Inventory
   }
   if ("origenRef" in body) out.origenRef = str(body.origenRef);
   if ("marcaId" in body) out.marcaId = str(body.marcaId);
+  if ("tienda" in body) out.tienda = body.tienda === null ? null : sanitizeStoreProfile(body.tienda);
 
   if ("talles" in body) {
     // Talles canónicos y sin repetir ("2XL" y "XXL" son uno). Con talles, los

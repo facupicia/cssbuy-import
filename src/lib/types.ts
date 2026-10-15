@@ -200,6 +200,16 @@ export interface InventoryTalleCalc extends InventoryTalle {
   stock: number;
 }
 
+export interface StoreProductProfile {
+  descripcion: string;
+  categoria: string;
+  categoriaId: number | null;
+  fotos: string[];
+  pesoKg: number;
+  descuentoPct: number;
+  redondearA: number;
+}
+
 export interface InventoryItem {
   id: string;
   nombre: string;
@@ -227,6 +237,7 @@ export interface InventoryItem {
   origenRef?: string | null;
   /** Talles específicos si el artículo tiene múltiples talles / variantes. */
   talles?: InventoryTalle[] | null;
+  tienda?: StoreProductProfile | null;
   createdAt: string;
   updatedAt: string;
 }

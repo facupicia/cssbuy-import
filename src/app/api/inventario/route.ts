@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { isPgConfigured, getInventoryItems, insertInventoryItem } from "@/lib/db";
 import { sanitizeInventoryInput, suggestEstado } from "@/lib/inventory";
+import { readStoreJson } from "@/lib/store-auth";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -31,7 +32,9 @@ export async function POST(request: Request) {
     return NextResponse.json(NO_DB, { status: 500 });
   }
   try {
-    const body = await request.json();
+    let body;
+    try { body = await readStoreJson(request, 7 * 1024 * 1024); }
+    catch { return NextResponse.json({ error: "Solicitud inválida o demasiado grande (máximo 7 MB)" }, { status: 400 }); }
 
     // Alta múltiple (importación desde CSSBuy / cotizaciones)
     const list = Array.isArray(body) ? body : Array.isArray(body?.items) ? body.items : null;
