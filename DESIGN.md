@@ -152,7 +152,7 @@ Desktop navigation appears at 768px and highlights the current link with a muted
 
 `/publicidad` inherits these primitives: a private-access card, interval and expense inputs, then independent Meta-report and inventory-limit sections. Loading, empty, and error messages remain local to each section. Keep headings, explanatory copy, and table captions explicit about each section's meaning; report attribution and inventory planning estimates remain separate.
 
-`/inventario` prioritizes stock operations. Its summary contains only units remaining and their cost value. Do not restore the removed rankings, sell-through charts, or projected-profit summary. Keep the list focused on product, size, status, quantity, cost, price and margin. Secondary tools (brands, quotation prices and Tiendanube export) live in the Herramientas menu; brand and size filters use compact labeled selects.
+`/inventario` prioritizes stock operations. Its summary contains units remaining, accumulated sales revenue and realized merchandise profit, explicitly before advertising and payment fees. Totals use recorded sold quantities and current item prices and costs; they are not an invoice ledger or final net profit. Stack summary cards on mobile so currency values remain readable. Do not restore the removed rankings, sell-through charts, or projected-profit summary. Keep the list focused on product, size, status, quantity, cost, price and margin. Secondary tools (brands, quotation prices and Tiendanube export) live in the Herramientas menu; brand and size filters use compact labeled selects.
 
 ## Do's and Don'ts
 

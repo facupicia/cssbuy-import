@@ -628,7 +628,7 @@ export default function InventarioPage() {
 
         {/* Métricas */}
         {items.length > 0 && (
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
             <Card padding="sm">
               <StatTile
                 label="Unidades en stock"
@@ -639,11 +639,19 @@ export default function InventarioPage() {
             </Card>
             <Card padding="sm">
               <StatTile
-                label="Valor del stock"
-                value={fmtARS(summary.capitalStockARS)}
-                sub="Costo de las unidades sin vender"
+                label="Facturado"
+                value={fmtARS(summary.ingresoRealizadoARS)}
+                sub={`${summary.unidadesVendidas} unidades vendidas · Total acumulado`}
+                icon={<ShoppingCart className="h-3.5 w-3.5" />}
+              />
+            </Card>
+            <Card padding="sm">
+              <StatTile
+                label="Ganancia de las ventas"
+                value={fmtARS(summary.gananciaRealizadaARS)}
+                sub="Facturado menos costo de las prendas vendidas. Antes de publicidad y comisiones."
                 icon={<Wallet2 className="h-3.5 w-3.5" />}
-                tone="accent"
+                tone={summary.gananciaRealizadaARS < 0 ? "danger" : "accent"}
               />
             </Card>
           </div>
