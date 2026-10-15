@@ -60,6 +60,20 @@ test("validación y precios: mantiene talles agotados, bloquea datos incoherente
   assert.throws(() => sanitizeStoreProfile({ ...item.tienda, categoriaId: -1 }));
 });
 
+test("descripción automática válida aunque exista una ficha con texto vacío", () => {
+  for (const descripcion of ["", " \n\t "]) {
+    const automatic = { ...item, nombre: "Remera Bape", tienda: { ...item.tienda!, descripcion } };
+    assert.equal(storeReadiness(automatic, "Bape").ready, true);
+    const html = generarDescripcionTiendaHTML(automatic, "Bape");
+    assert.ok(html.includes("Remera Bape"));
+    assert.ok(html.includes("Tabla de talles · Bape"));
+    assert.ok(html.includes("Cómo saber tu talle"));
+    assert.ok(!html.includes("NOTA PRIVADA"));
+    assert.equal(html, generarDescripcionTiendaHTML({ ...automatic, tienda: null }, "Bape"));
+    assert.ok(buildTiendanubeCSV([automatic], { nombreDeMarca: { marca: "Bape" } }).csv.includes("Cómo saber tu talle"));
+  }
+});
+
 test("sesión de escritura independiente, origen y contrato de credenciales", async () => {
   const before = { ...process.env };
   try {
@@ -154,6 +168,14 @@ test("envíos recuperables: creación, actualización por ID, SKU existente y re
     await assert.rejects(() => syncStoreProduct(item.id, true, item.updatedAt), e => e instanceof StoreApiError && e.status === 409);
     assert.equal(link!.product_id, "100");
     assert.equal(creations, countAfterTimeout);
+    const originalDescription = item.tienda!.descripcion;
+    try {
+      item.tienda!.descripcion = "";
+      await syncStoreProduct(item.id, true, item.updatedAt, "100");
+      assert.ok(remote!.description.es.includes(item.nombre));
+      assert.ok(remote!.description.es.includes("Cómo saber tu talle"));
+      assert.ok(!remote!.description.es.includes("NOTA PRIVADA"));
+    } finally { item.tienda!.descripcion = originalDescription; }
     unavailable = true;
     await assert.rejects(() => storeRequest("/products"), e => e instanceof StoreApiError && e.status === 429 && !e.message.includes("private-token"));
   } finally { process.env = before; }

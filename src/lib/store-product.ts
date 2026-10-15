@@ -2,6 +2,7 @@ import type { InventoryItem, StoreProductProfile } from "./types";
 import { calcInventoryItem } from "./inventory";
 import { parseVariante, precioPublicado } from "./tiendanube";
 import { canonizar, varianteSinTalle } from "./variantes";
+import { descripcionATexto, generarDescripcionTiendaHTML } from "./descripcion";
 
 export const EMPTY_STORE_PROFILE: StoreProductProfile = {
   descripcion: "", categoria: "", categoriaId: null, fotos: [],
@@ -64,7 +65,7 @@ export function storeReadiness(item: InventoryItem, brand?: string) {
   const photos = storePhotos(item);
   if (!photos.length) errors.push("Agregá al menos una foto");
   if (photos.some(f => !validPhoto(f))) errors.push("Revisá los enlaces de las fotos: deben usar HTTPS");
-  if (!item.tienda?.descripcion.trim()) errors.push("Completá la descripción pública");
+  if (!descripcionATexto(generarDescripcionTiendaHTML(item, brand))) errors.push("No se pudo generar la descripción pública");
   if (!item.tienda?.categoria.trim() && !item.tienda?.categoriaId) errors.push("Elegí una categoría");
   if (!brand) errors.push("Asigná una marca");
   if (item.estado === "en_transito") errors.push("El producto sigue en tránsito");

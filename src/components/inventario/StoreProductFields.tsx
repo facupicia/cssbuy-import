@@ -59,6 +59,7 @@ export function StoreProductFields({ value, onChange, image, onBusyChange }: {
       <label htmlFor="store-description" className="text-sm font-medium">Descripción pública</label>
       <textarea id="store-description" rows={5} maxLength={10000} value={profile.descripcion} onChange={e => change("descripcion", e.target.value)}
         placeholder="Describí el material, el calce y los detalles de la prenda." className="w-full rounded-lg border border-[var(--color-border)] bg-[var(--color-bg-elevated)] p-3 text-sm focus-visible:outline-2 focus-visible:outline-offset-2" />
+      <p className="text-xs text-[var(--color-fg-muted)]">Opcional. Si lo dejás vacío, se usa la descripción automática con la tabla de talles de la marca.</p>
     </div>
     <div className="grid gap-4 sm:grid-cols-2">
       <Input label="Categoría para exportar" value={profile.categoria} onChange={e => onChange({ ...profile, categoria: e.target.value, categoriaId: null })} placeholder="Ropa > Camperas" hint="La categoría de Tiendanube se elige al conectar." />
