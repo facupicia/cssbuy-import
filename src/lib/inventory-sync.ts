@@ -1,4 +1,5 @@
 import { InventoryItem, Cotizacion } from "./types";
+import { gramsToKg } from "./inventory-weight";
 
 /**
  * Trae a un ítem de inventario los números que ya decidiste en la cotización.
@@ -42,6 +43,7 @@ export interface ProductoCotizado {
   precioARS: number;
   costoARS: number;
   costoUSD: number;
+  pesoKg: number;
   cotizacionId: string;
   cotizacionNombre: string;
   fecha: string;
@@ -80,6 +82,7 @@ export function productosCotizados(cotizaciones: Cotizacion[]): ProductoCotizado
         precioARS,
         costoARS,
         costoUSD: Number(pc.costoUnitUSD) || 0,
+        pesoKg: gramsToKg(pc.pesoG),
         cotizacionId: cot.id,
         cotizacionNombre: cot.nombre || "Sin nombre",
         fecha: cot.fecha,

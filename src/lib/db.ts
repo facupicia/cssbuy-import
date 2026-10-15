@@ -1,4 +1,5 @@
 import { Pool } from "pg";
+import { fillInventoryWeights } from "./inventory-weight";
 import type { InventoryItem, Marca } from "./types";
 import {
   isBulkPriceOp,
@@ -393,7 +394,20 @@ export async function getInventoryItems(): Promise<InventoryItem[]> {
   const res = await getPool().query(
     `SELECT ${INVENTORY_COLS} FROM inventory_items ORDER BY created_at DESC`
   );
-  return res.rows.map(mapInventoryRow);
+  return hydrateInventoryWeights(res.rows.map(mapInventoryRow));
+}
+
+async function hydrateInventoryWeights(items: InventoryItem[]): Promise<InventoryItem[]> {
+  const refs = [...new Set(items.filter(i => !i.tienda?.pesoKg).map(i => i.origenRef?.trim()).filter(Boolean))];
+  if (!refs.length) return items;
+  await Promise.all([ensureCotizacionesTable(), ensureCssbuyOrdersTable()]);
+  const [quotes, orders] = await Promise.all([
+    getPool().query(`SELECT productos FROM shop_cotizaciones ORDER BY created_at DESC`),
+    getPool().query(`SELECT order_no, raw FROM cssbuy_orders WHERE order_no = ANY($1::text[])`, [refs]),
+  ]);
+  return fillInventoryWeights(items,
+    quotes.rows.map(q => ({ productos: Array.isArray(q.productos) ? q.productos : [] })),
+    orders.rows.map(rowToCssbuyOrder));
 }
 
 export async function getInventoryItem(id: string): Promise<InventoryItem | null> {
@@ -402,7 +416,7 @@ export async function getInventoryItem(id: string): Promise<InventoryItem | null
     `SELECT ${INVENTORY_COLS} FROM inventory_items WHERE id = $1`,
     [id]
   );
-  return res.rows[0] ? mapInventoryRow(res.rows[0]) : null;
+  return res.rows[0] ? (await hydrateInventoryWeights([mapInventoryRow(res.rows[0])]))[0] : null;
 }
 
 /** Mapa campo del modelo → columna de la tabla, para inserts y updates parciales. */
@@ -456,7 +470,7 @@ export async function insertInventoryItem(input: InventoryInput): Promise<Invent
      RETURNING ${INVENTORY_COLS}`,
     values
   );
-  return mapInventoryRow(res.rows[0]);
+  return (await hydrateInventoryWeights([mapInventoryRow(res.rows[0])]))[0];
 }
 
 export async function updateInventoryItem(
@@ -485,7 +499,7 @@ export async function updateInventoryItem(
      RETURNING ${INVENTORY_COLS}`,
     values
   );
-  return res.rows[0] ? mapInventoryRow(res.rows[0]) : null;
+  return res.rows[0] ? (await hydrateInventoryWeights([mapInventoryRow(res.rows[0])]))[0] : null;
 }
 
 /** Devuelve false si el id no existía. */

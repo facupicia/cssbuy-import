@@ -1429,6 +1429,7 @@ function ItemFormDialog({
       precioVentaARS: p.precioARS > 0 ? Math.round(p.precioARS) : f.precioVentaARS,
       costoUnitARS: p.costoARS > 0 ? Math.round(p.costoARS) : f.costoUnitARS,
       costoUnitUSD: p.costoUSD > 0 ? p.costoUSD : f.costoUnitUSD,
+      tienda: f.tienda.pesoKg || !p.pesoKg ? f.tienda : { ...f.tienda, pesoKg: p.pesoKg },
       origenRef: f.origenRef || p.oid,
     }));
     setCotizacionAbierta(false);

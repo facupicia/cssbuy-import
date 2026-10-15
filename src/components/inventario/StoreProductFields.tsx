@@ -62,7 +62,7 @@ export function StoreProductFields({ value, onChange, image, onBusyChange }: {
     </div>
     <div className="grid gap-4 sm:grid-cols-2">
       <Input label="Categoría para exportar" value={profile.categoria} onChange={e => onChange({ ...profile, categoria: e.target.value, categoriaId: null })} placeholder="Ropa > Camperas" hint="La categoría de Tiendanube se elige al conectar." />
-      <Input label="Peso de envío (kg)" type="number" min={0} max={1000} step="0.01" value={profile.pesoKg || ""} onChange={e => change("pesoKg", Number(e.target.value))} hint="Incluí el embalaje para calcular el envío." />
+      <Input label="Peso de envío (kg)" type="number" min={0} max={1000} step="0.001" value={profile.pesoKg || ""} onChange={e => change("pesoKg", Number(e.target.value))} hint="Se completa con el peso guardado. Podés ajustarlo para incluir el embalaje." />
       <Input label="Descuento por transferencia (%)" type="number" min={0} max={90} value={profile.descuentoPct} onChange={e => change("descuentoPct", Number(e.target.value))} hint="El precio publicado se ajusta para conservar tu precio de venta." />
       <Input label="Redondear precio a ($)" type="number" min={0} max={100000} step={100} value={profile.redondearA} onChange={e => change("redondearA", Number(e.target.value))} hint="Usá 0 para no redondear." />
     </div>
