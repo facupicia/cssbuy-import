@@ -62,10 +62,10 @@ export interface CssbuyOrderRow {
 }
 
 export async function upsertCssbuyOrders(
-  rows: CssbuyOrderRow[]
+  rows: CssbuyOrderRow[], executor?: Pick<Pool, "query">
 ): Promise<{ inserted: number; updated: number }> {
   if (rows.length === 0) return { inserted: 0, updated: 0 };
-  const db = getPool();
+  const db = executor ?? getPool();
   let inserted = 0;
   let updated = 0;
   for (const r of rows) {

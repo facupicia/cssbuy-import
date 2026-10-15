@@ -1,0 +1,11 @@
+{
+  "manifest_version": 3,
+  "name": "PLUG · Conector CSSBuy",
+  "version": "1.0.0",
+  "description": "Envía tus pedidos y movimientos de CSSBuy a tu calculadora PLUG cuando lo solicitás.",
+  "permissions": ["scripting"],
+  "host_permissions": ["https://www.cssbuy.com/*"],
+  "background": { "service_worker": "background.js" },
+  "content_scripts": [{ "matches": ["https://db.vidaeventofiesta.site/*"], "js": ["bridge.js"] }],
+  "action": { "default_title": "Abrir calculadora PLUG" }
+}

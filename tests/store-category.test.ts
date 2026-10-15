@@ -23,7 +23,7 @@ test("vincula el nombre al ID real sin modificar la ficha original", () => {
   assert.equal(inferred.tienda.categoriaId, 1);
   assert.equal(inferred.tienda.descuentoPct, 10);
   assert.equal(item.tienda.categoria, "");
-  assert.equal(withStoreCategory({ nombre: "Campera negra", tienda: null }, categories).tienda?.categoriaId, 3);
+  assert.equal(withStoreCategory({ nombre: "Campera negra", tienda: null as ReturnType<typeof newStoreProfile> | null }, categories).tienda?.categoriaId, 3);
 });
 
 test("respeta categoría manual y resuelve nombres escritos en singular", () => {

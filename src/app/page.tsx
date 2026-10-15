@@ -68,6 +68,7 @@ import { EmptyState } from "@/components/ui/EmptyState";
 import { Navbar } from "@/components/Navbar";
 import { WarehouseScraperModal } from "@/components/WarehouseScraperModal";
 import { RecordScraperModal } from "@/components/RecordScraperModal";
+import { CssbuyConnectionDialog } from "@/components/CssbuyConnectionDialog";
 
 export default function CalculatorPage() {
   const [fx, setFx] = useState<FxRates>(DEFAULT_CALC_CONFIG.fx);
@@ -81,6 +82,7 @@ export default function CalculatorPage() {
   // Modales
   const [warehouseScraperOpen, setWarehouseScraperOpen] = useState(false);
   const [recordScraperOpen, setRecordScraperOpen] = useState(false);
+  const [cssbuyConnectionOpen, setCssbuyConnectionOpen] = useState(false);
 
   // Sync automático de órdenes CSSBuy → Postgres propio
   const [syncingCssbuy, setSyncingCssbuy] = useState(false);
@@ -191,48 +193,19 @@ export default function CalculatorPage() {
     }
   }, []);
 
-  const syncCssbuy = async () => {
-    setSyncingCssbuy(true);
-    toast.info("Sincronizando órdenes...", {
-      description: "Consultando servidor y base de datos...",
-      duration: 4000,
-    });
-    try {
-      const res = await fetch("/api/cssbuy/sync", { method: "POST" });
-      const data = await res.json();
-      if (data.ok) {
-        if (Array.isArray(data.orders) && data.orders.length > 0) {
-          const valid = data.orders.filter((o: any) => !isInvalidOrder(o));
-          setOrders(valid);
-          localStorage.setItem("cssbuy-orders", JSON.stringify(valid));
-        }
-        toast.success("Órdenes sincronizadas con éxito", {
-          description: `${data.total} órdenes encontradas (${data.inserted} nuevas, ${data.updated} actualizadas).`,
-        });
-      } else {
-        // Fallback: Si el scraping directo no es posible (ej: en Vercel serverless), cargar lo que ya está en PostgreSQL
-        const getRes = await fetch("/api/cssbuy/sync");
-        const getData = await getRes.json();
-        if (getData.ok && Array.isArray(getData.orders) && getData.orders.length > 0) {
-          const valid = getData.orders.filter((o: any) => !isInvalidOrder(o));
-          setOrders(valid);
-          localStorage.setItem("cssbuy-orders", JSON.stringify(valid));
-          toast.success("Órdenes cargadas desde la Base de Datos", {
-            description: `${valid.length} órdenes obtenidas de PostgreSQL.`,
-          });
-        } else {
-          toast.error("Error al sincronizar con CSSBuy", {
-            description: data.message || "No se pudo conectar a CSSBuy ni a la base de datos.",
-            duration: 8000,
-          });
-        }
+  const syncCssbuy = () => setCssbuyConnectionOpen(true);
+
+  useEffect(() => {
+    fetch("/api/cssbuy/bridge", { cache: "no-store" }).then(async response => {
+      if (!response.ok) return;
+      const data = await response.json();
+      if (Array.isArray(data.records) && data.records.length) {
+        const parsed = parseRecords(data.records);
+        setRecords(parsed);
+        localStorage.setItem("cssbuy-records", JSON.stringify(parsed));
       }
-    } catch {
-      toast.error("Error de red al sincronizar con el servidor");
-    } finally {
-      setSyncingCssbuy(false);
-    }
-  };
+    }).catch(() => {});
+  }, []);
 
   // Guardar configuración por defecto cuando cambian tasas base
   const handleSaveDefaultConfig = () => {
@@ -1805,6 +1778,21 @@ export default function CalculatorPage() {
         </DialogContent>
       </Dialog>
 
+      <CssbuyConnectionDialog
+        open={cssbuyConnectionOpen}
+        onOpenChange={setCssbuyConnectionOpen}
+        onBusyChange={setSyncingCssbuy}
+        onSynced={data => {
+          const valid = data.orders.filter(o => !isInvalidOrder(o));
+          setOrders(valid);
+          localStorage.setItem("cssbuy-orders", JSON.stringify(valid));
+          if (!data.warning) {
+            const parsed = parseRecords(data.records);
+            setRecords(parsed);
+            localStorage.setItem("cssbuy-records", JSON.stringify(parsed));
+          }
+        }}
+      />
       {/* Scraper Modals */}
       <WarehouseScraperModal
         open={warehouseScraperOpen}

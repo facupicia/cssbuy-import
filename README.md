@@ -7,7 +7,7 @@ Aplicación web independiente y moderna para el cálculo de costos de importaci�
 - 🧮 **Calculadora Multiproducto de Landed Cost**: Simulación en tiempo real de flete internacional, comisiones de depósito de CSSBuy (5.3%), franquicia aduanera de USD 50, aranceles, IVA e IIBB.
 - 📦 **Scraper de CSSBuy Warehouse**: Script en un clic para extraer todos los pedidos almacenados y descargarlos en `orders.json`.
 - 💳 **Costos desde movimientos CSSBuy**: La calculadora puede importar `records.json` para calcular el costo real por orden, incluyendo fotos, servicios adicionales y flete interno.
-- 🔄 **Sync automático a Postgres (CSSBuy → tu BD)**: Botón **"Sync CSSBuy"** que inicia sesión en `cssbuy.com` con tus credenciales y vuelca en la tabla `cssbuy_orders` de tu base Postgres propia (base `cssbuy_products`) **solo las órdenes en estado "en almacén" (In Warehouse, `state === 4`)** de `https://www.cssbuy.com/shop/cate/order`. Las demás (submitidas, pendientes, inválidas) se descartan para mantener la tabla enfocada en lo que está en el depósito. La primera vez puede pedir captcha (se abre el navegador para que lo resuelvas); luego reusa la sesión guardada para correr de forma automática (headless). Idempotente: re-sincronizar actualiza las órdenes existentes y elimina las que ya no están en almacén.
+- 🔄 **Conector CSSBuy → Postgres**: sincronización manual desde la sesión de Chrome mediante el conector PLUG. Trae pedidos válidos, pesos, fotos y movimientos sin copiar credenciales de CSSBuy al servidor. Ver [instalación](docs/cssbuy.md).
 - 📋 **Gestión de Cotizaciones**: Guardado en la nube (vía Supabase) y/o persistencia local con LocalStorage, con exportación a CSV y JSON.
 - 🎨 **Diseño Moderno & Modo Oscuro**: Interfaz limpia, responsiva, con paleta cálida y soporte para modo oscuro.
 
@@ -24,6 +24,12 @@ npm run dev
 ```
 
 La app estará disponible en [http://localhost:3001](http://localhost:3001).
+
+## Conexión con CSSBuy desde Chrome
+
+El botón **Sincronizar órdenes** usa el conector de Chrome para traer pedidos,
+pesos, fotos y movimientos a PostgreSQL. Ver [instalación y límites](docs/cssbuy.md).
+Este flujo reemplaza el acceso directo del servidor, bloqueado por CSSBuy.
 
 ## Productos y Tiendanube
 
@@ -45,9 +51,9 @@ SUPABASE_SERVICE_ROLE_KEY=tu-service-role-key
 
 *Si no configurás Supabase, la aplicación funciona al 100% en modo LocalStorage / Offline.*
 
-### Sync automático de órdenes CSSBuy → Postgres
+### Sincronizador local anterior (opcional)
 
-Para usar el botón **"Sync CSSBuy"**, agregá al `.env.local` tus credenciales de CSSBuy y los datos de tu base Postgres:
+El botón del panel usa el conector de Chrome. El comando local `npm run sync` anterior puede seguir configurándose con estas variables; depende del acceso que permita CSSBuy y no funciona desde el contenedor actual:
 
 ```env
 # CSSBuy
