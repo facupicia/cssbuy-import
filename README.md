@@ -6,7 +6,7 @@ Aplicación web independiente y moderna para el cálculo de costos de importaci�
 
 - 🧮 **Calculadora Multiproducto de Landed Cost**: Simulación en tiempo real de flete internacional, comisiones de depósito de CSSBuy (5.3%), franquicia aduanera de USD 50, aranceles, IVA e IIBB.
 - 📦 **Scraper de CSSBuy Warehouse**: Script en un clic para extraer todos los pedidos almacenados y descargarlos en `orders.json`.
-- 💳 **Balance Records Analyzer**: Parser inteligente de transacciones financieras de CSSBuy (`records.json`) para conocer el costo real por orden incluyendo fotos, servicios adicionales y flete interno.
+- 💳 **Costos desde movimientos CSSBuy**: La calculadora puede importar `records.json` para calcular el costo real por orden, incluyendo fotos, servicios adicionales y flete interno.
 - 🔄 **Sync automático a Postgres (CSSBuy → tu BD)**: Botón **"Sync CSSBuy"** que inicia sesión en `cssbuy.com` con tus credenciales y vuelca en la tabla `cssbuy_orders` de tu base Postgres propia (base `cssbuy_products`) **solo las órdenes en estado "en almacén" (In Warehouse, `state === 4`)** de `https://www.cssbuy.com/shop/cate/order`. Las demás (submitidas, pendientes, inválidas) se descartan para mantener la tabla enfocada en lo que está en el depósito. La primera vez puede pedir captcha (se abre el navegador para que lo resuelvas); luego reusa la sesión guardada para correr de forma automática (headless). Idempotente: re-sincronizar actualiza las órdenes existentes y elimina las que ya no están en almacén.
 - 📋 **Gestión de Cotizaciones**: Guardado en la nube (vía Supabase) y/o persistencia local con LocalStorage, con exportación a CSV y JSON.
 - 🎨 **Diseño Moderno & Modo Oscuro**: Interfaz limpia, responsiva, con paleta cálida y soporte para modo oscuro.

@@ -148,7 +148,7 @@ Buttons expose primary, secondary (default), danger, ghost, and outline variants
 
 Cards expose default, subtle, elevated, and accent treatments, with none/small/medium/large padding (0 / 0.75 / 1.25 / 1.5rem). Inputs use a thin border, elevated background, and border-color focus change; error state uses danger and replaces hint copy. Prefixes/suffixes reserve internal space. Global keyboard focus uses a two-pixel outline with a two-pixel offset, but Input explicitly removes the outline and changes its border.
 
-Desktop navigation appears at 768px and highlights the current link with a muted fill and semibold text. Below that breakpoint, five equal bottom tabs use emerald for the active destination. Header height changes from 3.5rem to 4rem at 640px; the brand subtitle is hidden below that breakpoint. Theme preference persists in local storage.
+Desktop navigation appears at 768px and highlights the current link with a muted fill and semibold text. Below that breakpoint, four equal bottom tabs use emerald for the active destination. Header height changes from 3.5rem to 4rem at 640px; the brand subtitle is hidden below that breakpoint. Theme preference persists in local storage.
 
 `/publicidad` inherits these primitives: a private-access card, interval and expense inputs, then independent Meta-report and inventory-limit sections. Loading, empty, and error messages remain local to each section. Keep headings, explanatory copy, and table captions explicit about each section's meaning; report attribution and inventory planning estimates remain separate.
 

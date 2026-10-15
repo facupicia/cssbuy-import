@@ -5,7 +5,6 @@ import { usePathname } from "next/navigation";
 import {
   Calculator,
   FileText,
-  Receipt,
   Boxes,
   Terminal,
   Moon,
@@ -23,7 +22,6 @@ const links = [
   { href: "/", label: "Calculadora", icon: Calculator },
   { href: "/cotizaciones", label: "Cotizaciones", icon: FileText },
   { href: "/inventario", label: "Inventario", icon: Boxes },
-  { href: "/records", label: "Balance", icon: Receipt },
   { href: "/publicidad", label: "Publicidad", icon: ChartNoAxesCombined },
 ];
 
@@ -191,7 +189,7 @@ export function Navbar({
 
       {/* Navegación inferior en mobile: alcanzable con el pulgar */}
       <nav className="md:hidden fixed bottom-0 inset-x-0 z-40 border-t border-[var(--color-border)] bg-[var(--color-bg-elevated)]/95 backdrop-blur-md">
-        <div className="grid grid-cols-5">
+        <div className="grid grid-cols-4">
           {links.map((link) => {
             const active = pathname === link.href;
             const Icon = link.icon;
