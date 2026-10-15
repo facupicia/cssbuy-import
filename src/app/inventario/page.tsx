@@ -20,13 +20,13 @@ import {
   ExternalLink,
   PackageX,
   Wallet2,
-  TrendingUp,
   Layers,
   Store,
   X,
   FileText,
   Tag,
   Hash,
+  MoreHorizontal,
 } from "lucide-react";
 import {
   InventoryItem,
@@ -75,7 +75,7 @@ import {
   DialogDescription,
 } from "@/components/ui/Dialog";
 import { toast } from "@/components/ui/Toast";
-import { InventoryCharts } from "@/components/InventoryCharts";
+import { Menu, MenuTrigger, MenuContent, MenuItem } from "@/components/ui/Menu";
 import { TiendanubeExportDialog } from "@/components/inventario/TiendanubeExportDialog";
 import { BulkEditDialog, type BulkChanges } from "@/components/inventario/BulkEditDialog";
 import { CotizacionPrecioPicker } from "@/components/inventario/CotizacionPrecioPicker";
@@ -167,7 +167,7 @@ const ORIGEN_LABEL: Record<InventoryOrigen, string> = {
   cotizacion: "Cotización",
 };
 
-type OrdenInventario = "reciente" | "ganancia" | "margen" | "capital" | "stock" | "nombre";
+type OrdenInventario = "reciente" | "margen" | "capital" | "stock" | "nombre";
 
 /* ── Página ──────────────────────────────────────────────────────────── */
 
@@ -261,8 +261,6 @@ export default function InventarioPage() {
         const ca = calcInventoryItem(a);
         const cb = calcInventoryItem(b);
         switch (orden) {
-          case "ganancia":
-            return cb.gananciaRealizadaARS - ca.gananciaRealizadaARS;
           case "margen":
             return cb.margenUnitPct - ca.margenUnitPct;
           case "capital":
@@ -571,48 +569,11 @@ export default function InventarioPage() {
               Inventario
             </h1>
             <p className="text-xs sm:text-sm text-[var(--color-fg-muted)] mt-0.5">
-              Stock físico en mano, costo landed unitario, unidades vendidas y ganancia realizada.
+              Consultá tus prendas, talles, stock, costos y precios de venta.
             </p>
           </div>
 
-          <div className="flex items-center gap-2">
-            <Button
-              variant="outline"
-              size="sm"
-              icon={<DownloadCloud className="h-3.5 w-3.5" />}
-              onClick={() => setImportOpen(true)}
-            >
-              Importar de CSSBuy
-            </Button>
-            <Button
-              variant="outline"
-              size="sm"
-              icon={<Tag className="h-3.5 w-3.5" />}
-              onClick={() => setMarcasOpen(true)}
-              title="Cargar y asignar marcas"
-            >
-              Marcas
-            </Button>
-            <Button
-              variant="outline"
-              size="sm"
-              icon={<FileText className="h-3.5 w-3.5" />}
-              onClick={() => setSyncCotOpen(true)}
-              disabled={items.length === 0}
-              title="Traer precio y costo de las cotizaciones guardadas"
-            >
-              Precios de cotización
-            </Button>
-            <Button
-              variant="outline"
-              size="sm"
-              icon={<Store className="h-3.5 w-3.5" />}
-              onClick={() => setExportOpen(true)}
-              disabled={items.length === 0}
-              title="Generar el CSV de carga masiva de Tiendanube"
-            >
-              A Tiendanube
-            </Button>
+          <div className="flex flex-wrap items-center gap-2">
             <Button
               variant="primary"
               size="sm"
@@ -624,9 +585,36 @@ export default function InventarioPage() {
             <Button
               variant="outline"
               size="sm"
+              icon={<DownloadCloud className="h-3.5 w-3.5" />}
+              onClick={() => setImportOpen(true)}
+            >
+              Importar de CSSBuy
+            </Button>
+            <Menu>
+              <MenuTrigger asChild>
+                <Button variant="outline" size="sm" icon={<MoreHorizontal className="h-3.5 w-3.5" />}>
+                  Herramientas
+                </Button>
+              </MenuTrigger>
+              <MenuContent>
+                <MenuItem icon={<Tag className="h-3.5 w-3.5" />} onSelect={() => setMarcasOpen(true)}>
+                  Administrar marcas
+                </MenuItem>
+                <MenuItem icon={<FileText className="h-3.5 w-3.5" />} disabled={items.length === 0} onSelect={() => setSyncCotOpen(true)}>
+                  Traer precios de cotizaciones
+                </MenuItem>
+                <MenuItem icon={<Store className="h-3.5 w-3.5" />} disabled={items.length === 0} onSelect={() => setExportOpen(true)}>
+                  Exportar a Tiendanube
+                </MenuItem>
+              </MenuContent>
+            </Menu>
+            <Button
+              variant="outline"
+              size="sm"
               icon={<RefreshCw className="h-3.5 w-3.5" />}
               onClick={load}
               title="Refrescar"
+              aria-label="Refrescar inventario"
             />
           </div>
         </div>
@@ -640,55 +628,36 @@ export default function InventarioPage() {
 
         {/* Métricas */}
         {items.length > 0 && (
-          <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+          <div className="grid grid-cols-2 gap-3">
             <Card padding="sm">
               <StatTile
                 label="Unidades en stock"
                 value={String(summary.unidadesStock)}
-                sub={`${summary.totalItems} ítems · ${summary.unidadesVendidas} vendidas`}
+                sub="En depósito y en tránsito"
                 icon={<Layers className="h-3.5 w-3.5" />}
               />
             </Card>
             <Card padding="sm">
               <StatTile
-                label="Capital inmovilizado"
+                label="Valor del stock"
                 value={fmtARS(summary.capitalStockARS)}
-                sub={`Invertido total ${fmtARS(summary.invertidoTotalARS)}`}
+                sub="Costo de las unidades sin vender"
                 icon={<Wallet2 className="h-3.5 w-3.5" />}
                 tone="accent"
-              />
-            </Card>
-            <Card padding="sm">
-              <StatTile
-                label="Ganancia realizada"
-                value={fmtARS(summary.gananciaRealizadaARS)}
-                sub={`Ingreso vendido ${fmtARS(summary.ingresoRealizadoARS)}`}
-                icon={<TrendingUp className="h-3.5 w-3.5" />}
-                tone={summary.gananciaRealizadaARS >= 0 ? "success" : "danger"}
-              />
-            </Card>
-            <Card padding="sm">
-              <StatTile
-                label="Ganancia potencial"
-                value={fmtARS(summary.gananciaPotencialARS)}
-                sub="Si se vende todo el stock restante"
-                icon={<Boxes className="h-3.5 w-3.5" />}
               />
             </Card>
           </div>
         )}
 
-        {/* Gráficos */}
-        {items.length > 0 && <InventoryCharts items={items} />}
-
         {/* Toolbar */}
         {items.length > 0 && (
-          <div className="flex flex-col sm:flex-row sm:items-center gap-3">
-            <div className="relative flex-1 max-w-md">
+          <div className="flex flex-wrap items-center gap-3">
+            <div className="relative w-full sm:flex-1 sm:min-w-64 max-w-md">
               <Search className="h-3.5 w-3.5 absolute left-3 top-1/2 -translate-y-1/2 text-[var(--color-fg-subtle)]" />
               <input
                 type="text"
                 placeholder="Buscar por nombre, SKU o variante..."
+                aria-label="Buscar productos por nombre, SKU o variante"
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
                 className="w-full h-9 pl-9 pr-3 text-xs bg-[var(--color-bg-elevated)] border border-[var(--color-border)] rounded-[var(--radius)] focus:outline-none focus:border-[var(--color-border-focus)]"
@@ -706,59 +675,38 @@ export default function InventarioPage() {
               ]}
             />
             {marcasConUso.length > 0 && (
-              <div className="flex items-center gap-1.5 flex-wrap shrink-0" role="group" aria-label="Filtrar por marca">
+              <label className="flex items-center gap-2">
                 <span className="text-[11px] uppercase tracking-wide text-[var(--color-fg-muted)]">
                   Marca
                 </span>
-                {[
-                  { id: "todas", label: "Todas" },
-                  ...marcasConUso.map((m) => ({ id: m.id, label: m.nombre })),
-                  ...(haySinMarca ? [{ id: "sin_marca", label: "Sin marca" }] : []),
-                ].map((op) => {
-                  const activo = marcaFilter === op.id;
-                  return (
-                    <button
-                      key={op.id}
-                      type="button"
-                      onClick={() => setMarcaFilter(op.id)}
-                      aria-pressed={activo}
-                      className={`h-8 px-2.5 rounded-[var(--radius-sm)] text-xs font-medium border transition-colors cursor-pointer ${
-                        activo
-                          ? "bg-[var(--color-accent)] text-[var(--color-accent-fg)] border-[var(--color-accent)]"
-                          : "bg-[var(--color-bg-elevated)] text-[var(--color-fg-muted)] border-[var(--color-border)] hover:text-[var(--color-fg)] hover:border-[var(--color-border-strong)]"
-                      }`}
-                    >
-                      {op.label}
-                    </button>
-                  );
-                })}
-              </div>
+                <select
+                  value={marcaFilter}
+                  onChange={e => setMarcaFilter(e.target.value)}
+                  aria-label="Filtrar por marca"
+                  className="h-9 max-w-48 px-2 text-xs bg-[var(--color-bg-elevated)] border border-[var(--color-border)] rounded-[var(--radius)] focus:outline-none focus:border-[var(--color-accent)]"
+                >
+                  <option value="todas">Todas las marcas</option>
+                  {marcasConUso.map(m => <option key={m.id} value={m.id}>{m.nombre}</option>)}
+                  {haySinMarca && <option value="sin_marca">Sin marca</option>}
+                </select>
+              </label>
             )}
 
             {talles.length > 1 && (
-              <div className="flex items-center gap-1.5 shrink-0" role="group" aria-label="Filtrar por talle">
+              <label className="flex items-center gap-2">
                 <span className="text-[11px] uppercase tracking-wide text-[var(--color-fg-muted)]">
                   Talle
                 </span>
-                {(["todos", ...talles] as const).map((t) => {
-                  const activo = talleFilter === t;
-                  return (
-                    <button
-                      key={t}
-                      type="button"
-                      onClick={() => setTalleFilter(t)}
-                      aria-pressed={activo}
-                      className={`min-w-8 h-8 px-2 rounded-[var(--radius-sm)] text-xs font-medium border transition-colors cursor-pointer ${
-                        activo
-                          ? "bg-[var(--color-accent)] text-[var(--color-accent-fg)] border-[var(--color-accent)]"
-                          : "bg-[var(--color-bg-elevated)] text-[var(--color-fg-muted)] border-[var(--color-border)] hover:text-[var(--color-fg)] hover:border-[var(--color-border-strong)]"
-                      }`}
-                    >
-                      {t === "todos" ? "Todos" : t}
-                    </button>
-                  );
-                })}
-              </div>
+                <select
+                  value={talleFilter}
+                  onChange={e => setTalleFilter(e.target.value)}
+                  aria-label="Filtrar por talle"
+                  className="h-9 px-2 text-xs bg-[var(--color-bg-elevated)] border border-[var(--color-border)] rounded-[var(--radius)] focus:outline-none focus:border-[var(--color-accent)]"
+                >
+                  <option value="todos">Todos</option>
+                  {talles.map(t => <option key={t} value={t}>{t}</option>)}
+                </select>
+              </label>
             )}
 
             <label className="flex items-center gap-2 shrink-0">
@@ -772,7 +720,6 @@ export default function InventarioPage() {
                 className="h-9 px-2 text-xs bg-[var(--color-bg-elevated)] border border-[var(--color-border)] rounded-[var(--radius)] text-[var(--color-fg)] cursor-pointer focus:outline-none focus:border-[var(--color-accent)]"
               >
                 <option value="reciente">Más reciente</option>
-                <option value="ganancia">Ganancia realizada</option>
                 <option value="margen">Margen</option>
                 <option value="capital">Capital inmovilizado</option>
                 <option value="stock">Stock</option>
@@ -901,7 +848,6 @@ export default function InventarioPage() {
                     <th className="py-2.5 px-3 text-right">Costo unit.</th>
                     <th className="py-2.5 px-3 text-right">Precio venta</th>
                     <th className="py-2.5 px-3 text-right">Margen</th>
-                    <th className="py-2.5 px-3 text-right">Gan. realizada</th>
                     <th className="py-2.5 px-3 text-right">Acciones</th>
                   </tr>
                 </thead>
@@ -1017,20 +963,6 @@ export default function InventarioPage() {
                             }
                           >
                             {fmtPct(c.margenUnitPct)}
-                          </span>
-                        </td>
-                        <td className="py-2.5 px-3 text-right font-mono tnum">
-                          <span
-                            className={
-                              c.gananciaRealizadaARS > 0
-                                ? "text-[var(--color-success)] font-semibold"
-                                : c.gananciaRealizadaARS < 0
-                                ? "text-[var(--color-danger)] font-semibold"
-                                : "text-[var(--color-fg-subtle)]"
-                            }
-                          >
-                            {c.gananciaRealizadaARS > 0 ? "+" : ""}
-                            {fmtARS(c.gananciaRealizadaARS)}
                           </span>
                         </td>
                         <td className="py-2.5 px-3">
@@ -1196,25 +1128,8 @@ export default function InventarioPage() {
                       </div>
                     </div>
 
-                    {/* Ganancia + acciones */}
-                    <div className="flex items-center justify-between gap-2">
-                      <div className="min-w-0">
-                        <span className="block text-[11px] uppercase tracking-wide text-[var(--color-fg-muted)]">
-                          Ganancia realizada
-                        </span>
-                        <span
-                          className={`font-mono tnum text-sm ${
-                            c.gananciaRealizadaARS > 0
-                              ? "text-[var(--color-success)] font-semibold"
-                              : c.gananciaRealizadaARS < 0
-                                ? "text-[var(--color-danger)] font-semibold"
-                                : "text-[var(--color-fg-subtle)]"
-                          }`}
-                        >
-                          {c.gananciaRealizadaARS > 0 ? "+" : ""}
-                          {fmtARS(c.gananciaRealizadaARS)}
-                        </span>
-                      </div>
+                    {/* Acciones del producto */}
+                    <div className="flex items-center justify-end gap-2">
                       <div className="flex items-center gap-1.5 shrink-0">
                         <Button
                           variant="outline"
