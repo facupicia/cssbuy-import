@@ -1,12 +1,20 @@
 import { NextResponse } from "next/server";
 import { isReportingOrigin, PRIVATE_HEADERS, secretMatches } from "@/lib/integration-auth";
 import { loginAllowed, readStoreJson, STORE_COOKIE, storeAuthenticated, storeSession } from "@/lib/store-auth";
-import { storeConfigured } from "@/lib/tiendanube-api";
+import { hasStoreCredentials, loadStoreCredentials } from "@/lib/store-connection";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 export async function GET(request: Request) {
-  return NextResponse.json({ configured: storeConfigured(), authenticated: storeAuthenticated(request),
+  const authenticated = storeAuthenticated(request);
+  let connection = null;
+  let configured = false;
+  try {
+    if (authenticated) { connection = await loadStoreCredentials(); configured = Boolean(connection); }
+    else configured = await hasStoreCredentials();
+  } catch { /* The private settings endpoint provides recovery guidance. */ }
+  return NextResponse.json({ configured, authenticated,
+    ...(authenticated && connection ? { storeId: connection.storeId } : {}),
     adminConfigured: (process.env.ADMIN_PASSWORD?.length ?? 0) >= 12 }, { headers: PRIVATE_HEADERS });
 }
 export async function POST(request: Request) {

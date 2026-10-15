@@ -16,7 +16,31 @@ En **Herramientas → Preparar y publicar productos** se revisan los productos s
 
 ## Configuración privada
 
-Crear o autorizar una aplicación para la tienda con permisos de lectura y escritura de productos, y lectura de categorías. Configurar en `.env.local` o en el servidor:
+### App privada para el plan Esencial
+
+PLUG usa el plan Esencial y el dominio `https://plugrosario.xyz`. Ese plan puede instalar una app privada mediante OAuth; no necesita “Aplicaciones a medida”, que está reservado a Escala y Evolución. La conexión del conector de este chat es independiente de la autorización de la web.
+
+Crear una app externa en el [Portal de Socios](https://partners.tiendanube.com), con distribución **Para tus clientes**. Nombre sugerido: **PLUG Inventario**. La app privada no requiere publicarse en la Tienda de Aplicaciones ni pasar por homologación. Puede seguir apareciendo En desarrollo.
+
+| Campo | Valor |
+| --- | --- |
+| URL de la app / panel | `https://db.vidaeventofiesta.site/inventario` |
+| URL de redirección | `https://db.vidaeventofiesta.site/api/tiendanube/oauth/callback` |
+| Permisos | Lectura y escritura de productos (`write_products`, que incluye lectura, variantes, imágenes y categorías) |
+
+En **Inventario → Herramientas → Preparar y publicar productos**, ingresar con la contraseña de administración. La sección **Conexión con Tiendanube** permite cargar el ID de la app, la clave secreta, el correo de contacto y el dominio de la tienda. **Guardar app** conserva la configuración cifrada; no solicita autorización ni publica productos. **Autorizar conexión en Tiendanube** abre el administrador de la tienda para que el propietario acepte sus permisos y vuelva automáticamente al inventario.
+
+El callback intercambia el código en el servidor, verifica `write_products`, el ID, el dominio y que la moneda sea ARS, y comprueba lectura de productos. Si se autoriza otra tienda, no se reemplaza la conexión anterior. La primera prueba de escritura se realiza luego desde la vista previa de un producto usando **Guardar oculto**. No se realizan altas ni publicaciones automáticas al conectar.
+
+La clave de la app y el token se guardan cifrados mediante AES de 256 bits en modo GCM, con clave derivada de `ADMIN_PASSWORD` mediante scrypt y sal aleatoria. La base solo contiene el cifrado; las respuestas nunca devuelven los secretos. La sesión de administración es independiente del OAuth. El estado de autorización dura diez minutos, se vincula al navegador con una cookie HttpOnly SameSite=Lax y se consume una sola vez en PostgreSQL. Las demás sesiones continúan con SameSite=Strict. Los envíos usan una conexión fija durante cada operación y comprueban que la tienda coincida con la vista previa.
+
+Conservar una copia segura de las credenciales de la app. Cambiar `ADMIN_PASSWORD` requiere volver a configurar la app y autorizar la tienda, porque la conexión anterior no puede descifrarse con otra contraseña. **Desconectar del panel** quita el token local y las autorizaciones pendientes, conserva los vínculos y no elimina productos remotos. Para revocar también el acceso en Tiendanube, desinstalar la app desde su administrador. **Verificar acceso** consulta la tienda sin modificar productos.
+
+Referencias: [instalar apps privadas](https://tiendanube.dev/es-AR/apps/admin/overview), [OAuth](https://tiendanube.github.io/api-documentation/authentication) y [planes de Aplicaciones a medida](https://ayuda.tiendanube.com/es_AR/aplicaciones-a-medida/como-gestionar-las-aplicaciones-a-medida-en-tiendanube).
+
+### Alternativa administrada desde el servidor
+
+Si ya existe una aplicación autorizada y se prefiere administrar su token mediante variables de entorno, se conserva este modo con prioridad sobre la configuración del panel. Configurar en `.env.local` o en el servidor:
 
 ```env
 TIENDANUBE_STORE_ID=
@@ -41,7 +65,7 @@ Las fotos se suben por `attachment` o URL HTTPS. Se registran sus IDs para reord
 
 ## Verificación del desarrollo
 
-`npx tsx --test tests/photos.test.ts tests/tiendanube.test.ts tests/publicidad.test.ts` verifica normalización de fotos, márgenes, transparencia, validaciones, protección de enlaces, separación de notas, cálculo de precios, permisos, creación y recuperación de IDs remotos con servicios simulados. Con el servidor en el puerto 3001, `node tests/tiendanube-ui.mjs` verifica escritorio y móvil, carga de varias fotos, dimensiones reales, recuperación de errores, edición y confirmación de envío sin escribir en servicios reales. `npm run build` valida la compilación. El comando de lint preexistente no funciona porque falta `eslint.config.*` en el proyecto.
+`npx tsx --test tests/photos.test.ts tests/tiendanube.test.ts tests/publicidad.test.ts tests/store-connection.test.ts` verifica normalización de fotos, márgenes, transparencia, validaciones, protección de enlaces, separación de notas, cálculo de precios, permisos, cifrado, estado OAuth, dominio autorizado, creación y recuperación de IDs remotos con servicios simulados. Con el servidor en el puerto 3001, `node tests/tiendanube-ui.mjs` verifica la galería y el envío y `node tests/tiendanube-connection-ui.mjs` verifica el formulario de conexión y el regreso al inventario, en escritorio y móvil. Ninguno escribe en servicios reales. `npm run build` valida la compilación. El comando de lint preexistente no funciona porque falta `eslint.config.*` en el proyecto.
 
 ## Stock y precios
 

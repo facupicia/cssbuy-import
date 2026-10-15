@@ -26,10 +26,11 @@ export async function POST(request: Request) {
   catch { return NextResponse.json({ error: "Solicitud inválida" }, { status: 400 }); }
   if (typeof body.id !== "string" || !/^[0-9a-f]{8}(-[0-9a-f]{4}){3}-[0-9a-f]{12}$/i.test(body.id)
     || typeof body.publish !== "boolean" || typeof body.updatedAt !== "string"
+    || typeof body.storeId !== "string" || !/^\d+$/.test(body.storeId)
     || (body.productId !== undefined && (typeof body.productId !== "string" || !/^\d+$/.test(body.productId)))) {
     return NextResponse.json({ error: "Producto, versión o acción inválida" }, { status: 400 });
   }
   try {
-    return NextResponse.json(await syncStoreProduct(body.id, body.publish, body.updatedAt, body.productId as string | undefined), { headers: PRIVATE_HEADERS });
+    return NextResponse.json(await syncStoreProduct(body.id, body.publish, body.updatedAt, body.productId as string | undefined, body.storeId), { headers: PRIVATE_HEADERS });
   } catch (e) { return failure(e); }
 }

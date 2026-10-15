@@ -42,7 +42,7 @@ try {
       if (url.pathname === "/api/marcas") return ok({ marcas: [{ id: "marca", nombre: "PLUG", activa: true, createdAt: item.createdAt }] });
       if (url.pathname === "/api/inventario") return ok({ items: [item] });
       if (url.pathname === `/api/inventario/${item.id}` && request.method() === "PATCH") { item = { ...item, ...request.postDataJSON() }; return ok({ item }); }
-      if (url.pathname === "/api/tiendanube/session") return ok({ configured: connected, authenticated: connected, adminConfigured: connected });
+      if (url.pathname === "/api/tiendanube/session") return ok({ configured: connected, authenticated: connected, adminConfigured: connected, storeId: connected ? "99" : undefined });
       if (url.pathname === "/api/tiendanube") {
         if (request.method() === "POST") { sent = request.postDataJSON(); return ok({ productId: 100, published: sent.publish }); }
         if (url.searchParams.get("resource") === "categories") return ok({ categories: [{ id: 12, name: "Camperas" }] });
@@ -60,7 +60,7 @@ try {
     await preview.screenshot({ path: `${output}/tiendanube-${viewport.width}.png` });
     assert.equal(await page.evaluate(() => document.documentElement.scrollWidth > window.innerWidth), false);
     await preview.getByRole("button", { name: "Editar ficha", exact: true }).click();
-    const editor = page.getByRole("dialog");
+    const editor = page.getByRole("dialog", { name: "Editar ítem", exact: true });
     await editor.getByLabel("Descripción pública", { exact: true }).fill("Descripción editada desde el panel");
     await editor.getByLabel("Subir fotos desde tu equipo").setInputFiles([
       { name: "prenda-horizontal.png", mimeType: "image/png", buffer: png },

@@ -131,6 +131,7 @@ test("envíos recuperables: creación, actualización por ID, SKU existente y re
   });
   try {
     await syncStoreProduct(item.id, false, item.updatedAt);
+    await assert.rejects(() => syncStoreProduct(item.id, true, item.updatedAt, "100", "another-store"), e => e instanceof StoreApiError && e.status === 409);
     assert.equal(creations, 1); assert.equal(images, 1); assert.equal(remote!.published, false);
     await syncStoreProduct(item.id, true, item.updatedAt, "100");
     assert.equal(creations, 1); assert.equal(images, 1); assert.equal(remote!.published, true);

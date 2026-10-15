@@ -203,6 +203,9 @@ export default function InventarioPage() {
   const [bulkSaving, setBulkSaving] = useState(false);
   const [exportOpen, setExportOpen] = useState(false);
   const [publishOpen, setPublishOpen] = useState(false);
+  useEffect(() => {
+    if (new URLSearchParams(window.location.search).has("tiendanube")) setPublishOpen(true);
+  }, []);
   const [returnToPublish, setReturnToPublish] = useState(false);
   const [confirmBulkDelete, setConfirmBulkDelete] = useState(false);
   const [orden, setOrden] = useState<OrdenInventario>("reciente");
@@ -619,7 +622,7 @@ export default function InventarioPage() {
                 <MenuItem icon={<Store className="h-3.5 w-3.5" />} disabled={items.length === 0} onSelect={() => setExportOpen(true)}>
                   Exportar a Tiendanube
                 </MenuItem>
-                <MenuItem icon={<Store className="h-3.5 w-3.5" />} disabled={items.length === 0} onSelect={() => setPublishOpen(true)}>
+                <MenuItem icon={<Store className="h-3.5 w-3.5" />} onSelect={() => setPublishOpen(true)}>
                   Preparar y publicar productos
                 </MenuItem>
               </MenuContent>

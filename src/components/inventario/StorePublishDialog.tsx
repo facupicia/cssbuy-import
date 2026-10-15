@@ -10,6 +10,7 @@ import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/Dialog";
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
+import { StoreConnectionSettings } from "@/components/inventario/StoreConnectionSettings";
 
 async function json<T>(url: string, init?: RequestInit): Promise<T> {
   const response = await fetch(url, { cache: "no-store", ...init });
@@ -17,7 +18,7 @@ async function json<T>(url: string, init?: RequestInit): Promise<T> {
   if (!response.ok) throw new Error(data.error || "No se pudo completar la operación");
   return data;
 }
-type Session = { configured: boolean; authenticated: boolean; adminConfigured: boolean };
+type Session = { configured: boolean; authenticated: boolean; adminConfigured: boolean; storeId?: string };
 export function StorePublishDialog({ open, onOpenChange, items, marcas, onChanged, onEdit }: {
   open: boolean; onOpenChange: (open: boolean) => void; items: InventoryItem[]; marcas: Marca[];
   onChanged: () => Promise<void>; onEdit: (item: InventoryItem) => void;
@@ -48,13 +49,20 @@ export function StorePublishDialog({ open, onOpenChange, items, marcas, onChange
       const l = await json<{ links: Record<string, StoreLink> }>("/api/tiendanube"); setLinks(l.links);
       if (s.configured) {
         const c = await json<{ categories: { id: number; name: string }[] }>("/api/tiendanube?resource=categories"); setCategories(c.categories);
-      }
+      } else setCategories([]);
     } else { setLinks({}); setCategories([]); }
   }, []);
   useEffect(() => {
     if (!open) return;
     let cancelled = false;
-    setChecking(true); setError(""); setMessage("");
+    const result = new URLSearchParams(window.location.search).get("tiendanube");
+    if (result) {
+      const cleanUrl = new URL(window.location.href); cleanUrl.searchParams.delete("tiendanube");
+      window.history.replaceState(window.history.state, "", cleanUrl.pathname + cleanUrl.search + cleanUrl.hash);
+    }
+    setChecking(true);
+    setError(result === "failed" ? "No se pudo autorizar la tienda. Revisá la app, los permisos de productos y que hayas ingresado a la tienda correcta; luego volvé a intentar." : "");
+    setMessage(result === "connected" ? "Tiendanube conectada. Ya podés elegir categorías y preparar un producto para enviarlo." : result === "cancelled" ? "La autorización fue cancelada. Podés retomarla cuando quieras." : "");
     refresh().catch(e => { if (!cancelled) setError(e.message); }).finally(() => { if (!cancelled) setChecking(false); });
     return () => { cancelled = true; };
   }, [open, refresh]);
@@ -70,7 +78,7 @@ export function StorePublishDialog({ open, onOpenChange, items, marcas, onChange
     setConfirm(null); setBusy(true); setError(""); setMessage("");
     try {
       await json("/api/tiendanube", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({
-        id: item.id, publish, updatedAt: item.updatedAt, ...(link?.product_id ? { productId: link.product_id } : {}),
+        id: item.id, publish, updatedAt: item.updatedAt, storeId: session?.storeId, ...(link?.product_id ? { productId: link.product_id } : {}),
       }) });
       setMessage(publish ? "Producto actualizado y publicado en Tiendanube" : "Producto guardado en Tiendanube como oculto");
     } catch (e) { setError(e instanceof Error ? e.message : "No se pudo enviar"); }
@@ -88,10 +96,11 @@ export function StorePublishDialog({ open, onOpenChange, items, marcas, onChange
             <span>{checking ? "Comprobando conexión…" : session?.configured ? "Credenciales configuradas" : "Tiendanube pendiente de conexión. Podés preparar tus productos ahora."}</span>
             <Button size="sm" variant="outline" disabled={busy || checking} onClick={async () => { setChecking(true); setError(""); try { await refresh(); } catch(e) { setError(e instanceof Error ? e.message : "No se pudo comprobar"); } finally { setChecking(false); } }}>Comprobar conexión</Button>
           </div>
-          {session?.configured && session.adminConfigured && !session.authenticated && <div className="flex flex-col items-end gap-3 sm:flex-row">
-            <Input label="Contraseña de administración" type="password" autoComplete="current-password" value={password} onChange={e => setPassword(e.target.value)} hint="Ingresá para habilitar categorías y envío de productos." />
+          {session?.adminConfigured && !session.authenticated && <div className="flex flex-col items-end gap-3 sm:flex-row">
+            <Input label="Contraseña de administración" type="password" autoComplete="current-password" value={password} onChange={e => setPassword(e.target.value)} hint="Ingresá para conectar tu tienda y habilitar el envío de productos." />
             <Button disabled={busy || !password || !session.adminConfigured} onClick={login}>Ingresar</Button>
           </div>}
+          {session?.authenticated && <StoreConnectionSettings onChanged={refresh} onBusyChange={setBusy} />}
           {session?.authenticated && <Button size="sm" variant="ghost" disabled={busy} onClick={async () => { try { await json("/api/tiendanube/session", { method: "DELETE" }); await refresh(); } catch(e) { setError(e instanceof Error ? e.message : "No se pudo cerrar la sesión"); } }}>Cerrar acceso de publicación</Button>}
           {error && <p role="alert" className="rounded-lg bg-[var(--color-danger-soft)] p-3 text-sm text-[var(--color-danger)]">{error}</p>}
           {message && <p role="status" className="rounded-lg bg-[var(--color-accent-soft)] p-3 text-sm text-[var(--color-accent)]">{message}</p>}
