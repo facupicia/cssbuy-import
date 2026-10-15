@@ -1,5 +1,6 @@
 import { Pool } from "pg";
 import { fillInventoryWeights } from "./inventory-weight";
+import { withStoreCategory } from "./store-category";
 import type { InventoryItem, Marca } from "./types";
 import {
   isBulkPriceOp,
@@ -399,7 +400,7 @@ export async function getInventoryItems(): Promise<InventoryItem[]> {
 
 async function hydrateInventoryWeights(items: InventoryItem[]): Promise<InventoryItem[]> {
   const refs = [...new Set(items.filter(i => !i.tienda?.pesoKg).map(i => i.origenRef?.trim()).filter(Boolean))];
-  if (!refs.length) return items;
+  if (!refs.length) return items.map(i => withStoreCategory(i));
   await Promise.all([ensureCotizacionesTable(), ensureCssbuyOrdersTable()]);
   const [quotes, orders] = await Promise.all([
     getPool().query(`SELECT productos FROM shop_cotizaciones ORDER BY created_at DESC`),
@@ -407,7 +408,7 @@ async function hydrateInventoryWeights(items: InventoryItem[]): Promise<Inventor
   ]);
   return fillInventoryWeights(items,
     quotes.rows.map(q => ({ productos: Array.isArray(q.productos) ? q.productos : [] })),
-    orders.rows.map(rowToCssbuyOrder));
+    orders.rows.map(rowToCssbuyOrder)).map(i => withStoreCategory(i));
 }
 
 export async function getInventoryItem(id: string): Promise<InventoryItem | null> {

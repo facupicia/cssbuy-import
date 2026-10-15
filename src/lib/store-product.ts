@@ -3,12 +3,9 @@ import { calcInventoryItem } from "./inventory";
 import { parseVariante, precioPublicado } from "./tiendanube";
 import { canonizar, varianteSinTalle } from "./variantes";
 import { descripcionATexto, generarDescripcionTiendaHTML } from "./descripcion";
-import { DEFAULT_TRANSFER_DISCOUNT_PCT } from "./store-defaults";
+import { DEFAULT_TRANSFER_DISCOUNT_PCT, newStoreProfile } from "./store-defaults";
 
-export const EMPTY_STORE_PROFILE: StoreProductProfile = {
-  descripcion: "", categoria: "", categoriaId: null, fotos: [],
-  pesoKg: 0, descuentoPct: DEFAULT_TRANSFER_DISCOUNT_PCT, redondearA: 0,
-};
+export const EMPTY_STORE_PROFILE: StoreProductProfile = newStoreProfile();
 
 export function validPhoto(value: string): boolean {
   if (/^data:image\/(jpeg|png|webp);base64,[A-Za-z0-9+/]+=*$/.test(value)) return value.length <= 700_000;

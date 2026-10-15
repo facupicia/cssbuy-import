@@ -129,6 +129,7 @@ test("envíos recuperables: creación, actualización por ID, SKU existente y re
     const path = new URL(input).pathname.replace("/2025-03/99", "");
     const data = init?.body ? JSON.parse(String(init.body)) : null;
     const ok = (data: unknown) => new Response(JSON.stringify(data), { status: 200 });
+    if (path === "/categories") return ok([{ id: 12, name: { es: "Camperas" } }]);
     if (unavailable) return new Response("", { status: 429 });
     if (path === "/products" && init?.method === "GET") {
       const handle = new URL(input).searchParams.get("handle");
@@ -180,6 +181,12 @@ test("envíos recuperables: creación, actualización por ID, SKU existente y re
       assert.ok(remote!.description.es.includes("Cómo saber tu talle"));
       assert.ok(!remote!.description.es.includes("NOTA PRIVADA"));
     } finally { item.tienda!.descripcion = originalDescription; }
+    const originalCategory = { categoria: item.tienda!.categoria, categoriaId: item.tienda!.categoriaId };
+    try {
+      item.tienda!.categoria = ""; item.tienda!.categoriaId = null;
+      await syncStoreProduct(item.id, true, item.updatedAt, "100");
+      assert.deepEqual(remote!.categories, [12]);
+    } finally { Object.assign(item.tienda!, originalCategory); }
     unavailable = true;
     await assert.rejects(() => storeRequest("/products"), e => e instanceof StoreApiError && e.status === 429 && !e.message.includes("private-token"));
   } finally { process.env = before; }

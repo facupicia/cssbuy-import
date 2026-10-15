@@ -1886,6 +1886,7 @@ function ItemFormDialog({
 
           <StoreProductFields
             value={form.tienda}
+            productName={form.nombre}
             image={form.imagen}
             onBusyChange={setProcessingPhotos}
             onChange={(update) => setForm(f => {

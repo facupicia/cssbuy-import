@@ -4,6 +4,7 @@ import { ensureSchema, getInventoryItem, getInventoryItems, getMarcas, getPool }
 import { storePhotos, storeReadiness, storeVariants } from "./store-product";
 import { generarDescripcionTiendaHTML } from "./descripcion";
 import { loadStoreCredentials, type StoreCredentials } from "./store-connection";
+import { withStoreCategory } from "./store-category";
 
 export class StoreApiError extends Error {
   constructor(message: string, public status = 502) { super(message); }
@@ -47,8 +48,8 @@ export async function getStoreLinks(): Promise<Record<string, StoreLink>> {
   const result = await getPool().query("SELECT item_id, product_id, synced_at, visibility, error FROM tiendanube_links WHERE store_id=$1", [credentials.storeId]);
   return Object.fromEntries(result.rows.map(r => [r.item_id, r]));
 }
-export async function getStoreCategories() {
-  const credentials = await loadStoreCredentials();
+export async function getStoreCategories(connection?: StoreCredentials) {
+  const credentials = connection ?? await loadStoreCredentials();
   if (!credentials) throw new StoreApiError("Conectá tu Tiendanube para cargar las categorías", 503);
   const all: { id: number; name: string }[] = [];
   for (let page = 1; page <= 50; page++) {
@@ -79,9 +80,10 @@ export async function syncStoreProduct(itemId: string, publish: boolean, expecte
     const result = await client.query("SELECT pg_try_advisory_lock(hashtextextended($1, 0)) AS locked", [lock]);
     locked = result.rows[0].locked;
     if (!locked) throw new StoreApiError("Este producto ya se está enviando. Esperá a que termine", 409);
-    const item = await getInventoryItem(itemId);
+    let item = await getInventoryItem(itemId);
     if (!item) throw new StoreApiError("Producto no encontrado", 404);
     if (item.updatedAt !== expectedUpdatedAt) throw new StoreApiError("El producto cambió desde la vista previa. Actualizá antes de enviarlo", 409);
+    if (!item.tienda?.categoriaId) item = withStoreCategory(item, await getStoreCategories(credentials));
     const brand = (await getMarcas()).find(m => m.id === item.marcaId)?.nombre;
     const readiness = storeReadiness(item, brand);
     if (!readiness.ready) throw new StoreApiError(readiness.errors.join(". "), 422);

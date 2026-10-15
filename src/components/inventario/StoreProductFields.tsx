@@ -7,11 +7,13 @@ import { Input } from "@/components/ui/Input";
 import { Button } from "@/components/ui/Button";
 import { normalizePhotoFile, normalizePhotoSource } from "@/lib/normalize-photo-client";
 import { PRODUCT_PHOTO_SIZE } from "@/lib/photo-format";
+import { inferCategoryName } from "@/lib/store-category";
 
-export function StoreProductFields({ value, onChange, image, onBusyChange }: {
+export function StoreProductFields({ value, onChange, image, onBusyChange, productName = "" }: {
   value?: StoreProductProfile | null;
   onChange: (value: StoreProductProfile | ((current: StoreProductProfile) => StoreProductProfile)) => void;
   image?: string; onBusyChange?: (busy: boolean) => void;
+  productName?: string;
 }) {
   const profile = value ?? EMPTY_STORE_PROFILE;
   const [url, setUrl] = useState("");
@@ -62,7 +64,7 @@ export function StoreProductFields({ value, onChange, image, onBusyChange }: {
       <p className="text-xs text-[var(--color-fg-muted)]">Opcional. Si lo dejás vacío, se usa la descripción automática con la tabla de talles de la marca.</p>
     </div>
     <div className="grid gap-4 sm:grid-cols-2">
-      <Input label="Categoría para exportar" value={profile.categoria} onChange={e => onChange({ ...profile, categoria: e.target.value, categoriaId: null })} placeholder="Ropa > Camperas" hint="La categoría de Tiendanube se elige al conectar." />
+      <Input label="Categoría para exportar" value={profile.categoria || inferCategoryName(productName) || ""} onChange={e => onChange({ ...profile, categoria: e.target.value, categoriaId: null })} placeholder="Ropa > Camperas" hint="Se completa según el nombre y se vincula con tu categoría de Tiendanube. Podés cambiarla." />
       <Input label="Peso de envío (kg)" type="number" min={0} max={1000} step="0.001" value={profile.pesoKg || ""} onChange={e => change("pesoKg", Number(e.target.value))} hint="Se completa con el peso guardado. Podés ajustarlo para incluir el embalaje." />
       <Input label="Descuento por transferencia (%)" type="number" min={0} max={90} value={profile.descuentoPct} onChange={e => change("descuentoPct", Number(e.target.value))} hint="El precio publicado se ajusta para conservar tu precio de venta." />
       <Input label="Redondear precio a ($)" type="number" min={0} max={100000} step={100} value={profile.redondearA} onChange={e => change("redondearA", Number(e.target.value))} hint="Usá 0 para no redondear." />

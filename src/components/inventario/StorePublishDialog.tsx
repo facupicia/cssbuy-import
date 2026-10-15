@@ -7,6 +7,7 @@ import { EMPTY_STORE_PROFILE, storePhotos, storeReadiness, storeVariants } from 
 import { calcInventoryItem } from "@/lib/inventory";
 import { fmtARS } from "@/lib/utils";
 import { generarDescripcionTiendaHTML } from "@/lib/descripcion";
+import { withStoreCategory } from "@/lib/store-category";
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/Dialog";
@@ -36,7 +37,8 @@ export function StorePublishDialog({ open, onOpenChange, items, marcas, onChange
   const [confirm, setConfirm] = useState<"hidden" | "visible" | null>(null);
   const [readyOnly, setReadyOnly] = useState(false);
   const brandFor = (item: InventoryItem) => marcas.find(m => m.id === item.marcaId)?.nombre;
-  const visible = readyOnly ? items.filter(i => storeReadiness(i, brandFor(i)).ready) : items;
+  const categorizedItems = items.map(i => withStoreCategory(i, categories));
+  const visible = readyOnly ? categorizedItems.filter(i => storeReadiness(i, brandFor(i)).ready) : categorizedItems;
   const item = visible.find(i => i.id === selectedId) ?? visible[0];
   const brand = item ? brandFor(item) : undefined;
   const readiness = item ? storeReadiness(item, brand) : null;
@@ -108,7 +110,7 @@ export function StorePublishDialog({ open, onOpenChange, items, marcas, onChange
           <label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={readyOnly} onChange={e => setReadyOnly(e.target.checked)} disabled={busy} />Mostrar solo fichas completas</label>
           <div className="grid gap-6 md:grid-cols-[minmax(0,1fr)_minmax(0,2fr)]">
             <div className="space-y-2">
-              <p className="text-sm text-[var(--color-fg-muted)]">{visible.length} {visible.length === 1 ? "producto" : "productos"} · Fichas completas: {items.filter(i => storeReadiness(i, brandFor(i)).ready).length}</p>
+              <p className="text-sm text-[var(--color-fg-muted)]">{visible.length} {visible.length === 1 ? "producto" : "productos"} · Fichas completas: {categorizedItems.filter(i => storeReadiness(i, brandFor(i)).ready).length}</p>
               <div className="max-h-80 space-y-2 overflow-y-auto" aria-label="Productos para revisar">{visible.map(i => {
                 const r = storeReadiness(i, brandFor(i));
                 return <button key={i.id} type="button" disabled={busy} aria-pressed={item?.id === i.id} onClick={() => { setSelectedId(i.id); setMessage(""); setError(""); }} className={`w-full rounded-lg border p-3 text-left text-sm hover:bg-[var(--color-bg-subtle)] focus-visible:outline-2 ${item?.id === i.id ? "border-[var(--color-border-focus)] bg-[var(--color-bg-subtle)]" : "border-[var(--color-border)]"}`}>
@@ -136,7 +138,7 @@ export function StorePublishDialog({ open, onOpenChange, items, marcas, onChange
                 setBusy(true); setError("");
                 try { await json(`/api/inventario/${item.id}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ tienda: { ...(item.tienda ?? EMPTY_STORE_PROFILE), categoriaId: category.id, categoria: category.name } }) }); await onChanged(); }
                 catch(e) { setError(e instanceof Error ? e.message : "No se pudo guardar la categoría"); } finally { setBusy(false); }
-              }}><option value="" disabled>Elegí una categoría de la tienda</option>{categories.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}</select></div>}
+              }}><option value="" disabled>Elegí una categoría de la tienda</option>{categories.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}</select>{!item.tienda?.categoriaId && item.tienda?.categoria && <p className="text-xs text-[var(--color-warning)]">No se encontró una categoría única para {item.tienda.categoria}. Creala en Tiendanube o elegí otra categoría.</p>}</div>}
               {readiness && <div className="space-y-2 text-sm" aria-live="polite">{readiness.errors.length > 0 && <div><h4 className="font-medium">Para completar la ficha</h4><ul className="list-disc space-y-1 pl-4">{readiness.errors.map(e => <li key={e}>{e}</li>)}</ul></div>}{readiness.warnings.length > 0 && <ul className="list-disc space-y-1 pl-4 text-[var(--color-warning)]">{readiness.warnings.map(w => <li key={w}>{w}</li>)}</ul>}{readiness.ready && <p className="text-[var(--color-accent)]">La ficha está completa.</p>}</div>}
               {link?.product_id && <p className="text-xs text-[var(--color-fg-muted)]">Producto Tiendanube #{link.product_id}. Último envío: {link.synced_at ? new Date(link.synced_at).toLocaleString("es-AR", { timeZone: "America/Argentina/Buenos_Aires" }) : "pendiente"}.{link.error && ` Último resultado: ${link.error}`}</p>}
               <p className="text-xs text-[var(--color-fg-muted)]">El envío usa el stock de este panel y reemplaza el de las variantes vinculadas en Tiendanube. Las ventas de Tiendanube todavía no vuelven automáticamente al inventario. Revisá las cantidades antes de actualizar.</p>
