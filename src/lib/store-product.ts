@@ -3,10 +3,11 @@ import { calcInventoryItem } from "./inventory";
 import { parseVariante, precioPublicado } from "./tiendanube";
 import { canonizar, varianteSinTalle } from "./variantes";
 import { descripcionATexto, generarDescripcionTiendaHTML } from "./descripcion";
+import { DEFAULT_TRANSFER_DISCOUNT_PCT } from "./store-defaults";
 
 export const EMPTY_STORE_PROFILE: StoreProductProfile = {
   descripcion: "", categoria: "", categoriaId: null, fotos: [],
-  pesoKg: 0, descuentoPct: 0, redondearA: 0,
+  pesoKg: 0, descuentoPct: DEFAULT_TRANSFER_DISCOUNT_PCT, redondearA: 0,
 };
 
 export function validPhoto(value: string): boolean {
@@ -22,7 +23,7 @@ export function sanitizeStoreProfile(raw: unknown): StoreProductProfile {
   const r = raw as Record<string, unknown>;
   const text = (key: string, max: number) => typeof r[key] === "string" ? r[key].trim().slice(0, max) : "";
   const number = (key: string, max: number) => {
-    const n = Number(r[key] ?? 0);
+    const n = Number(r[key] ?? (key === "descuentoPct" ? DEFAULT_TRANSFER_DISCOUNT_PCT : 0));
     if (!Number.isFinite(n) || n < 0 || n > max) throw new Error(`Valor inválido: ${key}`);
     return n;
   };

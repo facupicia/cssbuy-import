@@ -1,0 +1,1 @@
+export const DEFAULT_TRANSFER_DISCOUNT_PCT = 10;

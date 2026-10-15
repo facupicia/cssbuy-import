@@ -3,6 +3,7 @@ import { calcInventoryItem } from "./inventory";
 import { generarDescripcionTiendaHTML } from "./descripcion";
 import { varianteSinTalle, parseColor, canonizar } from "./variantes";
 import { normalizarColor } from "./colores";
+import { DEFAULT_TRANSFER_DISCOUNT_PCT } from "./store-defaults";
 
 /**
  * Exportación al CSV de carga masiva de Tiendanube.
@@ -279,7 +280,7 @@ export function buildTiendanubeCSV(
     nombreDeMarca = {},
     mostrarEnTienda = false,
     redondearA = 0,
-    descuentoEfectivoPct = 0,
+    descuentoEfectivoPct = DEFAULT_TRANSFER_DISCOUNT_PCT,
     incluirCosto = true,
     descripcionHTML = true,
     diferenciarNombres = true,

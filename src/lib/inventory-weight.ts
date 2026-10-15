@@ -1,4 +1,5 @@
 import type { InventoryItem, StoreProductProfile } from "./types";
+import { DEFAULT_TRANSFER_DISCOUNT_PCT } from "./store-defaults";
 
 /** Las cotizaciones guardan peso por unidad; CSSBuy pesa la orden completa. */
 export function gramsToKg(grams: unknown): number {
@@ -29,7 +30,7 @@ export function fillInventoryWeights(
     if (!pesoKg) return item;
     const profile: StoreProductProfile = item.tienda ?? {
       descripcion: "", categoria: "", categoriaId: null, fotos: [],
-      pesoKg: 0, descuentoPct: 0, redondearA: 0,
+      pesoKg: 0, descuentoPct: DEFAULT_TRANSFER_DISCOUNT_PCT, redondearA: 0,
     };
     return { ...item, tienda: { ...profile, pesoKg } };
   });

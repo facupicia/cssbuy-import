@@ -38,6 +38,10 @@ test("la ficha y la exportación conservan la tabla de la marca junto con la des
   assert.ok(!generarDescripcionTiendaHTML(bape, "Sin tabla").includes("Tabla de talles · Bape"));
 });
 test("validación y precios: mantiene talles agotados, bloquea datos incoherentes y separa las notas", () => {
+  assert.equal(EMPTY_STORE_PROFILE.descuentoPct, 10);
+  assert.equal(sanitizeStoreProfile({}).descuentoPct, 10);
+  assert.equal(sanitizeStoreProfile({ descuentoPct: 0 }).descuentoPct, 0);
+  assert.equal(storeVariants({ ...item, tienda: null })[0].price, 50000);
   assert.equal(storeReadiness(item, "PLUG").ready, true);
   const variants = storeVariants(item);
   assert.deepEqual(variants.map(v => v.stock), [2, 0]);

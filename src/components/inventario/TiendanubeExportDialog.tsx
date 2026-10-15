@@ -25,6 +25,7 @@ import {
   DialogDescription,
 } from "@/components/ui/Dialog";
 import { toast } from "@/components/ui/Toast";
+import { DEFAULT_TRANSFER_DISCOUNT_PCT } from "@/lib/store-defaults";
 
 // El descuento de la tienda cambia poco: se recuerda entre exportaciones.
 const CLAVE_DESCUENTO = "tiendanube-descuento-efectivo";
@@ -50,7 +51,7 @@ export function TiendanubeExportDialog({
   const [incluirCosto, setIncluirCosto] = useState(true);
   const [descripcionHTML, setDescripcionHTML] = useState(true);
   const [verPreview, setVerPreview] = useState(false);
-  const [descuentoEfectivo, setDescuentoEfectivo] = useState(10);
+  const [descuentoEfectivo, setDescuentoEfectivo] = useState(DEFAULT_TRANSFER_DISCOUNT_PCT);
   const [diferenciarNombres, setDiferenciarNombres] = useState(true);
 
   useEffect(() => {
