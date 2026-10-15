@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, type FormEvent } from "react";
+import { useCallback, useEffect, useState, type FormEvent } from "react";
 import { Navbar } from "@/components/Navbar";
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
@@ -42,7 +42,7 @@ export default function PublicidadPage() {
   const [loading, setLoading] = useState(false);
   const [reportedRange, setReportedRange] = useState<typeof range | null>(null);
 
-  async function loadReports() {
+  const loadReports = useCallback(async () => {
     setLoading(true);
     setCampaigns(null); setProducts(null); setCampaignError(""); setCostError("");
     const read = async (url: string) => {
@@ -66,7 +66,19 @@ export default function PublicidadPage() {
       setProducts(result[1].value.products); setAppliedCosts(result[1].value.assumptions);
     } else setCostError(result[1].reason instanceof Error ? result[1].reason.message : "Error consultando inventario.");
     setLoading(false);
-  }
+  }, [range, costs]);
+
+  useEffect(() => {
+    if (unlocked) return;
+    let active = true;
+    void fetch("/api/publicidad/session", { cache: "no-store" }).then(response => {
+      if (response.ok && active) {
+        setUnlocked(true);
+        void loadReports();
+      }
+    }).catch(() => { /* El formulario permite reintentar si no hay conexión. */ });
+    return () => { active = false; };
+  }, [unlocked, loadReports]);
 
   async function login(event: FormEvent<HTMLFormElement>) {
     event.preventDefault(); setLoading(true); setLoginError("");

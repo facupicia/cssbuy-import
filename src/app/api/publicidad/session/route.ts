@@ -1,9 +1,15 @@
 import { NextResponse } from "next/server";
-import { createReportingSession, isReportingOrigin, PRIVATE_HEADERS, secretMatches } from "@/lib/integration-auth";
+import { authorizeIntegration, createReportingSession, isReportingOrigin, PRIVATE_HEADERS, secretMatches } from "@/lib/integration-auth";
 
 export const runtime = "nodejs";
 let attempts = 0;
 let windowStart = 0;
+
+export async function GET(request: Request) {
+  const denied = authorizeIntegration(request);
+  if (denied) return denied;
+  return NextResponse.json({ authenticated: true }, { headers: PRIVATE_HEADERS });
+}
 
 export async function POST(request: Request) {
   if (!isReportingOrigin(request)) {

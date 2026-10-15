@@ -14,7 +14,7 @@ No modifica anuncios, presupuestos, productos ni ventas. No atribuye las ventas 
 3. Generar una clave aleatoria diferente de al menos 32 caracteres para `BUSINESS_READ_API_KEY`, por ejemplo con `node -e "console.log(require('node:crypto').randomBytes(32).toString('hex'))"` en una terminal privada.
 4. Configurar `META_ACCESS_TOKEN` con permiso `ads_read` y acceso a la cuenta publicitaria, `META_AD_ACCOUNT_ID` y `META_GRAPH_API_VERSION` con la versión vigente habilitada en la app de Meta. El token del conector de este chat no se transfiere automáticamente al sitio.
 5. Configurar `BUSINESS_APP_ORIGIN=https://db.vidaeventofiesta.site` (o el origen público usado). Reiniciar el servicio con su `.env.local` actualizado. Docker Compose ya carga ese archivo; no se necesitan credenciales durante el build.
-6. Abrir `/publicidad` e ingresar la contraseña de administración. La sesión dura ocho horas, en cookie HttpOnly, SameSite Strict y Secure en producción. No se guarda la contraseña en el navegador.
+6. Abrir `/publicidad` e ingresar la contraseña de administración. La sesión dura ocho horas y se recupera al recargar o volver a la página, en cookie HttpOnly, SameSite Strict y Secure en producción. No se guarda la contraseña en el navegador.
 
 No guardar secretos en Git, variables `NEXT_PUBLIC_*`, URLs o mensajes del chat. Un token vencido debe renovarse en el servidor.
 

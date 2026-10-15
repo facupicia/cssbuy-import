@@ -4,7 +4,7 @@ import { productAdEconomics, parseSellingCosts, DEFAULT_SELLING_COSTS } from "..
 import { normalizeInsight, parseReportRange, getMetaCampaignReport, type MetaInsight } from "../src/lib/meta-report";
 import { authorizeIntegration, createReportingSession } from "../src/lib/integration-auth";
 import type { InventoryItem } from "../src/lib/types";
-import { POST as login, DELETE as logout } from "../src/app/api/publicidad/session/route";
+import { GET as restoreSession, POST as login, DELETE as logout } from "../src/app/api/publicidad/session/route";
 
 const product: InventoryItem = {
   id: "test", nombre: "Remera", cantidadInicial: 2, cantidadVendida: 0,
@@ -120,6 +120,10 @@ test("ingreso exige origen permitido y contraseña, devuelve cookie HttpOnly y p
     assert.match(cookie, /SameSite=strict/i);
     assert.doesNotMatch(await result.text(), /test-private/);
     assert.equal(authorizeIntegration(new Request("https://panel.invalid/api/integraciones/costos", { headers: { cookie: cookie.split(";")[0] } })), null);
+    const restored = await restoreSession(new Request("https://panel.invalid/api/publicidad/session", { headers: { cookie: cookie.split(";")[0] } }));
+    assert.equal(restored.status, 200);
+    assert.deepEqual(await restored.json(), { authenticated: true });
+    assert.equal((await restoreSession(new Request("https://panel.invalid/api/publicidad/session"))).status, 401);
     const closed = await logout(new Request("http://internal:3001/api/publicidad/session", { method: "DELETE", headers: { origin: "https://panel.invalid" } }));
     assert.match(closed.headers.get("set-cookie") ?? "", /Max-Age=0/i);
   } finally {
