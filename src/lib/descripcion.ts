@@ -110,6 +110,16 @@ const COMO_MEDIR = [
   ["Manga", "Desde la costura del hombro hasta el borde de la manga."],
 ];
 
+/** Keeps the brand's size chart when the product has its own public description. */
+export function generarDescripcionTiendaHTML(item: InventoryItem, marca?: string | null, titulo?: string): string {
+  if (!item.tienda) return generarDescripcionHTML(item, { marca, titulo });
+  const texto = item.tienda.descripcion.split(/\n\s*\n/)
+    .map(p => `<p>${esc(p).replace(/\n/g, "<br>")}</p>`).join("");
+  const tabla = tablaDeMarca(marca);
+  const talle = item.talles?.length ? null : parseTalle(item.variante);
+  return texto + (tabla ? seccion(`Tabla de talles · ${tabla.marca}`, tablaHTML(tabla, talle)) : "");
+}
+
 export function generarDescripcionHTML(
   item: Pick<InventoryItem, "nombre" | "variante" | "notas" | "talles">,
   opts: OpcionesDescripcion = {}

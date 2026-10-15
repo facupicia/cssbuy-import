@@ -1,9 +1,8 @@
 import { InventoryItem } from "./types";
 import { calcInventoryItem } from "./inventory";
-import { generarDescripcionHTML } from "./descripcion";
+import { generarDescripcionTiendaHTML } from "./descripcion";
 import { varianteSinTalle, parseColor, canonizar } from "./variantes";
 import { normalizarColor } from "./colores";
-import { publicDescription } from "./store-product";
 
 /**
  * Exportación al CSV de carga masiva de Tiendanube.
@@ -339,12 +338,9 @@ export function buildTiendanubeCSV(
       "Código de barras": "",
       "Mostrar en tienda": mostrarEnTienda ? "SI" : "NO",
       "Envío sin cargo": "NO",
-      Descripción: it.tienda ? (descripcionHTML ? publicDescription(it.tienda.descripcion) : it.tienda.descripcion) : descripcionHTML
-        ? generarDescripcionHTML(it, {
-            marca: it.marcaId ? nombreDeMarca[it.marcaId] : null,
-            titulo: nombreTienda,
-          })
-        : "",
+      Descripción: descripcionHTML
+        ? generarDescripcionTiendaHTML(it, (it.marcaId && nombreDeMarca[it.marcaId]) || marca, nombreTienda)
+        : it.tienda?.descripcion ?? "",
       Tags: "",
       "Título para SEO": "",
       "Descripción para SEO": "",

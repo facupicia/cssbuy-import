@@ -4,6 +4,8 @@ import { Pool } from "pg";
 import { sanitizeStoreProfile, storeReadiness, storeVariants, publicDescription, EMPTY_STORE_PROFILE } from "../src/lib/store-product";
 import { buildTiendanubeCSV } from "../src/lib/tiendanube";
 import { sanitizeInventoryInput } from "../src/lib/inventory";
+import { generarDescripcionTiendaHTML } from "../src/lib/descripcion";
+import { tablaDeMarca } from "../src/lib/tablas-talle";
 import { storeSession, storeAuthenticated, storeGuard } from "../src/lib/store-auth";
 import { syncStoreProduct, StoreApiError, storeRequest } from "../src/lib/tiendanube-api";
 import { POST as syncRoute } from "../src/app/api/tiendanube/route";
@@ -19,6 +21,22 @@ const item: InventoryItem = {
   ], tienda: { ...EMPTY_STORE_PROFILE, descripcion: "Algodón <script>alert(1)</script>\nCalce regular", categoria: "Camperas", categoriaId: 12,
     pesoKg: 0.6, descuentoPct: 10, redondearA: 100, fotos: ["https://example.com/campera.jpg"] },
 };
+test("la ficha y la exportación conservan la tabla de la marca junto con la descripción pública", () => {
+  const bape = { ...item, nombre: "Remera Bape", talles: null, variante: "Color:Negro;Tamaño:2XL" };
+  assert.equal(tablaDeMarca(" BAPE ")?.marca, "Bape");
+  for (const profile of [bape, { ...bape, tienda: null }]) {
+    const html = generarDescripcionTiendaHTML(profile, "Bape");
+    assert.ok(html.includes("Tabla de talles · Bape"));
+    assert.ok(html.includes("XXL"));
+    assert.ok(!html.includes("NOTA PRIVADA"));
+    if (profile.tienda) assert.ok(html.includes("&lt;script&gt;"));
+  }
+  const csv = buildTiendanubeCSV([bape], { nombreDeMarca: { marca: "Bape" } }).csv;
+  assert.ok(csv.includes("Tabla de talles · Bape"));
+  assert.ok(!csv.includes("NOTA PRIVADA"));
+  assert.ok(generarDescripcionTiendaHTML(bape, "Supreme").includes("Tabla de talles · Supreme"));
+  assert.ok(!generarDescripcionTiendaHTML(bape, "Sin tabla").includes("Tabla de talles · Bape"));
+});
 test("validación y precios: mantiene talles agotados, bloquea datos incoherentes y separa las notas", () => {
   assert.equal(storeReadiness(item, "PLUG").ready, true);
   const variants = storeVariants(item);

@@ -1,7 +1,8 @@
 import { createHash } from "node:crypto";
 import type { PoolClient } from "pg";
 import { ensureSchema, getInventoryItem, getInventoryItems, getMarcas, getPool } from "./db";
-import { publicDescription, storePhotos, storeReadiness, storeVariants } from "./store-product";
+import { storePhotos, storeReadiness, storeVariants } from "./store-product";
+import { generarDescripcionTiendaHTML } from "./descripcion";
 
 export function storeConfigured() {
   return /^\d+$/.test(process.env.TIENDANUBE_STORE_ID ?? "") && Boolean(process.env.TIENDANUBE_ACCESS_TOKEN && process.env.TIENDANUBE_USER_AGENT);
@@ -85,7 +86,7 @@ export async function syncStoreProduct(itemId: string, publish: boolean, expecte
     const attributes = variants[0].props.map(p => ({ es: p.nombre }));
     const stockBody = (stock: number) => ({ inventory_levels: [{ stock, ...(process.env.TIENDANUBE_LOCATION_ID ? { location_id: process.env.TIENDANUBE_LOCATION_ID } : {}) }] });
     const variantBody = (v: typeof variants[number]) => ({ sku: v.sku, price: v.price, weight: v.weight, promotional_price: null, ...stockBody(v.stock), values: v.props.map(p => ({ es: p.valor })) });
-    const metadata = { name: { es: item.nombre.trim() }, description: { es: publicDescription(item.tienda.descripcion) }, brand,
+    const metadata = { name: { es: item.nombre.trim() }, description: { es: generarDescripcionTiendaHTML(item, brand) }, brand,
       categories: [item.tienda.categoriaId], requires_shipping: true };
     await client.query("INSERT INTO tiendanube_links (store_id,item_id) VALUES ($1,$2) ON CONFLICT DO NOTHING", [process.env.TIENDANUBE_STORE_ID, itemId]);
     const link = (await client.query("SELECT * FROM tiendanube_links WHERE store_id=$1 AND item_id=$2", [process.env.TIENDANUBE_STORE_ID, itemId])).rows[0];

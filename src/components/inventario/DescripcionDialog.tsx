@@ -3,8 +3,7 @@
 import { useMemo, useState } from "react";
 import { FileText, Copy, Check, AlertTriangle } from "lucide-react";
 import { InventoryItem } from "@/lib/types";
-import { generarDescripcionHTML } from "@/lib/descripcion";
-import { publicDescription } from "@/lib/store-product";
+import { generarDescripcionTiendaHTML } from "@/lib/descripcion";
 import { tablaDeMarca } from "@/lib/tablas-talle";
 import { Button } from "@/components/ui/Button";
 import { Segmented } from "@/components/ui/Segmented";
@@ -42,7 +41,7 @@ export function DescripcionDialog({
 
   const html = useMemo(() => {
     if (!item) return "";
-    return item.tienda ? publicDescription(item.tienda.descripcion) : generarDescripcionHTML(item, { marca });
+    return generarDescripcionTiendaHTML(item, marca);
   }, [item, marca]);
 
   async function copiar() {

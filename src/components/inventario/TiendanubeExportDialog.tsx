@@ -11,8 +11,7 @@ import {
 } from "@/lib/tiendanube";
 import { calcInventoryItem } from "@/lib/inventory";
 import { fmtARS } from "@/lib/utils";
-import { generarDescripcionHTML } from "@/lib/descripcion";
-import { publicDescription } from "@/lib/store-product";
+import { generarDescripcionTiendaHTML } from "@/lib/descripcion";
 import { tablaDeMarca } from "@/lib/tablas-talle";
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
@@ -135,9 +134,7 @@ export function TiendanubeExportDialog({
   ).length;
 
   const ejemplo = items[0]
-    ? items[0].tienda ? publicDescription(items[0].tienda.descripcion) : generarDescripcionHTML(items[0], {
-        marca: items[0].marcaId ? nombreDeMarca[items[0].marcaId] : null,
-      })
+    ? generarDescripcionTiendaHTML(items[0], (items[0].marcaId && nombreDeMarca[items[0].marcaId]) || marca)
     : "";
 
   const conMarcaPropia = items.filter((i) => i.marcaId && nombreDeMarca[i.marcaId]).length;

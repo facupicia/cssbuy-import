@@ -1,7 +1,7 @@
 /**
  * Tablas de talle por marca, tomadas de las fichas del proveedor.
  *
- * NO hay una tabla genérica a propósito. Comparando las cuatro, el largo casi
+ * NO hay una tabla genérica a propósito. Comparando las fichas, el largo casi
  * coincide (1-2 cm de diferencia) pero el PECHO se dispersa 16 cm entre marcas,
  * y el escalón entre talles dentro de una misma marca es de solo 4-6 cm: la
  * diferencia entre marcas equivale a 3 o 4 talles. El caso que lo cierra es que
@@ -28,7 +28,7 @@ export interface FilaTalle {
   manga?: number;
   /** Altura sugerida en cm, cuando la ficha la trae. */
   alturaCm?: string;
-  /** Peso sugerido en kg. El proveedor lo da en 斤 (jin); 1 jin = 0,5 kg. */
+  /** Peso sugerido en kg. Las fichas en 斤 (jin) se convierten: 1 jin = 0,5 kg. */
   pesoKg?: string;
 }
 
@@ -41,6 +41,17 @@ export interface TablaTalle {
 }
 
 export const TABLAS_TALLE: TablaTalle[] = [
+  {
+    marca: "Bape",
+    nota: "Tabla del proveedor para remeras Bape. Pecho expresado como contorno: se duplicó el ancho de la ficha original (axila a axila). El talle XXL corresponde al 2XL del proveedor. La altura y el peso son orientativos; el calce depende de cada persona.",
+    filas: [
+      { talle: "S", hombro: 47, pecho: 100, largo: 68, manga: 20, alturaCm: "165 a 170", pesoKg: "50 a 60" },
+      { talle: "M", hombro: 50, pecho: 106, largo: 71, manga: 21, alturaCm: "170 a 175", pesoKg: "60 a 70" },
+      { talle: "L", hombro: 53, pecho: 112, largo: 74, manga: 22, alturaCm: "175 a 180", pesoKg: "70 a 80" },
+      { talle: "XL", hombro: 56, pecho: 118, largo: 77, manga: 23, alturaCm: "180 a 185", pesoKg: "80 a 90" },
+      { talle: "XXL", hombro: 59, pecho: 124, largo: 80, manga: 24, alturaCm: "185 a 190", pesoKg: "90 a 100" },
+    ],
+  },
   {
     marca: "Supreme",
     nota: "La ficha original da el peso en 斤 (jin). Está convertido a kilos: 1 jin = 0,5 kg.",
