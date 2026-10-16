@@ -4,7 +4,8 @@
   "private": true,
   "scripts": {
     "dev": "next dev -p 3001",
-    "build": "next build",
+    "build": "npm run build:storefront && next build",
+    "build:storefront": "node scripts/build-storefront.mjs",
     "start": "next start -p 3001",
     "lint": "eslint",
     "sync": "tsx scripts/sync.ts"
@@ -32,10 +33,13 @@
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4",
+    "@tiendanube/nube-sdk-jsx": "^0.22.0",
+    "@tiendanube/nube-sdk-types": "^0.107.0",
     "@types/node": "^20",
     "@types/pg": "^8.23.1",
     "@types/react": "^19",
     "@types/react-dom": "^19",
+    "esbuild": "^0.28.2",
     "eslint": "^9",
     "eslint-config-next": "16.2.9",
     "playwright": "^1.62.1",
