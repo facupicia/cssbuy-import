@@ -40,12 +40,14 @@ test("configuración pública valida medios, alcance, fechas y no acepta videos 
 test("SDK renderiza por página y producto, oculta al vencer y solo consulta contenido público", async t => {
   const config=defaultWidgetConfig(); config.widgets[0].enabled=true;
   const faq=config.widgets.find(w=>w.kind==='faq')!; faq.enabled=true; faq.scope='products'; faq.productIds=[10];
+  faq.slot='after_dynamic_section_main_product';
+  const videos=config.widgets.find(w=>w.kind==='videos')!; videos.enabled=true; videos.scope='products'; videos.productIds=[10]; videos.slot='after_product_detail_shipping_options'; videos.entries=[{title:'',text:'',url:'https://cdn.example.com/a.mp4'}];
   const timer=config.widgets.find(w=>w.kind==='countdown')!; timer.enabled=true; timer.endsAt=new Date(Date.now()+100000).toISOString();
   let page:any={type:'product',data:{product:{id:10}}}; const renders=new Map(); const events:Record<string,Function>={}; const intervals:Function[]=[];
   t.mock.method(globalThis,'setInterval',(fn:Function)=>{intervals.push(fn);return 1;});
   t.mock.method(globalThis,'fetch',async(url:string, options:RequestInit)=>{assert.equal(url,'https://db.vidaeventofiesta.site/api/storefront/widgets?store=99'); assert.equal(options.credentials,'omit'); assert.equal(options.body,undefined);return Response.json(config);});
   const sdk:any={getState:()=>({store:{id:99},location:{page}}),on:(event:string,fn:Function)=>events[event]=fn,render:(slot:string,node:unknown)=>renders.set(slot,node),clearSlot:(slot:string)=>renders.delete(slot)};
-  await App(sdk); assert.ok(renders.has('before_product_detail_name')); assert.ok(renders.has('after_product_description'));
+  await App(sdk); assert.ok(renders.has('before_product_detail_name')); assert.ok(renders.has('after_product_description')); assert.ok(!renders.has('after_product_detail_shipping_options'));
   page={type:'product',data:{product:{id:20}}}; events['page:loaded'](); assert.ok(!renders.has('after_product_description'));
   const pastEnd=Date.parse(timer.endsAt)+1000; t.mock.method(Date,'now',()=>pastEnd); intervals[0](); assert.ok(!renders.has('after_product_detail_price'));
   page={type:'home'}; events['page:loaded'](); assert.ok(!renders.has('after_product_detail_price'));

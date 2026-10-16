@@ -45,7 +45,10 @@ export async function App(nube: NubeSDK) {
     // Ipanema exposes named legacy dynamic sections without numeric instance suffixes.
     for (const slot of Object.keys(WIDGET_SLOTS) as WidgetSlot[]) {
       if (slot.includes("product") && !productId) continue;
-      const widgets = config.widgets.filter(w => w.slot === slot && widgetApplies(w, productId));
+      // Ipanema's after_product_description is the full-width anchor after the
+      // description and before related products. Keep these two widgets there
+      // even when an older saved configuration points into the product column.
+      const widgets = config.widgets.filter(w => (w.kind === "faq" || w.kind === "videos" ? "after_product_description" : w.slot) === slot && widgetApplies(w, productId));
       if (widgets.length) next.add(slot);
       const clockSlot = config.widgets.some(w => w.kind === "countdown" && w.enabled && w.slot === slot);
       if (onlyClock && !clockSlot) continue;
