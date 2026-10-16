@@ -53,7 +53,7 @@ export function defaultWidgetConfig(): WidgetConfig {
 /** Upgrade the original unstyled layout without changing content or activation. */
 export function upgradeWidgetDesign(config: WidgetConfig): WidgetConfig {
   return { ...config, widgets: config.widgets.map(w => {
-    const slot = (w.kind === "faq" || w.kind === "videos") && w.slot === "after_dynamic_section_main_product" ? "after_product_description" : w.slot;
+    const slot = w.kind === "faq" || w.kind === "videos" ? "after_product_description" : w.slot;
     return w.colors ? { ...w, slot } : { ...w, slot: REFERENCE_SLOTS[w.kind], colors: { ...REFERENCE_COLORS[w.kind] } };
   }) };
 }

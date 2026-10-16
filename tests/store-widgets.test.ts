@@ -12,6 +12,8 @@ test("los videos admiten títulos vacíos y se renderizan sin controles", () => 
   const rendered=JSON.stringify(renderWidget(w,config.accent));
   assert.ok(rendered.includes('"controls":false'));
   assert.ok(!rendered.includes('"controls":true'));
+  assert.ok(rendered.includes('"objectFit":"cover"'));
+  assert.ok(rendered.includes('"scrollbarWidth":"none"'));
 });
 
 test("el diseño anterior se actualiza sin cambiar textos, selección ni activación; respeta diseños editados", () => {
@@ -20,7 +22,7 @@ test("el diseño anterior se actualiza sin cambiar textos, selección ni activac
   const next=upgradeWidgetDesign(config);assert.equal(next.widgets[1].slot,"after_product_description");
   assert.deepEqual(next.widgets[1].entries,faq.entries);assert.deepEqual(next.widgets[1].productIds,[42]);assert.equal(next.widgets[1].enabled,true);
   next.widgets[1].slot="after_dynamic_section_main_product";assert.equal(upgradeWidgetDesign(next).widgets[1].slot,"after_product_description");
-  const videos=next.widgets.find(w=>w.kind==='videos')!;videos.slot="after_dynamic_section_main_product";assert.equal(upgradeWidgetDesign(next).widgets.find(w=>w.kind==='videos')!.slot,"after_product_description");
+  const videos=next.widgets.find(w=>w.kind==='videos')!;videos.slot="after_product_detail_shipping_options";assert.equal(upgradeWidgetDesign(next).widgets.find(w=>w.kind==='videos')!.slot,"after_product_description");
 });
 test("configuración pública valida medios, alcance, fechas y no acepta videos ejecutables", () => {
   const config = defaultWidgetConfig(); assert.equal(config.widgets.filter(w=>w.enabled).length,0);

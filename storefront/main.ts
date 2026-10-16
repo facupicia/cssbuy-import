@@ -27,10 +27,10 @@ export function renderWidget(w: StoreWidget, accent: string): NubeComponent {
   const card = (e:StoreWidget["entries"][number],i:number) => {
     const id=uploadedVideoId(e.url);
     const player=id ? Iframe({ id:`plug-player-${i}`,src:`https://db.vidaeventofiesta.site/storefront-video.html?id=${id}&active=${i===0?1:0}`,width:"100%",height:"100%",sandbox:"allow-scripts allow-same-origin",style:{border:"none",display:"block",width:"100%",height:"100%",borderRadius:"12px"} })
-      : Video.Root({ width:"100%",height:"100%",autoplay:i===0,muted:true,loop:true,style:{width:"100%",height:"100%",overflow:"hidden",backgroundColor:"#171717"},children:videoSource(e.url)==="youtube"?Video.YouTube({src:e.url,controls:false}):Video.Player({src:e.url as `https://${string}`,controls:false,aspectRatio:"9/16"})});
+      : Video.Root({ width:"100%",height:"100%",autoplay:i===0,muted:true,loop:true,style:{width:"100%",height:"100%",overflow:"hidden",backgroundColor:"#171717",objectFit:"cover"},children:videoSource(e.url)==="youtube"?Video.YouTube({src:e.url,controls:false}):Video.Player({src:e.url as `https://${string}`,controls:false,aspectRatio:"9/16"})});
     return Box({id:`plug-video-${i}`,style:{width:"32%",height:"100%",flex:"0 0 32%",minWidth:"32%",scrollSnapAlign:"start"},children:Box({style:{position:"relative",width:"100%",height:"100%",overflow:"hidden",borderRadius:"12px",backgroundColor:"#171717",pointerEvents:"none"},children:player})});
   };
-  return Box({id:"plug-widget-videos",style:{boxSizing:"border-box",minWidth:"0px",width:"100%",margin:"20px auto",maxWidth:"1280px",paddingBottom:"16px"},children:w.entries.length ? [Box({style:{display:"flex",alignItems:"stretch",gap:"2%",width:"100%",minWidth:"0px",height:"clamp(180px, 28vw, 360px)",overflowX:"auto",overflowY:"hidden",scrollSnapType:"x mandatory"},children:w.entries.map(card)})] : []});
+  return Box({id:"plug-widget-videos",style:{boxSizing:"border-box",minWidth:"0px",width:"100%",margin:"20px auto",maxWidth:"1280px",paddingBottom:"16px"},children:w.entries.length ? [Box({style:{display:"flex",alignItems:"stretch",gap:"2%",width:"100%",minWidth:"0px",height:"clamp(180px, 28vw, 360px)",overflowX:"auto",overflowY:"hidden",scrollSnapType:"x mandatory",scrollbarWidth:"none",msOverflowStyle:"none"},children:w.entries.map(card)})] : []});
 }
 /** Worker entry point: only public configuration is fetched; no shop/customer/cart data leaves the worker. */
 export async function App(nube: NubeSDK) {
