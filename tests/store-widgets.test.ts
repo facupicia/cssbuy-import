@@ -5,6 +5,15 @@ import { App, renderWidget } from "../storefront/main";
 import { GET, POST } from "../src/app/api/tiendanube/widgets/route";
 Object.defineProperty(globalThis, "self", { value: { __APP_DATA__: { id: "46841" } }, configurable: true });
 
+test("los videos admiten títulos vacíos y se renderizan sin controles", () => {
+  const config=defaultWidgetConfig(), w=config.widgets.find(w=>w.kind==='videos')!;
+  w.enabled=true; w.title=''; w.entries=[{title:'',text:'',url:'https://cdn.example.com/a.mp4'}];
+  assert.doesNotThrow(()=>parseWidgetConfig(config));
+  const rendered=JSON.stringify(renderWidget(w,config.accent));
+  assert.ok(rendered.includes('"controls":false'));
+  assert.ok(!rendered.includes('"controls":true'));
+});
+
 test("el diseño anterior se actualiza sin cambiar textos, selección ni activación; respeta diseños editados", () => {
   const config=defaultWidgetConfig(); const faq=config.widgets[1];
   delete faq.colors; faq.slot="after_product_description";faq.enabled=true;faq.scope="products";faq.productIds=[42];

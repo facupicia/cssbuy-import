@@ -65,6 +65,9 @@ try { for(const width of [1365,390]) {
   assert.equal(await videoPreview.locator('video').nth(1).getAttribute('src'),'https://cdn.example.com/2.mp4');
   const heights=await videoPreview.locator('video').evaluateAll(elements=>elements.map(e=>e.parentElement.getBoundingClientRect().height));
   assert.ok(Math.max(...heights)<=321,'Los videos conservan una altura acotada');
+  assert.ok(Math.max(...heights)-Math.min(...heights)<1,'Todas las tarjetas tienen la misma altura');
+  assert.equal(await videoPreview.locator('video[controls]').count(),0);
+  assert.equal(await videoPreview.getByText('Video 1',{exact:true}).count(),0);
   assert.equal(await videoPreview.locator('video').first().evaluate(e=>getComputedStyle(e).objectFit),'contain');
   await videoPreview.screenshot({path:`.impeccable/review/reference-videos-${width}.png`});
   await page.getByLabel('Subir video desde tu equipo',{exact:true}).setInputFiles({name:'Remera propia.mp4',mimeType:'video/mp4',buffer:Buffer.alloc(100)});

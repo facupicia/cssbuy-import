@@ -98,9 +98,9 @@ export function parseWidgetConfig(input: unknown): WidgetConfig {
     if (result.endsAt && !Number.isFinite(Date.parse(result.endsAt))) throw new Error("Fecha inválida");
     if (result.kind === "videos") for (const e of result.entries) videoSource(e.url);
     if (result.enabled) {
-      if (!result.title) throw new Error("Completá el título del bloque");
+      if (!result.title && result.kind !== "videos") throw new Error("Completá el título del bloque");
       if (result.scope === "products" && !result.productIds.length) throw new Error("Seleccioná al menos un producto o elegí todos");
-      if (["faq", "payments", "videos"].includes(result.kind) && (!result.entries.length || result.entries.some(e => !e.title || (result.kind === "faq" && !e.text)))) throw new Error("Completá los elementos del bloque");
+      if (["faq", "payments", "videos"].includes(result.kind) && (!result.entries.length || result.entries.some(e => (result.kind !== "videos" && !e.title) || (result.kind === "faq" && !e.text)))) throw new Error("Completá los elementos del bloque");
       if (result.kind === "alert" && !result.text) throw new Error("Completá el mensaje de alerta");
       if (result.kind === "countdown" && !result.endsAt) throw new Error("Elegí cuándo termina la cuenta regresiva");
     }
