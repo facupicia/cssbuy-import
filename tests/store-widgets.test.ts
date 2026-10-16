@@ -1,9 +1,17 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { defaultWidgetConfig, parseWidgetConfig, widgetApplies, countdownText, videoSource } from "../src/lib/store-widgets";
+import { defaultWidgetConfig, parseWidgetConfig, upgradeWidgetDesign, widgetApplies, countdownText, videoSource } from "../src/lib/store-widgets";
 import { App, renderWidget } from "../storefront/main";
 import { GET, POST } from "../src/app/api/tiendanube/widgets/route";
 Object.defineProperty(globalThis, "self", { value: { __APP_DATA__: { id: "46841" } }, configurable: true });
+
+test("el diseño anterior se actualiza sin cambiar textos, selección ni activación; respeta diseños editados", () => {
+  const config=defaultWidgetConfig(); const faq=config.widgets[1];
+  delete faq.colors; faq.slot="after_product_description";faq.enabled=true;faq.scope="products";faq.productIds=[42];
+  const next=upgradeWidgetDesign(config);assert.equal(next.widgets[1].slot,"after_product_detail_shipping_options");
+  assert.deepEqual(next.widgets[1].entries,faq.entries);assert.deepEqual(next.widgets[1].productIds,[42]);assert.equal(next.widgets[1].enabled,true);
+  next.widgets[1].slot="after_product_description";assert.equal(upgradeWidgetDesign(next).widgets[1].slot,"after_product_description");
+});
 test("configuración pública valida medios, alcance, fechas y no acepta videos ejecutables", () => {
   const config = defaultWidgetConfig(); assert.equal(config.widgets.filter(w=>w.enabled).length,0);
   const faq = config.widgets.find(w=>w.kind==='faq')!; faq.enabled=true; faq.scope='products'; faq.productIds=[10];
@@ -16,6 +24,7 @@ test("configuración pública valida medios, alcance, fechas y no acepta videos 
   assert.equal(countdownText(timer.endsAt,Date.parse(timer.endsAt)-90061000),'1d 01h 01m 01s');
   assert.throws(()=>parseWidgetConfig({...config,widgets:[faq,faq,faq,faq,faq]}));
   assert.throws(()=>parseWidgetConfig({...config,accent:'red;display:none'}));
+  assert.throws(()=>parseWidgetConfig({...config,widgets:config.widgets.map(w=>({...w,colors:{background:'url(x)',foreground:'#ffffff',highlight:'#ffffff'}}))}));
   assert.ok(JSON.stringify(renderWidget(faq,config.accent)).includes('accordion'));
 });
 test("SDK renderiza por página y producto, oculta al vencer y solo consulta contenido público", async t => {
@@ -26,8 +35,8 @@ test("SDK renderiza por página y producto, oculta al vencer y solo consulta con
   t.mock.method(globalThis,'setInterval',(fn:Function)=>{intervals.push(fn);return 1;});
   t.mock.method(globalThis,'fetch',async(url:string, options:RequestInit)=>{assert.equal(url,'https://db.vidaeventofiesta.site/api/storefront/widgets?store=99'); assert.equal(options.credentials,'omit'); assert.equal(options.body,undefined);return Response.json(config);});
   const sdk:any={getState:()=>({store:{id:99},location:{page}}),on:(event:string,fn:Function)=>events[event]=fn,render:(slot:string,node:unknown)=>renders.set(slot,node),clearSlot:(slot:string)=>renders.delete(slot)};
-  await App(sdk); assert.ok(renders.has('after_header')); assert.ok(renders.has('after_product_description'));
-  page={type:'product',data:{product:{id:20}}}; events['page:loaded'](); assert.ok(!renders.has('after_product_description'));
+  await App(sdk); assert.ok(renders.has('before_product_detail_name')); assert.ok(renders.has('after_product_detail_shipping_options'));
+  page={type:'product',data:{product:{id:20}}}; events['page:loaded'](); assert.ok(!renders.has('after_product_detail_shipping_options'));
   const pastEnd=Date.parse(timer.endsAt)+1000; t.mock.method(Date,'now',()=>pastEnd); intervals[0](); assert.ok(!renders.has('after_product_detail_price'));
   page={type:'home'}; events['page:loaded'](); assert.ok(!renders.has('after_product_detail_price'));
 });

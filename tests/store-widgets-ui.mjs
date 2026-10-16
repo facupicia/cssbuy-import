@@ -21,6 +21,7 @@ try { for(const width of [1365,390]) {
   await page.getByRole('heading',{name:'Personalizar tienda',exact:true}).waitFor();
   await page.getByText('Script activo en Tiendanube · versión 2',{exact:true}).waitFor();
   await page.getByLabel('Mostrar bloque',{exact:true}).check();
+  assert.equal(await page.getByLabel('Ubicación',{exact:true}).inputValue(), 'before_product_detail_name');
   await page.getByRole('button',{name:'Guardar borrador',exact:true}).click();
   await page.getByRole('status').filter({hasText:'Borrador guardado'}).waitFor(); assert.equal(data.published,null);
   await page.getByRole('button',{name:'Preguntas frecuentes Apagado',exact:true}).click();
@@ -37,9 +38,16 @@ try { for(const width of [1365,390]) {
   await page.getByText('Consultá la tabla de talles del producto.',{exact:true}).last().waitFor();
   assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth),false);
   await page.screenshot({path:`.impeccable/review/store-widgets-${width}.png`,fullPage:true});
+  await page.getByRole('region',{name:'Vista previa del bloque'}).screenshot({path:`.impeccable/review/reference-faq-${width}.png`});
   conflict=true;await page.getByLabel('Título',{exact:true}).fill('Preguntas PLUG');
   await page.getByRole('button',{name:'Guardar borrador',exact:true}).click();await page.getByRole('alert').filter({hasText:'Otra pestaña'}).waitFor();
   assert.equal(await page.getByLabel('Título',{exact:true}).inputValue(),'Preguntas PLUG');
-  assert.deepEqual(errors,[]);await page.close();
+  assert.deepEqual(errors,[]);
+  await page.getByRole('button',{name:'Mensaje de alerta Activo',exact:true}).click();
+  await page.getByRole('region',{name:'Vista previa del bloque'}).screenshot({path:`.impeccable/review/reference-alert-${width}.png`});
+  await page.getByLabel('Color de fondo',{exact:true}).fill('#dc2626');
+  await page.getByRole('button',{name:'Usar diseño de referencia',exact:true}).click();
+  assert.equal(await page.getByLabel('Color de fondo',{exact:true}).inputValue(),'#ef4444');
+  await page.close();
 } } finally {await browser.close();}
 console.log('Widgets: borrador/publicación, selección, FAQ, conflicto y escritorio/móvil correctos');

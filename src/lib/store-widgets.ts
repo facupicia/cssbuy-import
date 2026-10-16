@@ -2,23 +2,46 @@
 export const WIDGET_KINDS = ["alert", "faq", "payments", "videos", "countdown"] as const;
 export type WidgetKind = typeof WIDGET_KINDS[number];
 export const WIDGET_LABELS: Record<WidgetKind, string> = { alert: "Mensaje de alerta", faq: "Preguntas frecuentes", payments: "Medios de pago", videos: "Slider de videos", countdown: "Cuenta regresiva" };
-export const WIDGET_SLOTS = { after_header: "Debajo del encabezado", after_product_detail_price: "Debajo del precio", after_product_description: "Después de la descripción", after_main_content: "Al final del contenido" } as const;
+export const WIDGET_SLOTS = { before_product_detail_name: "Arriba del nombre del producto", after_product_detail_price: "Debajo del precio", after_product_detail_shipping_options: "Debajo de las opciones de envío", before_main_content: "Barra superior del contenido", after_header: "Debajo del encabezado", after_product_description: "Después de la descripción", after_main_content: "Al final del contenido" } as const;
 export type WidgetSlot = keyof typeof WIDGET_SLOTS;
+export const REFERENCE_SLOTS: Record<WidgetKind, WidgetSlot> = { alert: "before_product_detail_name", faq: "after_product_detail_shipping_options", payments: "after_product_detail_shipping_options", videos: "after_product_detail_shipping_options", countdown: "after_product_detail_price" };
+export interface WidgetColors { background: string; foreground: string; highlight: string }
+export const REFERENCE_COLORS: Record<WidgetKind, WidgetColors> = {
+  alert: { background: "#ef4444", foreground: "#ffffff", highlight: "#f87171" },
+  faq: { background: "#f7f7f7", foreground: "#333333", highlight: "#333333" },
+  payments: { background: "#fafafa", foreground: "#555555", highlight: "#15803d" },
+  videos: { background: "#e8e8e8", foreground: "#333333", highlight: "#cccccc" },
+  countdown: { background: "#1e1e1e", foreground: "#ffffff", highlight: "#ef4444" },
+};
+export function widgetColors(w: StoreWidget): WidgetColors { return w.colors ?? REFERENCE_COLORS[w.kind]; }
+export function countdownParts(endsAt: string, now = Date.now()) {
+  const seconds = Math.max(0, Math.floor((Date.parse(endsAt) - now) / 1000)) || 0;
+  return [[String(Math.floor(seconds / 3600)).padStart(2,"0"),"HRS"], [String(Math.floor(seconds / 60) % 60).padStart(2,"0"),"MIN"], [String(seconds % 60).padStart(2,"0"),"SEG"]];
+}
+export function paymentLogo(title: string): string | undefined {
+  const key = title.toLowerCase().replace(/[^a-z]/g, "");
+  const logo = ({visa:"visa",mastercard:"mastercard",americanexpress:"amex",amex:"amex",naranjax:"ar_tarjeta-naranja",naranja:"ar_tarjeta-naranja",visadebito:"visadebit",pagofacil:"pagofacil",rapipago:"rapipago"} as Record<string,string>)[key];
+  return logo ? `https://d26lpennugtm8s.cloudfront.net/assets/common/img/logos/payment/new_logos_payment/${logo}@2x.png` : undefined;
+}
 export interface StoreWidget {
   kind: WidgetKind; enabled: boolean; title: string; text: string; slot: WidgetSlot;
   scope: "all" | "products"; productIds: number[];
   entries: { title: string; text: string; url: string }[];
-  endsAt: string;
+  endsAt: string; colors?: WidgetColors;
 }
 export interface WidgetConfig { widgets: StoreWidget[]; accent: string }
 export function defaultWidgetConfig(): WidgetConfig {
   return { accent: "#181818", widgets: WIDGET_KINDS.map(kind => ({
     kind, enabled: false, title: WIDGET_LABELS[kind], text: kind === "alert" || kind === "payments" ? "10% de descuento pagando por transferencia." : "",
-    slot: kind === "alert" ? "after_header" : kind === "payments" || kind === "countdown" ? "after_product_detail_price" : "after_product_description",
+    slot: REFERENCE_SLOTS[kind], colors: { ...REFERENCE_COLORS[kind] },
     scope: "all", productIds: [], endsAt: "",
     entries: kind === "faq" ? [{ title: "¿Cómo elijo mi talle?", text: "Consultá la tabla de talles de la descripción del producto y compará las medidas con una prenda tuya.", url: "" }]
       : kind === "payments" ? [{ title: "Transferencia bancaria", text: "10% de descuento", url: "" }] : [],
   })) };
+}
+/** Upgrade the original unstyled layout without changing content or activation. */
+export function upgradeWidgetDesign(config: WidgetConfig): WidgetConfig {
+  return { ...config, widgets: config.widgets.map(w => w.colors ? w : { ...w, slot: REFERENCE_SLOTS[w.kind], colors: { ...REFERENCE_COLORS[w.kind] } }) };
 }
 function text(value: unknown, limit: number): string {
   if (typeof value !== "string" || value.length > limit) throw new Error("Revisá la extensión de los textos");
@@ -50,6 +73,11 @@ export function parseWidgetConfig(input: unknown): WidgetConfig {
     if (!Array.isArray(w.entries) || w.entries.length > 20) throw new Error("Podés agregar hasta 20 elementos por bloque");
     const result: StoreWidget = { kind: w.kind, enabled: w.enabled, title: text(w.title, 160), text: text(w.text, 2000), slot: w.slot, scope: w.scope,
       productIds: [...new Set(w.productIds)], endsAt: text(w.endsAt, 40), entries: w.entries.map(e => ({ title: text(e.title, 160), text: text(e.text, 2000), url: text(e.url, 2000) })) };
+    if (w.colors !== undefined) {
+      const colors = w.colors;
+      if (!colors || typeof colors !== "object" || ["background","foreground","highlight"].some(k => typeof colors[k as keyof WidgetColors] !== "string" || !/^#[0-9a-f]{6}$/i.test(colors[k as keyof WidgetColors]))) throw new Error("Color del bloque inválido");
+      result.colors = { background: w.colors.background, foreground: w.colors.foreground, highlight: w.colors.highlight };
+    }
     if (result.endsAt && !/^\d{4}-\d\d-\d\dT.*(Z|[+-]\d\d:\d\d)$/.test(result.endsAt)) throw new Error("Fecha inválida");
     if (result.endsAt && !Number.isFinite(Date.parse(result.endsAt))) throw new Error("Fecha inválida");
     if (result.kind === "videos") for (const e of result.entries) videoSource(e.url);
