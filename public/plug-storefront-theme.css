@@ -1,0 +1,30 @@
+/* PLUG widgets: compatibility with Ipanema's native NubeSDK styles. */
+#ns-section-main_product [data-nubesdk-slot="before_product_detail_name"][data-nubesdk-mounted="true"],
+#ns-section-main_product [data-nubesdk-slot="after_product_detail_price"][data-nubesdk-mounted="true"] {
+  display: block !important;
+}
+[id^="accordionRoot-46841-"] { border: 0; }
+[id^="accordionRoot-46841-"] > details > .nube-accordion-content {
+  padding: 0;
+  border: 0;
+  background: transparent;
+}
+[id^="accordionRoot-46841-"] > details > summary {
+  align-items: center;
+  gap: 8px;
+}
+[id^="accordionRoot-46841-"] > details > summary > .nube-row { flex: 1; min-width: 0; }
+[id^="accordionRoot-46841-"] > details > summary > svg {
+  order: 2;
+  width: 16px;
+  height: 16px;
+  margin: 0;
+  flex-shrink: 0;
+  transform: rotate(90deg);
+}
+[id^="accordionRoot-46841-"] > details[open] > summary > svg { transform: rotate(-90deg); }
+[id^="accordionRoot-46841-"] > details > summary .nube-row > svg { margin: 0; }
+[id^="accordionRoot-46841-"] > details > summary:focus-visible {
+  outline: 2px solid currentColor;
+  outline-offset: -2px;
+}

@@ -71,5 +71,12 @@ El contador utiliza horas totales (no pierde días), una fecha real y desaparece
 El panel y el archivo público se despliegan desde el repositorio. El CDN de Partners requiere subir
 `public/plug-storefront.min.js` como nueva versión del script 11413 y activarla en las tiendas.
 La versión 2 instalada no recibe cambios del archivo alojado en el panel.
-La subida automatizada quedó bloqueada por el permiso de URLs de archivo de la extensión de Chrome.
-No se modificó la configuración publicada mientras el CDN continúa usando la versión 2.
+El usuario habilitó el permiso de URLs de archivo de Chrome. Se subió y activó la versión 3
+el 16/10/2026; la versión 2 quedó como legado. Se verificó el nuevo acordeón en la tienda real.
+La configuración publicada mantiene sus textos, activaciones y alcance anteriores.
+
+El tema tenía reglas de sección que ocultaban `before_product_detail_name` y `after_product_detail_price`.
+Se publicó `public/plug-storefront-theme.css` en Ajustes globales → CSS personalizado del tema Ipanema
+14128339, para mostrar estos slots únicamente cuando NubeSDK monta contenido y normalizar el acordeón
+nativo solo para los IDs de la app 46841. El campo global estaba vacío; los estilos previos de secciones
+se conservaron. La hoja debe acompañar al script si se migra el tema.
