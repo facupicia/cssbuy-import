@@ -4,6 +4,7 @@ import { parseVariante, precioPublicado } from "./tiendanube";
 import { canonizar, varianteSinTalle } from "./variantes";
 import { descripcionATexto, generarDescripcionTiendaHTML } from "./descripcion";
 import { DEFAULT_TRANSFER_DISCOUNT_PCT, newStoreProfile } from "./store-defaults";
+import { tablaDeMarca } from "./tablas-talle";
 
 export const EMPTY_STORE_PROFILE: StoreProductProfile = newStoreProfile();
 
@@ -66,6 +67,7 @@ export function storeReadiness(item: InventoryItem, brand?: string) {
   if (!descripcionATexto(generarDescripcionTiendaHTML(item, brand))) errors.push("No se pudo generar la descripción pública");
   if (!item.tienda?.categoria.trim() && !item.tienda?.categoriaId) errors.push("Elegí una categoría");
   if (!brand) errors.push("Asigná una marca");
+  if (!tablaDeMarca(brand)) warnings.push("Falta la tabla de talles de esta marca. Cargá las medidas del proveedor antes de publicar.");
   if (item.estado === "en_transito") errors.push("El producto sigue en tránsito");
   if (!item.tienda?.pesoKg) errors.push("Cargá el peso para calcular envíos");
   const quantities = item.talles?.length ? item.talles : [item];

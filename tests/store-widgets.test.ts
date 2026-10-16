@@ -42,7 +42,10 @@ test("configuración pública valida medios, alcance, fechas y no acepta videos 
   assert.throws(()=>parseWidgetConfig({...config,widgets:[faq,faq,faq,faq,faq]}));
   assert.throws(()=>parseWidgetConfig({...config,accent:'red;display:none'}));
   assert.throws(()=>parseWidgetConfig({...config,widgets:config.widgets.map(w=>({...w,colors:{background:'url(x)',foreground:'#ffffff',highlight:'#ffffff'}}))}));
-  assert.ok(JSON.stringify(renderWidget(faq,config.accent)).includes('accordion'));
+  const rendered = JSON.stringify(renderWidget(faq,config.accent));
+  assert.ok(!rendered.includes('accordion'));
+  assert.ok(rendered.includes(faq.entries[0].title));
+  assert.ok(rendered.includes(faq.entries[0].text));
 });
 test("SDK renderiza por página y producto, oculta al vencer y solo consulta contenido público", async t => {
   const config=defaultWidgetConfig(); config.widgets[0].enabled=true;

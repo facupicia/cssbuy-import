@@ -5,7 +5,7 @@ import { sanitizeStoreProfile, storeReadiness, storeVariants, publicDescription,
 import { buildTiendanubeCSV } from "../src/lib/tiendanube";
 import { sanitizeInventoryInput } from "../src/lib/inventory";
 import { generarDescripcionTiendaHTML } from "../src/lib/descripcion";
-import { tablaDeMarca } from "../src/lib/tablas-talle";
+import { tablaDeMarca, columnasDe } from "../src/lib/tablas-talle";
 import { storeSession, storeAuthenticated, storeGuard } from "../src/lib/store-auth";
 import { syncStoreProduct, StoreApiError, storeRequest } from "../src/lib/tiendanube-api";
 import { POST as syncRoute } from "../src/app/api/tiendanube/route";
@@ -21,6 +21,26 @@ const item: InventoryItem = {
   ], tienda: { ...EMPTY_STORE_PROFILE, descripcion: "Algodón <script>alert(1)</script>\nCalce regular", categoria: "Camperas", categoriaId: 12,
     pesoKg: 0.6, descuentoPct: 10, redondearA: 100, fotos: ["https://example.com/campera.jpg"] },
 };
+
+test("Sp5der conserva las medidas del proveedor y Amiri usa la referencia confirmada", () => {
+  const sp5der = tablaDeMarca("Sp5der")!;
+  assert.deepEqual(sp5der.filas.map(f => [f.talle, f.pecho, f.largo, f.manga, f.hombro, f.ruedo]), [
+    ["S", 114, 66, 59, 56, 45], ["M", 120, 68, 61, 58, 47],
+    ["L", 126, 70, 63, 60, 49], ["XL", 132, 72, 65, 62, 51],
+  ]);
+  assert.ok(columnasDe(sp5der).includes("ruedo"));
+  assert.deepEqual(tablaDeMarca("Amiri")!.filas, tablaDeMarca("Supreme")!.filas);
+  for (const marca of ["Amiri", "Sp5der", "Bape"]) {
+    const html = generarDescripcionTiendaHTML({ ...item, tienda: null }, marca);
+    assert.ok(html.includes(`<table`));
+    assert.ok(html.includes(`Tabla de talles · ${marca}`));
+    assert.ok(!html.includes("<details"));
+    assert.ok(!storeReadiness(item, marca).warnings.some(w => w.includes("tabla de talles")));
+  }
+  const missing = generarDescripcionTiendaHTML({ ...item, tienda: null }, "Sin referencia");
+  assert.ok(!missing.includes("Multiplicá por 2"));
+  assert.ok(storeReadiness(item, "Sin referencia").warnings.some(w => w.includes("tabla de talles")));
+});
 test("la ficha y la exportación conservan la tabla de la marca junto con la descripción pública", () => {
   const bape = { ...item, nombre: "Remera Bape", talles: null, variante: "Color:Negro;Tamaño:2XL" };
   assert.equal(tablaDeMarca(" BAPE ")?.marca, "Bape");

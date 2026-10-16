@@ -11,13 +11,14 @@
  * Todas las medidas están en centímetros, con la prenda apoyada y estirada.
  */
 
-export type ClaveMedida = "largo" | "pecho" | "hombro" | "manga";
+export type ClaveMedida = "largo" | "pecho" | "hombro" | "manga" | "ruedo";
 
 export const ETIQUETA_MEDIDA: Record<ClaveMedida, string> = {
   largo: "Largo",
   pecho: "Pecho",
   hombro: "Hombros",
   manga: "Manga",
+  ruedo: "Ancho del ruedo",
 };
 
 export interface FilaTalle {
@@ -26,6 +27,7 @@ export interface FilaTalle {
   pecho?: number;
   hombro?: number;
   manga?: number;
+  ruedo?: number;
   /** Altura sugerida en cm, cuando la ficha la trae. */
   alturaCm?: string;
   /** Peso sugerido en kg. Las fichas en 斤 (jin) se convierten: 1 jin = 0,5 kg. */
@@ -41,6 +43,16 @@ export interface TablaTalle {
 }
 
 export const TABLAS_TALLE: TablaTalle[] = [
+  {
+    marca: "Sp5der",
+    nota: "Tabla del proveedor para buzos Sp5der. Pecho expresado como contorno completo; el ruedo se mide de lado a lado, con la prenda apoyada.",
+    filas: [
+      { talle: "S", pecho: 114, largo: 66, manga: 59, hombro: 56, ruedo: 45 },
+      { talle: "M", pecho: 120, largo: 68, manga: 61, hombro: 58, ruedo: 47 },
+      { talle: "L", pecho: 126, largo: 70, manga: 63, hombro: 60, ruedo: 49 },
+      { talle: "XL", pecho: 132, largo: 72, manga: 65, hombro: 62, ruedo: 51 },
+    ],
+  },
   {
     marca: "Bape",
     nota: "Tabla del proveedor para remeras Bape. Pecho expresado como contorno: se duplicó el ancho de la ficha original (axila a axila). El talle XXL corresponde al 2XL del proveedor. La altura y el peso son orientativos; el calce depende de cada persona.",
@@ -94,6 +106,13 @@ export const TABLAS_TALLE: TablaTalle[] = [
   },
 ];
 
+// El dueño confirmó que las remeras Amiri usan las medidas de Supreme.
+TABLAS_TALLE.push({
+  marca: "Amiri",
+  nota: "Pecho expresado como contorno completo. La altura y el peso son orientativos; el calce depende de cada persona.",
+  filas: TABLAS_TALLE.find(t => t.marca === "Supreme")!.filas.map(f => ({ ...f })),
+});
+
 /** Busca la tabla de una marca sin distinguir mayúsculas ni tildes. */
 export function tablaDeMarca(marca?: string | null): TablaTalle | null {
   const q = (marca || "")
@@ -115,6 +134,6 @@ export function tablaDeMarca(marca?: string | null): TablaTalle | null {
 
 /** Columnas que esa tabla realmente tiene cargadas. */
 export function columnasDe(tabla: TablaTalle): ClaveMedida[] {
-  const claves: ClaveMedida[] = ["largo", "pecho", "hombro", "manga"];
+  const claves: ClaveMedida[] = ["largo", "pecho", "hombro", "manga", "ruedo"];
   return claves.filter((c) => tabla.filas.some((f) => typeof f[c] === "number"));
 }

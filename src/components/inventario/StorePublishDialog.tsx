@@ -136,10 +136,10 @@ export function StorePublishDialog({ open, onOpenChange, items, marcas, onChange
                 {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img src={src} alt={`${item.nombre}, foto ${i + 1}`} className="aspect-square w-full rounded-lg bg-[var(--color-bg-subtle)] object-contain" referrerPolicy="no-referrer" />
               </div>)}</div> : <p className="rounded-lg bg-[var(--color-bg-subtle)] p-4 text-sm">Agregá las fotos desde Editar ficha.</p>}
-              <details className="min-w-0 space-y-3 text-sm">
-                <summary className="cursor-pointer font-medium">Ver descripción que se enviará · {item.tienda?.descripcion.trim() ? "Personalizada" : "Automática"}</summary>
-                <div className="max-h-96 overflow-auto rounded-lg bg-white p-4 text-stone-900 break-words" dangerouslySetInnerHTML={{ __html: generarDescripcionTiendaHTML(item, brand) }} />
-              </details>
+              <section aria-label="Descripción que se enviará" className="min-w-0 space-y-3 text-sm">
+                <h4 className="font-medium">Descripción que se enviará · {item.tienda?.descripcion.trim() ? "Personalizada" : "Automática"}</h4>
+                <div className="overflow-x-auto rounded-lg bg-white p-4 text-stone-900 break-words" dangerouslySetInnerHTML={{ __html: generarDescripcionTiendaHTML(item, brand) }} />
+              </section>
               <dl className="grid grid-cols-2 gap-4 text-sm"><div><dt className="text-[var(--color-fg-muted)]">Precio publicado</dt><dd className="text-xl font-semibold tabular-nums">{fmtARS(variants[0]?.price ?? 0)}</dd></div><div><dt className="text-[var(--color-fg-muted)]">Precio objetivo por transferencia</dt><dd className="font-medium tabular-nums">{fmtARS(item.precioVentaARS)}</dd></div></dl>
               <p className="text-xs text-[var(--color-fg-muted)]">Descuento previsto: {item.tienda?.descuentoPct ?? EMPTY_STORE_PROFILE.descuentoPct}%. Configurá ese descuento en Tiendanube. El envío actualiza el precio de lista y quita el precio promocional de las variantes enviadas.</p>
               <div className="overflow-x-auto rounded-lg border border-[var(--color-border)]"><table className="w-full text-sm"><caption className="sr-only">Variantes y stock que se enviarán</caption><thead className="bg-[var(--color-bg-subtle)]"><tr><th className="p-3 text-left">Variante</th><th className="p-3 text-left">SKU</th><th className="p-3 text-right">Stock</th></tr></thead><tbody>{variants.map((v, i) => <tr key={i}><td className="p-3">{v.props.map(p => p.valor).join(" / ") || "Única"}</td><td className="break-all p-3">{v.sku}</td><td className="p-3 text-right tabular-nums">{v.stock}</td></tr>)}</tbody></table></div>

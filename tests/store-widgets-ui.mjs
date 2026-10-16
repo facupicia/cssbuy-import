@@ -27,7 +27,7 @@ try { for(const width of [1365,390]) {
   await page.getByRole('heading',{name:'Personalizar tienda',exact:true}).waitFor();
   await page.getByText('Script activo en Tiendanube · versión 2',{exact:true}).waitFor();
   await page.getByLabel('Mostrar bloque',{exact:true}).check();
-  assert.equal(await page.getByLabel('Ubicación',{exact:true}).inputValue(), 'before_product_detail_name');
+  assert.equal(await page.getByLabel('Ubicación',{exact:true}).inputValue(), 'after_header');
   await page.getByRole('button',{name:'Guardar borrador',exact:true}).click();
   await page.getByRole('status').filter({hasText:'Borrador guardado'}).waitFor(); assert.equal(data.published,null);
   await page.getByRole('button',{name:'Preguntas frecuentes Apagado',exact:true}).click();
@@ -40,7 +40,7 @@ try { for(const width of [1365,390]) {
   await page.getByRole('button',{name:'Confirmar publicación',exact:true}).click();
   await page.getByRole('status').filter({hasText:'Versión publicada guardada'}).waitFor();
   assert.deepEqual(data.published.widgets.find(w=>w.kind==='faq').productIds,[10]);
-  await page.getByText('¿Cómo elijo mi talle?',{exact:true}).click();
+  assert.equal(await page.getByRole('region',{name:'Vista previa del bloque'}).locator('details').count(),0);
   await page.getByText('Consultá la tabla de talles del producto.',{exact:true}).last().waitFor();
   assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth),false);
   await page.screenshot({path:`.impeccable/review/store-widgets-${width}.png`,fullPage:true});
@@ -68,7 +68,7 @@ try { for(const width of [1365,390]) {
   assert.equal(await videoPreview.locator('video[controls]').count(),0);
   assert.equal(await videoPreview.locator('button').filter({hasText:'Video'}).count(),0);
   assert.equal(await videoPreview.getByText('Video 1',{exact:true}).count(),0);
-  assert.equal(await videoPreview.locator('video').first().evaluate(e=>getComputedStyle(e).objectFit),'contain');
+  assert.equal(await videoPreview.locator('video').first().evaluate(e=>getComputedStyle(e).objectFit),'cover');
   await videoPreview.screenshot({path:`.impeccable/review/reference-videos-${width}.png`});
   await page.getByLabel('Subir video desde tu equipo',{exact:true}).setInputFiles({name:'Remera propia.mp4',mimeType:'video/mp4',buffer:Buffer.alloc(100)});
   await page.getByRole('status').filter({hasText:'Video listo.'}).waitFor();

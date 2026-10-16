@@ -1,5 +1,5 @@
 import type { NubeSDK, NubeComponent } from "@tiendanube/nube-sdk-types";
-import { Accordion, Box, Button, Column, Image, Iframe, Row, Svg, Text } from "@tiendanube/nube-sdk-jsx";
+import { Box, Button, Column, Image, Iframe, Row, Svg, Text } from "@tiendanube/nube-sdk-jsx";
 import { countdownEnd, upgradeWidgetDesign, countdownParts, paymentLogo, widgetColors, widgetApplies, WIDGET_SLOTS, type WidgetConfig, type StoreWidget, type WidgetSlot } from "../src/lib/store-widgets";
 
 const API = "https://db.vidaeventofiesta.site/api/storefront/widgets";
@@ -8,10 +8,7 @@ export function renderWidget(w: StoreWidget, accent: string, videoContext?: { st
   const text = (children: string, style: Parameters<typeof Text>[0]["style"] = {}) => Text({ children, style: { margin: "0px", fontSize: "14px", lineHeight: "1.4", color: c.foreground, ...style } });
   const frame = (children: NubeComponent[], style: Parameters<typeof Column>[0]["style"] = {}) => Column({ id: `plug-widget-${w.kind}`, width: "100%", children, style: { boxSizing: "border-box", minWidth: "0px", overflowWrap: "anywhere", ...style } });
   if (w.kind === "alert") return frame([Row({ children: [Box({ id:w.pulse===false?"plug-alert-dot-static":"plug-alert-dot", style: { animation:w.pulse===false?"none":"plug-status-pulse 1.8s ease-out infinite",color:c.highlight,width:"14px",height:"14px",borderRadius:"50%",backgroundColor:c.highlight,flexShrink:"0" } }), text(w.text)], style: { width:"fit-content",maxWidth:"100%",alignItems:"center",gap:"8px",backgroundColor:c.background,borderRadius:"25px",padding:"10px 20px",margin:"5px 0px 10px",boxSizing:"border-box" } })]);
-  if (w.kind === "faq") return frame([...(w.text?[text(w.text,{whiteSpace:"pre-wrap"})]:[]),...w.entries.map((e,i) => Accordion.Root({ id:`plug-faq-${i}`, style:{backgroundColor:c.background,borderRadius:"5px",overflow:"hidden",width:"100%"},children: Accordion.Item({ value:`plug-faq-${i}`,children:[
-    Accordion.Header({ showIcon:true,style:{padding:"18px",color:c.foreground,fontSize:"14px",fontWeight:"600",lineHeight:"1.4",border:"none",backgroundColor:c.background,textAlign:"left"},children:Row({style:{alignItems:"center",gap:"8px"},children:[Svg.Root({width:14,height:14,viewBox:"0 0 24 24",fill:"none",stroke:c.highlight,strokeWidth:2,children:[Svg.Circle({cx:12,cy:12,r:10}),Svg.Path({d:"M12 11v6M12 7h.01"})]}),text(e.title,{fontWeight:"600"})]}) }),
-    Accordion.Content({ children:Box({style:{padding:"0px 18px 18px",backgroundColor:c.background},children:text(e.text,{whiteSpace:"pre-wrap"})}) }),
-  ]}) }))],{gap:"10px",margin:"15px 0px 25px"});
+  if (w.kind === "faq") return frame([...(w.text?[text(w.text,{whiteSpace:"pre-wrap"})]:[]),...w.entries.map((e,i) => Column({id:`plug-faq-${i}`,style:{backgroundColor:c.background,borderRadius:"8px",padding:"16px",gap:"8px",width:"100%",boxSizing:"border-box"},children:[text(e.title,{fontWeight:"600",fontSize:"16px"}),text(e.text,{whiteSpace:"pre-wrap"})]}))],{gap:"16px",margin:"16px 0px 24px"});
   if (w.kind === "payments") return frame([
     Row({style:{flexWrap:"wrap",justifyContent:"center",gap:"6px"},children:w.entries.map((e,i)=>Box({id:`plug-payment-${i}`,style:{backgroundColor:"#ffffff",borderRadius:"6px",padding:"4px",minWidth:"56px",minHeight:"36px",display:"flex",alignItems:"center",justifyContent:"center",boxSizing:"border-box"},children:paymentLogo(e.title)?Image({src:paymentLogo(e.title)! as `https://${string}`,alt:e.title,width:"46px",height:"26px",style:{objectFit:"contain"}}):text(e.title,{fontWeight:"600",fontSize:"12px",textAlign:"center"})}))}),
     ...w.entries.filter(e=>e.text).map(e=>text(`${e.title}: ${e.text}`,{fontSize:"13px",color:c.highlight,textAlign:"center"})),

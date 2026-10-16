@@ -55,6 +55,12 @@ La contraseña debe tener al menos 12 caracteres. La sesión de publicación dur
 
 ## Envío y reintentos
 
+### Descripciones y medidas
+
+La vista previa de la descripción queda siempre visible. Las tablas automáticas incluyen Bape, Supreme, Valley Dreams, Miexed Emotions, Amiri y Sp5der. Amiri usa las medidas de Supreme por indicación del dueño; Sp5der usa la tabla del proveedor para buzos, con el contorno de pecho y el ancho del ruedo diferenciados. Cuando falta una tabla, la revisión avisa y la descripción pide consultar medidas sin mostrar una tabla vacía ni indicar una conversión de pecho sin referencia.
+
+Las preguntas frecuentes se presentan con sus respuestas visibles en el panel y en el nuevo archivo del script de tienda. Para cambiar un script ya instalado en Tiendanube se debe publicar una nueva versión de ese archivo desde el Portal de Socios; desplegar el panel no reemplaza por sí solo una versión instalada.
+
 ### Publicación masiva y edición del catálogo
 
 El diálogo tiene dos modos:

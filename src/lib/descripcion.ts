@@ -108,6 +108,7 @@ const COMO_MEDIR = [
   ["Largo", "Desde el punto más alto del hombro, al lado del cuello, hasta el ruedo de abajo."],
   ["Hombros", "De costura a costura de hombro, por la espalda."],
   ["Manga", "Desde la costura del hombro hasta el borde de la manga."],
+  ["Ancho del ruedo", "Medí de lado a lado el borde inferior de la prenda apoyada, sin estirarlo."],
 ];
 
 /** Keeps the brand's size chart when the product has its own public description. */
@@ -117,7 +118,7 @@ export function generarDescripcionTiendaHTML(item: InventoryItem, marca?: string
     .map(p => `<p>${esc(p).replace(/\n/g, "<br>")}</p>`).join("");
   const tabla = tablaDeMarca(marca);
   const talle = item.talles?.length ? null : parseTalle(item.variante);
-  return texto + (tabla ? seccion(`Tabla de talles · ${tabla.marca}`, tablaHTML(tabla, talle)) : "");
+  return texto + (tabla ? seccion(`Tabla de talles · ${tabla.marca}`, tablaHTML(tabla, talle)) : seccion("Medidas de la prenda", `<p>Consultanos las medidas de este modelo antes de comprar.</p>`));
 }
 
 export function generarDescripcionHTML(
@@ -188,7 +189,7 @@ export function generarDescripcionHTML(
   } else {
     partes.push(
       seccion(
-        "Tabla de talles",
+        "Medidas de la prenda",
         `<p style="${p}">Escribinos y te pasamos las medidas exactas de esta prenda antes de que compres.</p>`
       )
     );
@@ -198,9 +199,9 @@ export function generarDescripcionHTML(
   partes.push(
     seccion(
       "Cómo saber tu talle",
-      `<p style="${p}">La forma más segura es medir una prenda que ya tengas y compararla con la tabla.</p>` +
+      `<p style="${p}">Medí una prenda que te quede bien y compará sus medidas con ${tabla ? "la tabla de este modelo" : "las medidas que te confirmemos de este modelo"}.</p>` +
         `<ul style="margin:0;padding-left:20px;color:${TINTA};font-size:14px;line-height:1.7;">` +
-        COMO_MEDIR.map(([k, v]) => `<li style="margin-bottom:6px;"><strong>${esc(k)}:</strong> ${esc(v)}</li>`).join("") +
+        COMO_MEDIR.filter(([k]) => k !== "Ancho del ruedo" || tabla?.filas.some(f => f.ruedo)).map(([k, v]) => `<li style="margin-bottom:6px;"><strong>${esc(k)}:</strong> ${esc(k === "Pecho" && !tabla ? "Medí de axila a axila. Confirmá si las medidas del modelo expresan ese ancho o el contorno completo antes de comparar." : v)}</li>`).join("") +
         `</ul>`
     )
   );
