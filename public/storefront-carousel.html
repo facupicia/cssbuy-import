@@ -34,6 +34,7 @@
           if(u.hostname==='youtu.be')return u.pathname.slice(1);
         }catch{}return null;
       };
+      const videoObserver='IntersectionObserver' in window?new IntersectionObserver(entries=>{for(const entry of entries){const video=entry.target;if(entry.isIntersecting){video.muted=true;video.preload='auto';video.play().catch(()=>{})}else{video.pause();video.preload='metadata'}}},{root:track,threshold:0.15}):null;
       for(const [index,raw] of items.entries()){
         if(typeof raw!=='string'||raw.length>2000)continue;
         let u;try{u=new URL(raw)}catch{continue}
@@ -42,9 +43,11 @@
         const id=/^\/api\/storefront\/videos\/[0-9a-f-]{36}\.mp4$/i.test(u.pathname)&&u.origin==='https://db.vidaeventofiesta.site';
         const yt=youtubeId(raw);
         if(id||/\.(mp4|m3u8|mpd)$/i.test(u.pathname)){
-          const video=document.createElement('video');video.src=u.href;video.muted=true;video.loop=true;video.playsInline=true;video.preload=index===0?'auto':'metadata';video.autoplay=index===0;video.disablePictureInPicture=true;video.disableRemotePlayback=true;video.setAttribute('aria-label','Video del producto');card.append(video);
+          const video=document.createElement('video');video.src=u.href;video.muted=true;video.defaultMuted=true;video.loop=true;video.playsInline=true;video.preload='metadata';video.setAttribute('muted','');video.setAttribute('playsinline','');video.disablePictureInPicture=true;video.disableRemotePlayback=true;video.setAttribute('aria-label','Video del producto');
+          if(id)video.poster=u.href.replace(/\.mp4(?:[?#].*)?$/i,'.jpg');
+          card.append(video);if(videoObserver)videoObserver.observe(video);else{video.preload='auto';video.play().catch(()=>{})}
         }else if(yt&&/^[\w-]{11}$/.test(yt)){
-          const frame=document.createElement('iframe');const qs=new URLSearchParams({autoplay:index===0?'1':'0',mute:'1',loop:'1',playlist:yt,controls:'0',playsinline:'1',rel:'0'});frame.src=`https://www.youtube-nocookie.com/embed/${yt}?${qs}`;frame.className='youtube';frame.title='Video del producto';frame.allow='autoplay; encrypted-media';frame.referrerPolicy='strict-origin-when-cross-origin';card.append(frame);
+          const frame=document.createElement('iframe');const qs=new URLSearchParams({autoplay:'1',mute:'1',loop:'1',playlist:yt,controls:'0',playsinline:'1',rel:'0'});frame.src=`https://www.youtube-nocookie.com/embed/${yt}?${qs}`;frame.className='youtube';frame.title='Video del producto';frame.allow='autoplay; encrypted-media';frame.referrerPolicy='strict-origin-when-cross-origin';card.append(frame);
         }else continue;
         track.append(card);
       }

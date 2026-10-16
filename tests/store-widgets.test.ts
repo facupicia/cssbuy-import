@@ -16,16 +16,18 @@ test("los videos admiten títulos vacíos y se renderizan sin controles", () => 
   const carousel=readFileSync('public/storefront-carousel.html','utf8');
   assert.ok(carousel.includes('object-fit:cover'));
   assert.ok(carousel.includes('::-webkit-scrollbar{display:none'));
+  assert.ok(carousel.includes('new IntersectionObserver'));
+  assert.ok(carousel.includes('video.poster='));
+  assert.ok(carousel.includes("video.play().catch(()=>{})"));
   assert.ok(!carousel.includes('<video controls'));
 });
 
-test("el diseño anterior se actualiza sin cambiar textos, selección ni activación; respeta diseños editados", () => {
+test("actualizar el diseño conserva la ubicación elegida y solo agrega colores faltantes", () => {
   const config=defaultWidgetConfig(); const faq=config.widgets[1];
-  delete faq.colors; faq.slot="after_product_description";faq.enabled=true;faq.scope="products";faq.productIds=[42];
-  const next=upgradeWidgetDesign(config);assert.equal(next.widgets[1].slot,"after_product_description");
+  delete faq.colors; faq.slot="after_dynamic_section_main_product";faq.enabled=true;faq.scope="products";faq.productIds=[42];
+  const next=upgradeWidgetDesign(config);assert.equal(next.widgets[1].slot,"after_dynamic_section_main_product");
   assert.deepEqual(next.widgets[1].entries,faq.entries);assert.deepEqual(next.widgets[1].productIds,[42]);assert.equal(next.widgets[1].enabled,true);
-  next.widgets[1].slot="after_dynamic_section_main_product";assert.equal(upgradeWidgetDesign(next).widgets[1].slot,"after_product_description");
-  const videos=next.widgets.find(w=>w.kind==='videos')!;videos.slot="after_product_detail_shipping_options";assert.equal(upgradeWidgetDesign(next).widgets.find(w=>w.kind==='videos')!.slot,"after_product_description");
+  const videos=next.widgets.find(w=>w.kind==='videos')!;videos.slot="after_product_detail_shipping_options";assert.equal(upgradeWidgetDesign(next).widgets.find(w=>w.kind==='videos')!.slot,"after_product_detail_shipping_options");
 });
 test("configuración pública valida medios, alcance, fechas y no acepta videos ejecutables", () => {
   const config = defaultWidgetConfig(); assert.equal(config.widgets.filter(w=>w.enabled).length,0);
@@ -52,9 +54,9 @@ test("SDK renderiza por página y producto, oculta al vencer y solo consulta con
   t.mock.method(globalThis,'setInterval',(fn:Function)=>{intervals.push(fn);return 1;});
   t.mock.method(globalThis,'fetch',async(url:string, options:RequestInit)=>{assert.equal(url,'https://db.vidaeventofiesta.site/api/storefront/widgets?store=99'); assert.equal(options.credentials,'omit'); assert.equal(options.body,undefined);return Response.json(config);});
   const sdk:any={getState:()=>({store:{id:99},location:{page}}),on:(event:string,fn:Function)=>events[event]=fn,render:(slot:string,node:unknown)=>renders.set(slot,node),clearSlot:(slot:string)=>renders.delete(slot)};
-  await App(sdk); assert.ok(renders.has('before_product_detail_name')); assert.ok(renders.has('after_product_description')); assert.ok(!renders.has('after_product_detail_shipping_options'));
-  assert.ok(JSON.stringify(renders.get('after_product_description')).includes('store=99&product=10'));
-  page={type:'product',data:{product:{id:20}}}; events['page:loaded'](); assert.ok(!renders.has('after_product_description'));
+  await App(sdk); assert.ok(renders.has('before_product_detail_name')); assert.ok(renders.has('after_dynamic_section_main_product')); assert.ok(renders.has('after_product_detail_shipping_options')); assert.ok(!renders.has('after_product_description'));
+  assert.ok(JSON.stringify(renders.get('after_product_detail_shipping_options')).includes('store=99&product=10'));
+  page={type:'product',data:{product:{id:20}}}; events['page:loaded'](); assert.ok(!renders.has('after_dynamic_section_main_product'));assert.ok(!renders.has('after_product_detail_shipping_options'));
   const pastEnd=Date.parse(timer.endsAt)+1000; t.mock.method(Date,'now',()=>pastEnd); intervals[0](); assert.ok(!renders.has('after_product_detail_price'));
   page={type:'home'}; events['page:loaded'](); assert.ok(!renders.has('after_product_detail_price'));
 });

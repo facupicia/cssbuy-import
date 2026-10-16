@@ -53,8 +53,9 @@ export function defaultWidgetConfig(): WidgetConfig {
 /** Upgrade the original unstyled layout without changing content or activation. */
 export function upgradeWidgetDesign(config: WidgetConfig): WidgetConfig {
   return { ...config, widgets: config.widgets.map(w => {
-    const slot = w.kind === "faq" || w.kind === "videos" ? "after_product_description" : w.slot;
-    return w.colors ? { ...w, slot } : { ...w, slot: REFERENCE_SLOTS[w.kind], colors: { ...REFERENCE_COLORS[w.kind] } };
+    // Keep the placement selected by the merchant. Reference placement is only
+    // supplied by defaultWidgetConfig for new blocks; upgrades must not pin it.
+    return w.colors ? { ...w } : { ...w, colors: { ...REFERENCE_COLORS[w.kind] } };
   }) };
 }
 function text(value: unknown, limit: number): string {
