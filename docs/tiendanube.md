@@ -55,6 +55,56 @@ La contraseña debe tener al menos 12 caracteres. La sesión de publicación dur
 
 ## Envío y reintentos
 
+### Publicación masiva y edición del catálogo
+
+El diálogo tiene dos modos:
+
+- **Publicar inventario**: respeta la selección de la pantalla de inventario
+  (o su filtro si no hay selección). **Publicación masiva** permite marcar
+  fichas listas y crear o actualizar esos productos, publicados u ocultos.
+  La vista previa muestra la acción, el precio y los datos pendientes. Los
+  envíos son secuenciales, informan cada resultado y permiten detenerse
+  después del producto actual. Los éxitos salen de la selección pendiente.
+  Actualizar desde inventario reemplaza también el stock local en Tiendanube;
+  mantiene las restricciones y recuperación de IDs del envío individual.
+- **Editar catálogo de Tiendanube**: consulta el catálogo real, incluidos los
+  productos sin vínculo con inventario. Permite seleccionar uno o varios
+  (hasta 100, con páginas de 30) y cambiar campos concretos: nombre completo,
+  prefijo, sufijo o reemplazo; precio de lista fijo o porcentaje por variante;
+  categoría, marca, peso, descripción o visibilidad. Fotos, stock y atributos
+  de variantes se preservan. Los precios promocionales solo se quitan cuando
+  se elige ese campo. Reemplazar la descripción completa es opcional y avisa
+  que también reemplaza la tabla de talles de ese texto.
+
+La edición directa del catálogo toma Tiendanube como fuente. No modifica
+costos, precios objetivo ni fichas del inventario local. Volver a publicar
+un artículo vinculado desde inventario enviará los datos de esa ficha.
+
+Ambos modos exigen vista previa y confirmación explícita. El catálogo verifica
+la tienda y una huella del producto antes de iniciar. La API no ofrece una
+transacción remota ni una actualización condicional atómica; un cambio externo
+entre la última lectura y el PUT sigue siendo una limitación de esa API.
+Las modificaciones parciales se guardan como objetivos absolutos en
+`tiendanube_catalog_jobs`. Un reintento con el mismo ID recupera esos objetivos
+sin volver a calcular un porcentaje sobre un precio ya aumentado. Se aceptan
+solo los campos anteriores o los ya aplicados por el lote; otros cambios
+requieren una nueva revisión. La cola del catálogo se recupera desde
+sessionStorage después de recargar la misma pestaña. **Nueva edición** consulta
+otra vez los datos y comienza con nuevas versiones.
+
+Los bloqueos por producto de PostgreSQL evitan cruces entre el envío desde
+inventario y la edición del catálogo. Los errores de autorización, límites de
+API o indisponibilidad detienen el lote para no repetir la misma falla sobre
+todos los artículos. Cada producto tiene su propio resultado; los éxitos no
+se revierten si falla otro artículo. Mantener la pantalla abierta durante la
+publicación desde inventario; se pueden reintentar solo pendientes y fallidos.
+
+Validación: `tests/store-catalog.test.ts` cubre cambios acotados, precios por
+variante, respuesta perdida, reintentos, versiones, tienda y permisos.
+`node tests/tiendanube-bulk-ui.mjs` prueba publicación, fallos parciales y
+recuperación del catálogo tras recarga en escritorio y móvil con servicios
+simulados. Estas pruebas no publican ni modifican productos reales.
+
 Cada envío pide revisar y confirmar un producto. **Guardar oculto** también oculta un producto ya publicado. **Publicar producto / Actualizar y publicar** lo hace visible cuando todas las operaciones terminan. Durante la actualización queda oculto; si una operación falla, puede conservar cambios parciales y se debe revisar y reintentar. La fecha mostrada corresponde al último envío completo; el estado de visibilidad corresponde al último confirmado por la API, no a una consulta en vivo de la tienda.
 
 La tabla `tiendanube_links` vincula tienda e ítem con el ID remoto. Las actualizaciones conservan ese ID y el identificador de URL. Un bloqueo de PostgreSQL impide dos envíos simultáneos del mismo ítem. Un identificador de URL estable permite recuperar una creación con respuesta perdida. Si el SKU principal ya existe en la tienda, se guarda el vínculo encontrado y se exige actualizar la vista previa antes de modificarlo. Revisar productos importados previamente sin SKU: no es posible reconocer automáticamente que representan el mismo producto. Los SKU compartidos entre ítems se bloquean.

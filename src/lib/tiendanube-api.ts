@@ -21,7 +21,7 @@ export async function storeRequest<T>(path: string, method = "GET", body?: unkno
   } catch { throw new StoreApiError("Tiendanube no respondió a tiempo. Reintentá: se verificará el producto existente antes de crearlo"); }
   if (!response.ok) {
     const labels: Record<number, string> = { 401: "Credenciales de Tiendanube inválidas", 403: "La aplicación necesita permisos de lectura y escritura de productos", 404: "No se encontró el recurso en Tiendanube. Revisá el vínculo antes de reintentar", 422: "Tiendanube rechazó los datos. Revisá categorías, variantes, peso y fotos", 429: "Tiendanube alcanzó su límite de solicitudes. Esperá un minuto y reintentá" };
-    throw new StoreApiError(labels[response.status] ?? "Tiendanube no pudo completar la operación", response.status === 429 ? 429 : 502);
+    throw new StoreApiError(labels[response.status] ?? "Tiendanube no pudo completar la operación", [401, 403, 422, 429].includes(response.status) ? response.status : 502);
   }
   return response.json() as Promise<T>;
 }
@@ -76,6 +76,7 @@ export async function syncStoreProduct(itemId: string, publish: boolean, expecte
   const client = await getPool().connect();
   const lock = `tiendanube:${credentials.storeId}:${itemId}`;
   let locked = false;
+  let productLock: string | null = null;
   try {
     const result = await client.query("SELECT pg_try_advisory_lock(hashtextextended($1, 0)) AS locked", [lock]);
     locked = result.rows[0].locked;
@@ -117,6 +118,9 @@ export async function syncStoreProduct(itemId: string, publish: boolean, expecte
     }
     // When adopting an existing ID, the user must have previewed the link first.
     if ((recovered || link.product_id) && String(remote.id) !== expectedProductId) throw new StoreApiError("Se encontró el producto existente y se guardó su vínculo. Actualizá la vista previa antes de modificarlo", 409);
+    const remoteLock = `tiendanube:product:${credentials.storeId}:${remote.id}`;
+    if (!(await client.query("SELECT pg_try_advisory_lock(hashtextextended($1, 0)) AS locked", [remoteLock])).rows[0].locked) throw new StoreApiError("Este producto se está editando en el catálogo. Reintentá cuando termine", 409);
+    productLock = remoteLock;
     if (variantKey((remote.attributes ?? []).map(translated)) !== variantKey(attributes.map(translated))) throw new StoreApiError("Cambió la estructura de variantes. Conservá los mismos atributos para actualizar este producto", 409);
     // Hide while updating so an interrupted operation cannot publish an incomplete product.
     await request(`/products/${remote.id}`, "PUT", { ...metadata, published: false });
@@ -166,6 +170,7 @@ export async function syncStoreProduct(itemId: string, publish: boolean, expecte
     if (locked) await client.query("UPDATE tiendanube_links SET error=$3 WHERE store_id=$1 AND item_id=$2", [credentials.storeId, itemId, error instanceof StoreApiError ? error.message : "Error al enviar el producto. Reintentá desde la vista previa"]).catch(() => undefined);
     throw error;
   } finally {
+    if (productLock) await client.query("SELECT pg_advisory_unlock(hashtextextended($1, 0))", [productLock]).catch(() => undefined);
     if (locked) await client.query("SELECT pg_advisory_unlock(hashtextextended($1, 0))", [lock]).catch(() => undefined);
     client.release();
   }

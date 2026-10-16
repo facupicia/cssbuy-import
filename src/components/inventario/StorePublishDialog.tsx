@@ -13,6 +13,9 @@ import { Input } from "@/components/ui/Input";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/Dialog";
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 import { StoreConnectionSettings } from "@/components/inventario/StoreConnectionSettings";
+import { StoreInventoryBatch } from "@/components/inventario/StoreInventoryBatch";
+import { StoreCatalogPanel } from "@/components/inventario/StoreCatalogPanel";
+import { Segmented } from "@/components/ui/Segmented";
 
 async function json<T>(url: string, init?: RequestInit): Promise<T> {
   const response = await fetch(url, { cache: "no-store", ...init });
@@ -36,6 +39,7 @@ export function StorePublishDialog({ open, onOpenChange, items, marcas, onChange
   const [message, setMessage] = useState("");
   const [confirm, setConfirm] = useState<"hidden" | "visible" | null>(null);
   const [readyOnly, setReadyOnly] = useState(false);
+  const [mode, setMode] = useState("inventory");
   const brandFor = (item: InventoryItem) => marcas.find(m => m.id === item.marcaId)?.nombre;
   const categorizedItems = items.map(i => withStoreCategory(i, categories));
   const visible = readyOnly ? categorizedItems.filter(i => storeReadiness(i, brandFor(i)).ready) : categorizedItems;
@@ -107,6 +111,12 @@ export function StorePublishDialog({ open, onOpenChange, items, marcas, onChange
           {session?.authenticated && <Button size="sm" variant="ghost" disabled={busy} onClick={async () => { try { await json("/api/tiendanube/session", { method: "DELETE" }); await refresh(); } catch(e) { setError(e instanceof Error ? e.message : "No se pudo cerrar la sesión"); } }}>Cerrar acceso de publicación</Button>}
           {error && <p role="alert" className="rounded-lg bg-[var(--color-danger-soft)] p-3 text-sm text-[var(--color-danger)]">{error}</p>}
           {message && <p role="status" className="rounded-lg bg-[var(--color-accent-soft)] p-3 text-sm text-[var(--color-accent)]">{message}</p>}
+          <div className={busy ? "pointer-events-none opacity-60" : ""}><Segmented value={mode} onChange={value => { if (!busy) setMode(value); }} options={[{ value: "inventory", label: "Publicar inventario" }, { value: "catalog", label: "Editar catálogo de Tiendanube" }]} /></div>
+          {mode === "catalog" && (session?.authenticated && session.configured && session.storeId
+            ? <StoreCatalogPanel storeId={session.storeId} categories={categories} onBusyChange={setBusy} />
+            : <p className="text-sm">Ingresá y conectá tu tienda para consultar y editar su catálogo.</p>)}
+          <div hidden={mode !== "inventory"} className="space-y-4">
+          <StoreInventoryBatch items={categorizedItems} marcas={marcas} links={links} storeId={session?.storeId} enabled={Boolean(session?.authenticated && session.configured && !checking)} busy={busy} onBusyChange={setBusy} onRefresh={async () => { await refresh(); await onChanged(); }} />
           <label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={readyOnly} onChange={e => setReadyOnly(e.target.checked)} disabled={busy} />Mostrar solo fichas completas</label>
           <div className="grid gap-6 md:grid-cols-[minmax(0,1fr)_minmax(0,2fr)]">
             <div className="space-y-2">
@@ -144,6 +154,7 @@ export function StorePublishDialog({ open, onOpenChange, items, marcas, onChange
               <p className="text-xs text-[var(--color-fg-muted)]">El envío usa el stock de este panel y reemplaza el de las variantes vinculadas en Tiendanube. Las ventas de Tiendanube todavía no vuelven automáticamente al inventario. Revisá las cantidades antes de actualizar.</p>
               <div className="flex flex-wrap gap-2"><Button variant="outline" disabled={busy || checking || !session?.authenticated || !session.configured || !readiness?.ready || !item.tienda?.categoriaId} onClick={() => setConfirm("hidden")}>Guardar oculto</Button><Button variant="primary" disabled={busy || checking || !session?.authenticated || !session.configured || !readiness?.ready || !item.tienda?.categoriaId} onClick={() => setConfirm("visible")}>{busy ? "Enviando…" : link?.product_id ? "Actualizar y publicar" : "Publicar producto"}</Button></div>
             </div>}
+          </div>
           </div>
         </div>
       </DialogContent>

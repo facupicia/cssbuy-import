@@ -785,7 +785,7 @@ export default function InventarioPage() {
               variant="outline"
               size="sm"
               icon={<Store className="h-3.5 w-3.5" />}
-              onClick={() => setExportOpen(true)}
+              onClick={() => setPublishOpen(true)}
             >
               A Tiendanube
             </Button>
