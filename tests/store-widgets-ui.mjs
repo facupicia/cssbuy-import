@@ -4,7 +4,7 @@ const widgets=['alert','faq','payments','videos','countdown'].map(kind=>({kind,e
 const browser=await chromium.launch({headless:true});
 try { for(const width of [1365,390]) {
   const page=await browser.newPage({viewport:{width,height:950}}); const errors=[];page.on('pageerror',e=>errors.push(e.message));
-  let data={storeId:'99',version:0,draft:{accent:'#181818',widgets:structuredClone(widgets)},published:null,publishedAt:null}; let saves=0; let conflict=false;
+  let data={storeId:'99',version:0,draft:{accent:'#181818',widgets:structuredClone(widgets)},published:null,publishedAt:null,installation:{status:'active',scriptId:11413,version:2}}; let saves=0; let conflict=false;
   await page.route('**/api/**',async route=>{
     const path=new URL(route.request().url()).pathname; const ok=value=>route.fulfill({contentType:'application/json',body:JSON.stringify(value)});
     if(path==='/api/tiendanube/session')return ok({authenticated:true});
@@ -19,6 +19,7 @@ try { for(const width of [1365,390]) {
   });
   await page.goto('http://localhost:3001/tienda');
   await page.getByRole('heading',{name:'Personalizar tienda',exact:true}).waitFor();
+  await page.getByText('Script activo en Tiendanube · versión 2',{exact:true}).waitFor();
   await page.getByLabel('Mostrar bloque',{exact:true}).check();
   await page.getByRole('button',{name:'Guardar borrador',exact:true}).click();
   await page.getByRole('status').filter({hasText:'Borrador guardado'}).waitFor(); assert.equal(data.published,null);

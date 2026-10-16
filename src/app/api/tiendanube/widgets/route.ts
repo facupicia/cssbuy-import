@@ -3,11 +3,21 @@ import { storeGuard, readStoreJson } from "@/lib/store-auth";
 import { PRIVATE_HEADERS } from "@/lib/integration-auth";
 import { parseWidgetConfig } from "@/lib/store-widgets";
 import { readWidgets, widgetStoreId, writeWidgets } from "@/lib/store-widgets-db";
+import { storeRequest } from "@/lib/tiendanube-api";
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 export async function GET(request: Request) {
   const denied = storeGuard(request); if (denied) return denied;
-  try { return NextResponse.json(await readWidgets(await widgetStoreId()), { headers: PRIVATE_HEADERS }); }
+  try {
+    const config = await readWidgets(await widgetStoreId());
+    let installation: { status: string; scriptId?: number; version?: number } = { status: "unavailable" };
+    try {
+      const response = await storeRequest<{ result: { id: number; name: string; status: string; current_version?: { version: number; src: string } }[] }>("/scripts");
+      const script = response.result.find(s => s.name === "PLUG Personalizar tienda" || s.current_version?.src.includes("/plug-storefront/"));
+      installation = script ? { status: script.status, scriptId: script.id, version: script.current_version?.version } : { status: "missing" };
+    } catch { /* Product integration may still work without permission to inspect scripts. */ }
+    return NextResponse.json({ ...config, installation }, { headers: PRIVATE_HEADERS });
+  }
   catch { return NextResponse.json({ error: "No se pudo cargar la configuración. Verificá la conexión con Tiendanube y reintentá" }, { status: 503, headers: PRIVATE_HEADERS }); }
 }
 export async function POST(request: Request) {
