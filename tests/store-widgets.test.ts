@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { defaultWidgetConfig, parseWidgetConfig, upgradeWidgetDesign, widgetApplies, countdownText, videoSource } from "../src/lib/store-widgets";
+import { defaultWidgetConfig, parseWidgetConfig, countdownEnd, upgradeWidgetDesign, widgetApplies, countdownText, videoSource } from "../src/lib/store-widgets";
 import { App, renderWidget } from "../storefront/main";
 import { GET, POST } from "../src/app/api/tiendanube/widgets/route";
 Object.defineProperty(globalThis, "self", { value: { __APP_DATA__: { id: "46841" } }, configurable: true });
@@ -45,4 +45,14 @@ test("rutas de edición exigen administración y origen antes de consultar la ba
   t.after(()=>{if(original===undefined)delete process.env.ADMIN_PASSWORD;else process.env.ADMIN_PASSWORD=original;});
   assert.equal((await GET(new Request('https://db.vidaeventofiesta.site/api/tiendanube/widgets'))).status,401);
   assert.equal((await POST(new Request('https://db.vidaeventofiesta.site/api/tiendanube/widgets',{method:'POST',headers:{Origin:'https://evil.example'},body:'{}'}))).status,403);
+});
+
+
+test("el contador repetitivo conserva el ciclo al recargar y pasa de cero al intervalo elegido",()=>{
+  const w=defaultWidgetConfig().widgets.find(w=>w.kind==='countdown')!;w.enabled=true;w.repeatHours=10;w.endsAt='2026-10-16T10:00:00Z';
+  const first=Date.parse(w.endsAt);assert.equal(countdownEnd(w,first-1000),w.endsAt);assert.equal(countdownEnd(w,first),'2026-10-16T20:00:00.000Z');
+  assert.equal(countdownEnd(w,first+25*3600000),'2026-10-17T16:00:00.000Z');assert.equal(widgetApplies(w,undefined,first+25*3600000),true);
+  assert.equal(countdownEnd(w,first+1000),countdownEnd(structuredClone(w),first+1000));
+  const config=defaultWidgetConfig();config.widgets=config.widgets.map(v=>v.kind==='countdown'?w:v);assert.equal(parseWidgetConfig(config).widgets.find(v=>v.kind==='countdown')!.repeatHours,10);
+  assert.throws(()=>parseWidgetConfig({...config,widgets:config.widgets.map(v=>v.kind==='countdown'?{...v,repeatHours:-10}:v)}));
 });

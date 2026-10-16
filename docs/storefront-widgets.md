@@ -89,3 +89,27 @@ FAQ y videos usan `after_dynamic_section_main_product`, confirmado en el DOM de 
 fuera de las dos columnas de producto y antes de Productos similares.
 La ubicación se ofrece como «Al pie de la ficha, antes de productos similares».
 El contenedor conserva el ancho de 1280px de la página y el carrusel se limita a 480px centrado.
+
+
+## Pulso, contador repetitivo y videos propios
+
+- La alerta anima el punto por defecto; el editor permite desactivarlo. La hoja del tema incluye
+  `plug-status-pulse` y respeta `prefers-reduced-motion`.
+- `repeatHours` (0,25–720 horas; 0/apagado conserva la fecha única) usa `endsAt` como primer cierre
+  y ancla permanente. No reinicia por visitante ni al recargar; al vencer comienza el siguiente ciclo.
+- `/api/tiendanube/videos` requiere la sesión administrativa y el origen del panel. Carga en partes
+  de 768 KiB con reintentos idempotentes; hasta 100 MB, tres subidas incompletas y una conversión simultánea.
+- Se inspecciona la firma y se procesa con FFprobe/FFmpeg (sin shell ni protocolos de red), máximo
+  180 segundos y 4K de entrada. Se prepara H.264/AAC MP4, máximo 1080×1920 sin ampliar la imagen,
+  orientación corregida, faststart y poster JPG.
+- El volumen Docker `store-videos` mantiene los archivos entre despliegues. Incluirlo en los backups.
+  El directorio es configurable con `STORE_VIDEO_DIR`; FFmpeg/FFprobe con `FFMPEG_PATH`/`FFPROBE_PATH`.
+- `/api/storefront/videos/[uuid].mp4|jpg` sirve únicamente nombres validados, sin autenticación por ser
+  assets de la tienda, con soporte GET/HEAD y Range, CORS y caché inmutable. No sirve archivos fuente ni metadatos.
+- El reproductor propio usa un iframe de NubeSDK y medios del mismo servidor. El central intenta
+  reproducirse sin sonido y en loop; se pausa cuando sale de pantalla o se oculta la pestaña y respeta
+  movimiento reducido. Los controles permiten reproducción manual y sonido; los navegadores pueden
+  restringir autoplay. Los enlaces de YouTube se conservan, con las limitaciones del proveedor.
+- El carrusel siempre limita su ancho a 480px y los videos a 320px de alto; muestra cada lateral
+  completo con `contain`, sin ampliación lateral ni duplicados cuando hay dos videos.
+- La subida prepara un elemento en el borrador: no activa el slider ni publica videos automáticamente.

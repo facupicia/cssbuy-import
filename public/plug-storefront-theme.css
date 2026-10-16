@@ -28,3 +28,7 @@
   outline: 2px solid currentColor;
   outline-offset: -2px;
 }
+
+/* Stable app-owned ID, independent of NubeSDK's generated suffix. */
+@keyframes plug-status-pulse {0%{box-shadow:0 0 0 0 currentColor}70%,100%{box-shadow:0 0 0 8px transparent}}
+@media (prefers-reduced-motion:reduce){[id^="box-46841-"][style*="plug-status-pulse"]{animation:none!important}}

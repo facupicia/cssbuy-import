@@ -13,5 +13,10 @@ services:
       - NODE_ENV=production
       - PORT=3001
       - HOSTNAME=0.0.0.0
+    volumes:
+      - store-videos:/app/data/store-videos
     extra_hosts:
       - "host.docker.internal:host-gateway"
+
+volumes:
+  store-videos:

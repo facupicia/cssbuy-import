@@ -22,6 +22,7 @@ RUN npm run build
 
 # 3. Runner en producción
 FROM base AS runner
+RUN apk add --no-cache ffmpeg
 WORKDIR /app
 
 ENV NODE_ENV=production
@@ -33,7 +34,7 @@ RUN addgroup --system --gid 1001 nodejs
 RUN adduser --system --uid 1001 nextjs
 
 # Crear directorio public si no existe
-RUN mkdir -p public
+RUN mkdir -p public data/store-videos && chown -R nextjs:nodejs data
 
 COPY --from=builder /app/public ./public
 COPY --from=builder --chown=nextjs:nodejs /app/.next/standalone ./

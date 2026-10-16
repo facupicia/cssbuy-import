@@ -28,6 +28,17 @@ export interface StoreWidget {
   scope: "all" | "products"; productIds: number[];
   entries: { title: string; text: string; url: string }[];
   endsAt: string; colors?: WidgetColors;
+  repeatHours?: number;
+  pulse?: boolean;
+}
+/** A fixed anchor keeps repeat cycles consistent across reloads and visitors. */
+export function countdownEnd(w: StoreWidget, now = Date.now()): string {
+  const anchor = Date.parse(w.endsAt), period = (w.repeatHours ?? 0) * 3600000;
+  if (!Number.isFinite(anchor) || !period || now < anchor) return w.endsAt;
+  return new Date(anchor + (Math.floor((now - anchor) / period) + 1) * period).toISOString();
+}
+export function uploadedVideoId(url: string): string | undefined {
+  try { const u=new URL(url); if(u.origin!=="https://db.vidaeventofiesta.site")return; return /^\/api\/storefront\/videos\/([0-9a-f-]{36})\.mp4$/.exec(u.pathname)?.[1]; } catch { return; }
 }
 export interface WidgetConfig { widgets: StoreWidget[]; accent: string }
 export function defaultWidgetConfig(): WidgetConfig {
@@ -78,6 +89,11 @@ export function parseWidgetConfig(input: unknown): WidgetConfig {
       if (!colors || typeof colors !== "object" || ["background","foreground","highlight"].some(k => typeof colors[k as keyof WidgetColors] !== "string" || !/^#[0-9a-f]{6}$/i.test(colors[k as keyof WidgetColors]))) throw new Error("Color del bloque inválido");
       result.colors = { background: w.colors.background, foreground: w.colors.foreground, highlight: w.colors.highlight };
     }
+    if (w.pulse !== undefined) { if (typeof w.pulse !== "boolean") throw new Error("Animación inválida"); result.pulse=w.pulse; }
+    if (w.repeatHours !== undefined) {
+      if (typeof w.repeatHours !== "number" || !Number.isFinite(w.repeatHours) || (w.repeatHours !== 0 && (w.repeatHours < 0.25 || w.repeatHours > 720))) throw new Error("Elegí un intervalo de entre 0,25 y 720 horas");
+      result.repeatHours=w.repeatHours;
+    }
     if (result.endsAt && !/^\d{4}-\d\d-\d\dT.*(Z|[+-]\d\d:\d\d)$/.test(result.endsAt)) throw new Error("Fecha inválida");
     if (result.endsAt && !Number.isFinite(Date.parse(result.endsAt))) throw new Error("Fecha inválida");
     if (result.kind === "videos") for (const e of result.entries) videoSource(e.url);
@@ -94,7 +110,7 @@ export function parseWidgetConfig(input: unknown): WidgetConfig {
 }
 export function widgetApplies(w: StoreWidget, productId?: number, now = Date.now()): boolean {
   return w.enabled && (w.scope === "all" || Boolean(productId && w.productIds.includes(productId)))
-    && (w.kind !== "countdown" || Date.parse(w.endsAt) > now);
+    && (w.kind !== "countdown" || Date.parse(countdownEnd(w,now)) > now);
 }
 export function countdownText(endsAt: string, now = Date.now()): string {
   const seconds = Math.max(0, Math.floor((Date.parse(endsAt) - now) / 1000));

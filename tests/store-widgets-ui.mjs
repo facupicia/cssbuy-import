@@ -7,6 +7,12 @@ try { for(const width of [1365,390]) {
   let data={storeId:'99',version:0,draft:{accent:'#181818',widgets:structuredClone(widgets)},published:null,publishedAt:null,installation:{status:'active',scriptId:11413,version:2}}; let saves=0; let conflict=false;
   await page.route('**/api/**',async route=>{
     const path=new URL(route.request().url()).pathname; const ok=value=>route.fulfill({contentType:'application/json',body:JSON.stringify(value)});
+    if(path==='/api/tiendanube/videos') {
+      const u=new URL(route.request().url());
+      if(!u.searchParams.has('upload'))return ok({id:'11111111-1111-4111-8111-111111111111',chunkBytes:786432,parts:1});
+      if(route.request().method()==='GET')return ok({id:'11111111-1111-4111-8111-111111111111',status:'ready',url:'https://db.vidaeventofiesta.site/api/storefront/videos/11111111-1111-4111-8111-111111111111.mp4'});
+      return ok({status:'processing'});
+    }
     if(path==='/api/tiendanube/session')return ok({authenticated:true});
     if(path==='/api/tiendanube/catalog')return ok({storeId:'99',products:[{id:10,name:'Remera Bape'}],hasMore:false});
     if(path==='/api/tiendanube/widgets'){
@@ -58,8 +64,17 @@ try { for(const width of [1365,390]) {
   const videoPreview=page.getByRole('region',{name:'Vista previa del bloque'});
   assert.equal(await videoPreview.locator('video').nth(1).getAttribute('src'),'https://cdn.example.com/2.mp4');
   const heights=await videoPreview.locator('video').evaluateAll(elements=>elements.map(e=>e.parentElement.getBoundingClientRect().height));
-  assert.ok(Math.max(...heights)-Math.min(...heights)<2,'Los laterales conservan la altura del video central');
+  assert.ok(Math.max(...heights)<=321,'Los videos conservan una altura acotada');
+  assert.equal(await videoPreview.locator('video').first().evaluate(e=>getComputedStyle(e).objectFit),'contain');
   await videoPreview.screenshot({path:`.impeccable/review/reference-videos-${width}.png`});
+  await page.getByLabel('Subir video desde tu equipo',{exact:true}).setInputFiles({name:'Remera propia.mp4',mimeType:'video/mp4',buffer:Buffer.alloc(100)});
+  await page.getByRole('status').filter({hasText:'Video listo.'}).waitFor();
+  assert.equal(await page.locator('#entry-title-3').inputValue(),'Remera propia');
+  assert.match(await page.locator('#entry-url-3').inputValue(),/11111111-1111-4111-8111-111111111111/);
+  await page.getByRole('button',{name:'Cuenta regresiva Apagado',exact:true}).click();
+  await page.getByLabel('Repetir la cuenta automáticamente',{exact:true}).check();
+  assert.equal(await page.getByLabel('Duración de cada ciclo (horas)',{exact:true}).inputValue(),'10');
+  await page.getByRole('region',{name:'Vista previa del bloque'}).screenshot({path:`.impeccable/review/reference-loop-${width}.png`});
   await page.close();
 } } finally {await browser.close();}
 console.log('Widgets: borrador/publicación, selección, FAQ, conflicto y escritorio/móvil correctos');

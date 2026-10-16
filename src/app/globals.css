@@ -106,3 +106,7 @@ input[type="number"].no-spin {
 .tnum {
   font-variant-numeric: tabular-nums;
 }
+
+@keyframes plug-status-pulse {0%{box-shadow:0 0 0 0 currentColor}70%,100%{box-shadow:0 0 0 8px transparent}}
+.plug-alert-pulse {animation:plug-status-pulse 1.8s ease-out infinite}
+@media (prefers-reduced-motion:reduce){.plug-alert-pulse{animation:none}}

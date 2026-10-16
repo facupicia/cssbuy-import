@@ -19,3 +19,6 @@ Thumbs.db
 
 # Capturas locales de validación; no son assets de la aplicación.
 .impeccable/review/
+
+# Persistent uploaded storefront media
+data/store-videos/
