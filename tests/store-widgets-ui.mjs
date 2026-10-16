@@ -48,6 +48,18 @@ try { for(const width of [1365,390]) {
   await page.getByLabel('Color de fondo',{exact:true}).fill('#dc2626');
   await page.getByRole('button',{name:'Usar diseño de referencia',exact:true}).click();
   assert.equal(await page.getByLabel('Color de fondo',{exact:true}).inputValue(),'#ef4444');
+  await page.getByRole('button',{name:'Slider de videos Apagado',exact:true}).click();
+  for(let i=0;i<3;i++) {
+    await page.getByRole('button',{name:'Agregar video',exact:true}).click();
+    await page.locator(`#entry-title-${i}`).fill(`Video ${i+1}`);
+    await page.locator(`#entry-url-${i}`).fill(`https://cdn.example.com/${i+1}.mp4`);
+  }
+  await page.getByRole('button',{name:'Video siguiente',exact:true}).click();
+  const videoPreview=page.getByRole('region',{name:'Vista previa del bloque'});
+  assert.equal(await videoPreview.locator('video').nth(1).getAttribute('src'),'https://cdn.example.com/2.mp4');
+  const heights=await videoPreview.locator('video').evaluateAll(elements=>elements.map(e=>e.parentElement.getBoundingClientRect().height));
+  assert.ok(Math.max(...heights)-Math.min(...heights)<2,'Los laterales conservan la altura del video central');
+  await videoPreview.screenshot({path:`.impeccable/review/reference-videos-${width}.png`});
   await page.close();
 } } finally {await browser.close();}
 console.log('Widgets: borrador/publicación, selección, FAQ, conflicto y escritorio/móvil correctos');

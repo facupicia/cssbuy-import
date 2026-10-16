@@ -72,7 +72,8 @@ El panel y el archivo público se despliegan desde el repositorio. El CDN de Par
 `public/plug-storefront.min.js` como nueva versión del script 11413 y activarla en las tiendas.
 La versión 2 instalada no recibe cambios del archivo alojado en el panel.
 El usuario habilitó el permiso de URLs de archivo de Chrome. Se subió y activó la versión 3
-el 16/10/2026; la versión 2 quedó como legado. Se verificó el nuevo acordeón en la tienda real.
+el 16/10/2026; la versión 2 quedó como legado. La revisión 4 añade formato vertical 9:16 explícito
+y mantiene los laterales del carrusel a la misma altura del centro. Se verificó el nuevo acordeón en la tienda real.
 La configuración publicada mantiene sus textos, activaciones y alcance anteriores.
 
 El tema tenía reglas de sección que ocultaban `before_product_detail_name` y `after_product_detail_price`.
