@@ -2,9 +2,9 @@
 export const WIDGET_KINDS = ["alert", "faq", "payments", "videos", "countdown"] as const;
 export type WidgetKind = typeof WIDGET_KINDS[number];
 export const WIDGET_LABELS: Record<WidgetKind, string> = { alert: "Mensaje de alerta", faq: "Preguntas frecuentes", payments: "Medios de pago", videos: "Slider de videos", countdown: "Cuenta regresiva" };
-export const WIDGET_SLOTS = { before_product_detail_name: "Arriba del nombre del producto", after_product_detail_price: "Debajo del precio", after_product_detail_shipping_options: "Debajo de las opciones de envío", before_main_content: "Barra superior del contenido", after_header: "Debajo del encabezado", after_product_description: "Después de la descripción", after_main_content: "Al final del contenido" } as const;
+export const WIDGET_SLOTS = { after_dynamic_section_main_product: "Al pie de la ficha, antes de productos similares", before_product_detail_name: "Arriba del nombre del producto", after_product_detail_price: "Debajo del precio", after_product_detail_shipping_options: "Debajo de las opciones de envío", before_main_content: "Barra superior del contenido", after_header: "Debajo del encabezado", after_product_description: "Después de la descripción", after_main_content: "Al final del contenido" } as const;
 export type WidgetSlot = keyof typeof WIDGET_SLOTS;
-export const REFERENCE_SLOTS: Record<WidgetKind, WidgetSlot> = { alert: "before_product_detail_name", faq: "after_product_detail_shipping_options", payments: "after_product_detail_shipping_options", videos: "after_product_detail_shipping_options", countdown: "after_product_detail_price" };
+export const REFERENCE_SLOTS: Record<WidgetKind, WidgetSlot> = { alert: "before_product_detail_name", faq: "after_dynamic_section_main_product", payments: "after_product_detail_shipping_options", videos: "after_dynamic_section_main_product", countdown: "after_product_detail_price" };
 export interface WidgetColors { background: string; foreground: string; highlight: string }
 export const REFERENCE_COLORS: Record<WidgetKind, WidgetColors> = {
   alert: { background: "#ef4444", foreground: "#ffffff", highlight: "#f87171" },

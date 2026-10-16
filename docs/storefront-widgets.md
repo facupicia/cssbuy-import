@@ -81,3 +81,11 @@ Se publicó `public/plug-storefront-theme.css` en Ajustes globales → CSS perso
 14128339, para mostrar estos slots únicamente cuando NubeSDK monta contenido y normalizar el acordeón
 nativo solo para los IDs de la app 46841. El campo global estaba vacío; los estilos previos de secciones
 se conservaron. La hoja debe acompañar al script si se migra el tema.
+
+
+## Ubicación al pie de la ficha (pedido del 16/10/2026)
+
+FAQ y videos usan `after_dynamic_section_main_product`, confirmado en el DOM de Ipanema,
+fuera de las dos columnas de producto y antes de Productos similares.
+La ubicación se ofrece como «Al pie de la ficha, antes de productos similares».
+El contenedor conserva el ancho de 1280px de la página y el carrusel se limita a 480px centrado.
