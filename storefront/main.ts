@@ -44,17 +44,18 @@ export async function App(nube: NubeSDK) {
     if (page.type === "checkout") return;
     const productId = page.type === "product" ? page.data.product.id : undefined;
     const next = new Set<WidgetSlot>();
+    // Ipanema exposes named legacy dynamic sections without numeric instance suffixes.
     for (const slot of Object.keys(WIDGET_SLOTS) as WidgetSlot[]) {
       if (slot.includes("product") && !productId) continue;
       const widgets = config.widgets.filter(w => w.slot === slot && widgetApplies(w, productId));
       if (widgets.length) next.add(slot);
       const clockSlot = config.widgets.some(w => w.kind === "countdown" && w.enabled && w.slot === slot);
       if (onlyClock && !clockSlot) continue;
-      if (widgets.length) nube.render(slot, Column({ id: `plug-slot-${slot}`, width: "100%", gap: "16px", style:slot==="after_dynamic_section_main_product"?{maxWidth:"1280px",margin:"0px auto",padding:"0px 16px",boxSizing:"border-box"}:undefined, children: widgets.map(w => renderWidget(w, config.accent, { index:videoIndices.get(w.kind) ?? 0, select:index=>{videoIndices.set(w.kind,index);render();} })) }));
-      else if (owned.has(slot)) nube.clearSlot(slot);
+      if (widgets.length) (nube.render as (slot: WidgetSlot, node: NubeComponent) => void)(slot, Column({ id: `plug-slot-${slot}`, width: "100%", gap: "16px", style:slot==="after_dynamic_section_main_product"?{maxWidth:"1280px",margin:"0px auto",padding:"0px 16px",boxSizing:"border-box"}:undefined, children: widgets.map(w => renderWidget(w, config.accent, { index:videoIndices.get(w.kind) ?? 0, select:index=>{videoIndices.set(w.kind,index);render();} })) }));
+      else if (owned.has(slot)) (nube.clearSlot as (slot: WidgetSlot) => void)(slot);
     }
     // Slots owned by this app only; never clear other app content.
-    if (!onlyClock) for (const slot of owned) if (!next.has(slot)) nube.clearSlot(slot);
+    if (!onlyClock) for (const slot of owned) if (!next.has(slot)) (nube.clearSlot as (slot: WidgetSlot) => void)(slot);
     owned = next;
   }
   async function refresh() {
