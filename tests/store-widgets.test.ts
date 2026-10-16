@@ -13,7 +13,8 @@ test("los videos admiten títulos vacíos y se renderizan sin controles", () => 
   assert.ok(rendered.includes('"controls":false'));
   assert.ok(!rendered.includes('"controls":true'));
   assert.ok(rendered.includes('"objectFit":"cover"'));
-  assert.ok(rendered.includes('"scrollbarWidth":"none"'));
+  assert.ok(rendered.includes('"hideScrollbar":true'));
+  assert.ok(rendered.includes('"type":"sidescroll"'));
 });
 
 test("el diseño anterior se actualiza sin cambiar textos, selección ni activación; respeta diseños editados", () => {
