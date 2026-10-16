@@ -1,0 +1,54 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; connect-src 'self'; media-src 'self' https:; frame-src https://www.youtube-nocookie.com; img-src 'self' https: data:">
+  <title>Videos del producto</title>
+  <style>
+    *{box-sizing:border-box}
+    html,body{margin:0;width:100%;height:100%;overflow:hidden;background:transparent}
+    #track{display:flex;align-items:stretch;gap:16px;width:100%;height:100%;overflow-x:auto;overflow-y:hidden;overscroll-behavior-x:contain;scroll-snap-type:x mandatory;scrollbar-width:none;-ms-overflow-style:none}
+    #track::-webkit-scrollbar{display:none;width:0;height:0}
+    .card{position:relative;flex:0 0 clamp(150px,20vw,220px);height:100%;min-width:0;overflow:hidden;border-radius:12px;background:#171717;scroll-snap-align:start}
+    video,.youtube{display:block;width:100%;height:100%;border:0;object-fit:cover;background:#171717}
+    video{pointer-events:none}
+  </style>
+</head>
+<body>
+  <main id="track" aria-label="Videos del producto"></main>
+  <script>
+    (async()=>{
+      const track=document.getElementById('track');
+      const params=new URLSearchParams(location.search);
+      let items=[];
+      try{items=JSON.parse(params.get('items')||'[]')}catch{}
+      const store=params.get('store'),product=Number(params.get('product'));
+      if(/^\d+$/.test(store||'')){
+        try{const response=await fetch(`/api/storefront/widgets?store=${store}`,{credentials:'omit',signal:AbortSignal.timeout(8000)});if(!response.ok)return;const config=await response.json();const widget=config.widgets?.find(w=>w.kind==='videos'&&w.enabled&&(w.scope==='all'||(product>0&&w.productIds?.includes(product))));items=widget?.entries?.map(e=>e.url)||[]}catch{return}
+      }
+      if(!Array.isArray(items))return;
+      const youtubeId=(raw)=>{
+        try{const u=new URL(raw);if(u.protocol!=='https:'||u.username||u.password)return null;
+          if(['youtube.com','www.youtube.com','m.youtube.com'].includes(u.hostname))return u.pathname.startsWith('/shorts/')?u.pathname.split('/')[2]:u.searchParams.get('v');
+          if(u.hostname==='youtu.be')return u.pathname.slice(1);
+        }catch{}return null;
+      };
+      for(const [index,raw] of items.entries()){
+        if(typeof raw!=='string'||raw.length>2000)continue;
+        let u;try{u=new URL(raw)}catch{continue}
+        if(u.protocol!=='https:'||u.username||u.password)continue;
+        const card=document.createElement('section');card.className='card';
+        const id=/^\/api\/storefront\/videos\/[0-9a-f-]{36}\.mp4$/i.test(u.pathname)&&u.origin==='https://db.vidaeventofiesta.site';
+        const yt=youtubeId(raw);
+        if(id||/\.(mp4|m3u8|mpd)$/i.test(u.pathname)){
+          const video=document.createElement('video');video.src=u.href;video.muted=true;video.loop=true;video.playsInline=true;video.preload=index===0?'auto':'metadata';video.autoplay=index===0;video.disablePictureInPicture=true;video.disableRemotePlayback=true;video.setAttribute('aria-label','Video del producto');card.append(video);
+        }else if(yt&&/^[\w-]{11}$/.test(yt)){
+          const frame=document.createElement('iframe');const qs=new URLSearchParams({autoplay:index===0?'1':'0',mute:'1',loop:'1',playlist:yt,controls:'0',playsinline:'1',rel:'0'});frame.src=`https://www.youtube-nocookie.com/embed/${yt}?${qs}`;frame.className='youtube';frame.title='Video del producto';frame.allow='autoplay; encrypted-media';frame.referrerPolicy='strict-origin-when-cross-origin';card.append(frame);
+        }else continue;
+        track.append(card);
+      }
+    })();
+  </script>
+</body>
+</html>

@@ -1,9 +1,9 @@
 import type { NubeSDK, NubeComponent } from "@tiendanube/nube-sdk-types";
-import { Accordion, Box, Button, Column, Image, Iframe, Row, SideScroll, Svg, Text, Video } from "@tiendanube/nube-sdk-jsx";
-import { uploadedVideoId, countdownEnd, upgradeWidgetDesign, countdownParts, paymentLogo, widgetColors, videoSource, widgetApplies, WIDGET_SLOTS, type WidgetConfig, type StoreWidget, type WidgetSlot } from "../src/lib/store-widgets";
+import { Accordion, Box, Button, Column, Image, Iframe, Row, Svg, Text } from "@tiendanube/nube-sdk-jsx";
+import { countdownEnd, upgradeWidgetDesign, countdownParts, paymentLogo, widgetColors, widgetApplies, WIDGET_SLOTS, type WidgetConfig, type StoreWidget, type WidgetSlot } from "../src/lib/store-widgets";
 
 const API = "https://db.vidaeventofiesta.site/api/storefront/widgets";
-export function renderWidget(w: StoreWidget, accent: string): NubeComponent {
+export function renderWidget(w: StoreWidget, accent: string, videoContext?: { storeId: string | number; productId?: number }): NubeComponent {
   const c = widgetColors(w);
   const text = (children: string, style: Parameters<typeof Text>[0]["style"] = {}) => Text({ children, style: { margin: "0px", fontSize: "14px", lineHeight: "1.4", color: c.foreground, ...style } });
   const frame = (children: NubeComponent[], style: Parameters<typeof Column>[0]["style"] = {}) => Column({ id: `plug-widget-${w.kind}`, width: "100%", children, style: { boxSizing: "border-box", minWidth: "0px", overflowWrap: "anywhere", ...style } });
@@ -24,13 +24,8 @@ export function renderWidget(w: StoreWidget, accent: string): NubeComponent {
       Column({style:{backgroundColor:c.highlight,borderRadius:"5px",padding:"10px 12px",minWidth:"50px",minHeight:"54px",boxSizing:"border-box",alignItems:"center",justifyContent:"center",gap:"2px"},children:[text(value,{fontSize:"16px",fontWeight:"700",lineHeight:"1",fontVariantNumeric:"tabular-nums"}),text(label,{fontSize:"10px",lineHeight:"1"})]})
     ])})
   ]})],{backgroundColor:c.background,borderRadius:"5px",padding:"15px",margin:"0px 0px 20px"});
-  const card = (e:StoreWidget["entries"][number],i:number) => {
-    const id=uploadedVideoId(e.url);
-    const player=id ? Iframe({ id:`plug-player-${i}`,src:`https://db.vidaeventofiesta.site/storefront-video.html?id=${id}&active=${i===0?1:0}`,width:"100%",height:"100%",sandbox:"allow-scripts allow-same-origin",style:{border:"none",display:"block",width:"100%",height:"100%",borderRadius:"12px"} })
-      : Video.Root({ width:"100%",height:"100%",autoplay:i===0,muted:true,loop:true,style:{width:"100%",height:"100%",overflow:"hidden",backgroundColor:"#171717",objectFit:"cover"},children:videoSource(e.url)==="youtube"?Video.YouTube({src:e.url,controls:false}):Video.Player({src:e.url as `https://${string}`,controls:false,aspectRatio:"9/16"})});
-    return Box({id:`plug-video-${i}`,style:{width:"32%",height:"100%",flex:"0 0 32%",minWidth:"32%",scrollSnapAlign:"start"},children:Box({style:{position:"relative",width:"100%",height:"100%",overflow:"hidden",borderRadius:"12px",backgroundColor:"#171717",pointerEvents:"none"},children:player})});
-  };
-  return Box({id:"plug-widget-videos",style:{boxSizing:"border-box",minWidth:"0px",width:"100%",margin:"20px auto",maxWidth:"1280px",paddingBottom:"16px"},children:w.entries.length ? [SideScroll({width:"100%",gap:"2%",hideScrollbar:true,style:{alignItems:"stretch",minWidth:"0px",height:"clamp(180px, 28vw, 360px)"},children:w.entries.map(card)})] : []});
+  const query = videoContext ? new URLSearchParams({store:String(videoContext.storeId),...(videoContext.productId?{product:String(videoContext.productId)}:{})}).toString() : new URLSearchParams({items:JSON.stringify(w.entries.map(e=>e.url))}).toString();
+  return Box({id:"plug-widget-videos",style:{boxSizing:"border-box",minWidth:"0px",width:"100%",margin:"20px auto",maxWidth:"1280px",height:"clamp(220px,32vw,360px)"},children:w.entries.length ? [Iframe({src:`https://db.vidaeventofiesta.site/storefront-carousel.html?${query}`,width:"100%",height:"100%",sandbox:"allow-scripts allow-same-origin",style:{border:"none",display:"block",width:"100%",height:"100%"}})] : []});
 }
 /** Worker entry point: only public configuration is fetched; no shop/customer/cart data leaves the worker. */
 export async function App(nube: NubeSDK) {
@@ -52,7 +47,7 @@ export async function App(nube: NubeSDK) {
       if (widgets.length) next.add(slot);
       const clockSlot = config.widgets.some(w => w.kind === "countdown" && w.enabled && w.slot === slot);
       if (onlyClock && !clockSlot) continue;
-      if (widgets.length) (nube.render as (slot: WidgetSlot, node: NubeComponent) => void)(slot, Column({ id: `plug-slot-${slot}`, width: "100%", gap: "16px", style:slot==="after_dynamic_section_main_product"||slot==="after_product_description"?{maxWidth:"1280px",margin:"0px auto",padding:"0px 16px",boxSizing:"border-box"}:undefined, children: widgets.map(w => renderWidget(w, config.accent)) }));
+      if (widgets.length) (nube.render as (slot: WidgetSlot, node: NubeComponent) => void)(slot, Column({ id: `plug-slot-${slot}`, width: "100%", gap: "16px", style:slot==="after_dynamic_section_main_product"||slot==="after_product_description"?{maxWidth:"1280px",margin:"0px auto",padding:"0px 16px",boxSizing:"border-box"}:undefined, children: widgets.map(w => renderWidget(w, config.accent, {storeId:nube.getState().store.id,productId})) }));
       else if (owned.has(slot)) (nube.clearSlot as (slot: WidgetSlot) => void)(slot);
     }
     // Slots owned by this app only; never clear other app content.
