@@ -3,8 +3,7 @@ import { Accordion, Box, Button, Column, Image, Iframe, Row, Svg, Text, Video } 
 import { uploadedVideoId, countdownEnd, upgradeWidgetDesign, countdownParts, paymentLogo, widgetColors, videoSource, widgetApplies, WIDGET_SLOTS, type WidgetConfig, type StoreWidget, type WidgetSlot } from "../src/lib/store-widgets";
 
 const API = "https://db.vidaeventofiesta.site/api/storefront/widgets";
-type VideoControls = { index: number; select: (index: number) => void };
-export function renderWidget(w: StoreWidget, accent: string, videoControls?: VideoControls): NubeComponent {
+export function renderWidget(w: StoreWidget, accent: string): NubeComponent {
   const c = widgetColors(w);
   const text = (children: string, style: Parameters<typeof Text>[0]["style"] = {}) => Text({ children, style: { margin: "0px", fontSize: "14px", lineHeight: "1.4", color: c.foreground, ...style } });
   const frame = (children: NubeComponent[], style: Parameters<typeof Column>[0]["style"] = {}) => Column({ id: `plug-widget-${w.kind}`, width: "100%", children, style: { boxSizing: "border-box", minWidth: "0px", overflowWrap: "anywhere", ...style } });
@@ -25,23 +24,19 @@ export function renderWidget(w: StoreWidget, accent: string, videoControls?: Vid
       Column({style:{backgroundColor:c.highlight,borderRadius:"5px",padding:"10px 12px",minWidth:"50px",minHeight:"54px",boxSizing:"border-box",alignItems:"center",justifyContent:"center",gap:"2px"},children:[text(value,{fontSize:"16px",fontWeight:"700",lineHeight:"1",fontVariantNumeric:"tabular-nums"}),text(label,{fontSize:"10px",lineHeight:"1"})]})
     ])})
   ]})],{backgroundColor:c.background,borderRadius:"5px",padding:"15px",margin:"0px 0px 20px"});
-  const index = Math.min(videoControls?.index ?? 0, Math.max(0,w.entries.length-1));
-  const card = (i:number,center:boolean) => {
-    const e=w.entries[(i+w.entries.length)%w.entries.length], id=uploadedVideoId(e.url);
-    const width=w.entries.length===1?"100%":w.entries.length===2?"48%":"32%";
-    const player=id ? Iframe({ id:`plug-player-${i}`,src:`https://db.vidaeventofiesta.site/storefront-video.html?id=${id}&active=${center?1:0}`,width:"100%",height:"100%",sandbox:"allow-scripts allow-same-origin",style:{border:"none",display:"block",width:"100%",height:"100%",borderRadius:"12px"} })
-      : Video.Root({ width:"100%",height:"100%",autoplay:center,muted:true,loop:true,style:{width:"100%",height:"100%",maxHeight:"320px",overflow:"hidden",backgroundColor:"#171717"},children:videoSource(e.url)==="youtube"?Video.YouTube({src:e.url,controls:false}):Video.Player({src:e.url as `https://${string}`,controls:false,aspectRatio:"9/16"})});
-    return Box({id:`plug-video-${i}`,style:{width,maxWidth:"180px",height:"100%",flexShrink:"1",minWidth:"0px"},children:Box({style:{position:"relative",width:"100%",height:"100%",overflow:"hidden",borderRadius:"12px",backgroundColor:"#171717",pointerEvents:"none"},children:player})});
+  const card = (e:StoreWidget["entries"][number],i:number) => {
+    const id=uploadedVideoId(e.url);
+    const player=id ? Iframe({ id:`plug-player-${i}`,src:`https://db.vidaeventofiesta.site/storefront-video.html?id=${id}&active=${i===0?1:0}`,width:"100%",height:"100%",sandbox:"allow-scripts allow-same-origin",style:{border:"none",display:"block",width:"100%",height:"100%",borderRadius:"12px"} })
+      : Video.Root({ width:"100%",height:"100%",autoplay:i===0,muted:true,loop:true,style:{width:"100%",height:"100%",overflow:"hidden",backgroundColor:"#171717"},children:videoSource(e.url)==="youtube"?Video.YouTube({src:e.url,controls:false}):Video.Player({src:e.url as `https://${string}`,controls:false,aspectRatio:"9/16"})});
+    return Box({id:`plug-video-${i}`,style:{width:"32%",height:"100%",flex:"0 0 32%",minWidth:"32%",scrollSnapAlign:"start"},children:Box({style:{position:"relative",width:"100%",height:"100%",overflow:"hidden",borderRadius:"12px",backgroundColor:"#171717",pointerEvents:"none"},children:player})});
   };
-  const arrow=(direction:number)=>Button({variant:"transparent",ariaLabel:direction<0?"Video anterior":"Video siguiente",onClick:()=>videoControls?.select((index+direction+w.entries.length)%w.entries.length),style:{width:"42px",height:"42px",minWidth:"42px",padding:"0px",border:"none",borderRadius:"50%",backgroundColor:c.background,color:c.foreground,display:"flex",alignItems:"center",justifyContent:"center"},children:Svg.Root({width:20,height:20,viewBox:"0 0 24 24",fill:"none",stroke:c.foreground,strokeWidth:2,children:Svg.Path({d:direction<0?"m15 6-6 6 6 6":"m9 6 6 6-6 6"})})});
-  return Box({id:"plug-widget-videos",style:{boxSizing:"border-box",minWidth:"0px",width:"100%",margin:"20px auto",maxWidth:"480px",paddingBottom:"16px"},children:w.entries.length ? [...(w.text?[text(w.text,{whiteSpace:"pre-wrap"})]:[]),Box({style:{display:"flex",alignItems:"stretch",justifyContent:"center",gap:"2%",width:"100%",minWidth:"0px",height:"clamp(160px, 50vw, 280px)"},children:w.entries.length>2?[card(index-1,false),card(index,true),card(index+1,false)]:w.entries.length===2?[card(index,true),card(index+1,false)]:[card(index,true)]}),...(w.entries.length>1?[Box({style:{display:"flex",justifyContent:"center",alignItems:"center",gap:"10px",marginTop:"10px",flexWrap:"wrap"},children:[arrow(-1),...w.entries.map((_,i)=>Button({ariaLabel:`Ver video ${i+1}`,onClick:()=>videoControls?.select(i),style:{width:"10px",minWidth:"10px",height:"10px",minHeight:"10px",padding:"0px",border:"none",borderRadius:"50%",backgroundColor:i===index?c.foreground:c.highlight}})),arrow(1)]})]:[])] : []});
+  return Box({id:"plug-widget-videos",style:{boxSizing:"border-box",minWidth:"0px",width:"100%",margin:"20px auto",maxWidth:"1280px",paddingBottom:"16px"},children:w.entries.length ? [Box({style:{display:"flex",alignItems:"stretch",gap:"2%",width:"100%",minWidth:"0px",height:"clamp(180px, 28vw, 360px)",overflowX:"auto",overflowY:"hidden",scrollSnapType:"x mandatory"},children:w.entries.map(card)})] : []});
 }
 /** Worker entry point: only public configuration is fetched; no shop/customer/cart data leaves the worker. */
 export async function App(nube: NubeSDK) {
   let config: WidgetConfig = { accent: "#181818", widgets: [] };
   let owned = new Set<WidgetSlot>();
   let activeStore = 0; let fetching = false;
-  const videoIndices = new Map<string,number>();
   function render(onlyClock = false) {
     const page = nube.getState().location.page;
     if (page.type === "checkout") return;
@@ -54,7 +49,7 @@ export async function App(nube: NubeSDK) {
       if (widgets.length) next.add(slot);
       const clockSlot = config.widgets.some(w => w.kind === "countdown" && w.enabled && w.slot === slot);
       if (onlyClock && !clockSlot) continue;
-      if (widgets.length) (nube.render as (slot: WidgetSlot, node: NubeComponent) => void)(slot, Column({ id: `plug-slot-${slot}`, width: "100%", gap: "16px", style:slot==="after_dynamic_section_main_product"?{maxWidth:"1280px",margin:"0px auto",padding:"0px 16px",boxSizing:"border-box"}:undefined, children: widgets.map(w => renderWidget(w, config.accent, { index:videoIndices.get(w.kind) ?? 0, select:index=>{videoIndices.set(w.kind,index);render();} })) }));
+      if (widgets.length) (nube.render as (slot: WidgetSlot, node: NubeComponent) => void)(slot, Column({ id: `plug-slot-${slot}`, width: "100%", gap: "16px", style:slot==="after_dynamic_section_main_product"||slot==="after_product_description"?{maxWidth:"1280px",margin:"0px auto",padding:"0px 16px",boxSizing:"border-box"}:undefined, children: widgets.map(w => renderWidget(w, config.accent)) }));
       else if (owned.has(slot)) (nube.clearSlot as (slot: WidgetSlot) => void)(slot);
     }
     // Slots owned by this app only; never clear other app content.

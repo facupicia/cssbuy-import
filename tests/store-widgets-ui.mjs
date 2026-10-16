@@ -60,13 +60,13 @@ try { for(const width of [1365,390]) {
     await page.locator(`#entry-title-${i}`).fill(`Video ${i+1}`);
     await page.locator(`#entry-url-${i}`).fill(`https://cdn.example.com/${i+1}.mp4`);
   }
-  await page.getByRole('button',{name:'Video siguiente',exact:true}).click();
   const videoPreview=page.getByRole('region',{name:'Vista previa del bloque'});
-  assert.equal(await videoPreview.locator('video').nth(1).getAttribute('src'),'https://cdn.example.com/2.mp4');
+  assert.equal(await videoPreview.locator('video').nth(0).getAttribute('src'),'https://cdn.example.com/1.mp4');
   const heights=await videoPreview.locator('video').evaluateAll(elements=>elements.map(e=>e.parentElement.getBoundingClientRect().height));
-  assert.ok(Math.max(...heights)<=321,'Los videos conservan una altura acotada');
+  assert.ok(Math.max(...heights)<=361,'Los videos conservan una altura acotada');
   assert.ok(Math.max(...heights)-Math.min(...heights)<1,'Todas las tarjetas tienen la misma altura');
   assert.equal(await videoPreview.locator('video[controls]').count(),0);
+  assert.equal(await videoPreview.locator('button').filter({hasText:'Video'}).count(),0);
   assert.equal(await videoPreview.getByText('Video 1',{exact:true}).count(),0);
   assert.equal(await videoPreview.locator('video').first().evaluate(e=>getComputedStyle(e).objectFit),'contain');
   await videoPreview.screenshot({path:`.impeccable/review/reference-videos-${width}.png`});

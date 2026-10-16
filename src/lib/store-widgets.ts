@@ -4,7 +4,7 @@ export type WidgetKind = typeof WIDGET_KINDS[number];
 export const WIDGET_LABELS: Record<WidgetKind, string> = { alert: "Mensaje de alerta", faq: "Preguntas frecuentes", payments: "Medios de pago", videos: "Slider de videos", countdown: "Cuenta regresiva" };
 export const WIDGET_SLOTS = { after_dynamic_section_main_product: "Al pie de la ficha, antes de productos similares", before_product_detail_name: "Arriba del nombre del producto", after_product_detail_price: "Debajo del precio", after_product_detail_shipping_options: "Debajo de las opciones de envío", before_main_content: "Barra superior del contenido", after_header: "Debajo del encabezado", after_product_description: "Después de la descripción", after_main_content: "Al final del contenido" } as const;
 export type WidgetSlot = keyof typeof WIDGET_SLOTS;
-export const REFERENCE_SLOTS: Record<WidgetKind, WidgetSlot> = { alert: "before_product_detail_name", faq: "after_dynamic_section_main_product", payments: "after_product_detail_shipping_options", videos: "after_dynamic_section_main_product", countdown: "after_product_detail_price" };
+export const REFERENCE_SLOTS: Record<WidgetKind, WidgetSlot> = { alert: "before_product_detail_name", faq: "after_product_description", payments: "after_product_detail_shipping_options", videos: "after_product_description", countdown: "after_product_detail_price" };
 export interface WidgetColors { background: string; foreground: string; highlight: string }
 export const REFERENCE_COLORS: Record<WidgetKind, WidgetColors> = {
   alert: { background: "#ef4444", foreground: "#ffffff", highlight: "#f87171" },
@@ -52,7 +52,10 @@ export function defaultWidgetConfig(): WidgetConfig {
 }
 /** Upgrade the original unstyled layout without changing content or activation. */
 export function upgradeWidgetDesign(config: WidgetConfig): WidgetConfig {
-  return { ...config, widgets: config.widgets.map(w => w.colors ? w : { ...w, slot: REFERENCE_SLOTS[w.kind], colors: { ...REFERENCE_COLORS[w.kind] } }) };
+  return { ...config, widgets: config.widgets.map(w => {
+    const slot = (w.kind === "faq" || w.kind === "videos") && w.slot === "after_dynamic_section_main_product" ? "after_product_description" : w.slot;
+    return w.colors ? { ...w, slot } : { ...w, slot: REFERENCE_SLOTS[w.kind], colors: { ...REFERENCE_COLORS[w.kind] } };
+  }) };
 }
 function text(value: unknown, limit: number): string {
   if (typeof value !== "string" || value.length > limit) throw new Error("Revisá la extensión de los textos");
