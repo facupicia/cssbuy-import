@@ -55,7 +55,6 @@ import {
   canonizar,
   compararTalles,
   tallesDeItems,
-  itemTieneTalle,
 } from "@/lib/variantes";
 import { generarSku, generarSkuParaTalle } from "@/lib/sku";
 import { fetchLiveFx } from "@/lib/fx";
@@ -86,6 +85,9 @@ import type { ProductoCotizado } from "@/lib/inventory-sync";
 import { SyncCotizacionDialog } from "@/components/inventario/SyncCotizacionDialog";
 import { MarcasDialog } from "@/components/inventario/MarcasDialog";
 import { DescripcionDialog } from "@/components/inventario/DescripcionDialog";
+import { InventoryFilters } from "@/components/inventario/InventoryFilters";
+import { InventoryPagination } from "@/components/inventario/InventoryPagination";
+import { EMPTY_INVENTORY_FILTERS, filtrarInventario, paginarInventario, categoriaInventario, colorInventario, type InventoryFilters as InventoryFilterState } from "@/lib/inventory-list";
 import { StoreProductFields } from "@/components/inventario/StoreProductFields";
 import { StorePublishDialog } from "@/components/inventario/StorePublishDialog";
 import { generarDescripcionTiendaHTML } from "@/lib/descripcion";
@@ -189,7 +191,9 @@ export default function InventarioPage() {
   const [error, setError] = useState<string | null>(null);
 
   const [search, setSearch] = useState("");
-  const [estadoFilter, setEstadoFilter] = useState<InventoryEstado | "todos">("todos");
+  const [filters, setFilters] = useState<InventoryFilterState>(EMPTY_INVENTORY_FILTERS);
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(20);
 
   const [formOpen, setFormOpen] = useState(false);
   const [editing, setEditing] = useState<InventoryItem | null>(null);
@@ -216,9 +220,7 @@ export default function InventarioPage() {
   const [confirmBulkDelete, setConfirmBulkDelete] = useState(false);
   const [orden, setOrden] = useState<OrdenInventario>("reciente");
   const [syncCotOpen, setSyncCotOpen] = useState(false);
-  const [talleFilter, setTalleFilter] = useState<string | "todos">("todos");
   const [marcas, setMarcas] = useState<Marca[]>([]);
-  const [marcaFilter, setMarcaFilter] = useState<string | "todas">("todas");
   const [marcasOpen, setMarcasOpen] = useState(false);
   const [generandoSkus, setGenerandoSkus] = useState(false);
   const [fichaDe, setFichaDe] = useState<InventoryItem | null>(null);
@@ -249,32 +251,7 @@ export default function InventarioPage() {
   const summary = useMemo(() => summarizeInventory(items), [items]);
 
   const filtered = useMemo(() => {
-    const q = search.trim().toLowerCase();
-    return items
-      .filter((it) => (estadoFilter === "todos" ? true : it.estado === estadoFilter))
-      .filter((it) => (talleFilter === "todos" ? true : itemTieneTalle(it, talleFilter)))
-      .filter((it) =>
-        marcaFilter === "todas"
-          ? true
-          : marcaFilter === "sin_marca"
-            ? !it.marcaId
-            : it.marcaId === marcaFilter
-      )
-      .filter((it) => {
-        if (!q) return true;
-        return (
-          it.nombre.toLowerCase().includes(q) ||
-          (it.sku || "").toLowerCase().includes(q) ||
-          (it.variante || "").toLowerCase().includes(q) ||
-          (parseColor(it.variante) || "").toLowerCase().includes(q) ||
-          (Array.isArray(it.talles) &&
-            it.talles.some(
-              (t) =>
-                t.talle.toLowerCase().includes(q) ||
-                (t.sku && t.sku.toLowerCase().includes(q))
-            ))
-        );
-      })
+    return filtrarInventario(items, filters, search)
       .sort((a, b) => {
         const ca = calcInventoryItem(a);
         const cb = calcInventoryItem(b);
@@ -291,7 +268,7 @@ export default function InventarioPage() {
             return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
         }
       });
-  }, [items, search, estadoFilter, talleFilter, marcaFilter, orden]);
+  }, [items, search, filters, orden]);
 
   // El SKU del ítem que se edita no cuenta como "en uso": si no, regenerarlo
   // saltaría al siguiente número sin motivo. Los SKU de cada talle sí cuentan:
@@ -310,36 +287,36 @@ export default function InventarioPage() {
     [marcas]
   );
 
-  // Solo se ofrecen marcas que tengan al menos un producto, más "sin marca"
-  // si hay alguno: ofrecer filtros vacíos es ruido.
-  const marcasConUso = useMemo(() => {
-    const usadas = new Set(items.map((i) => i.marcaId).filter(Boolean) as string[]);
-    return marcas.filter((m) => usadas.has(m.id));
-  }, [marcas, items]);
-  const haySinMarca = useMemo(() => items.some((i) => !i.marcaId), [items]);
-
+  const filterOptions = useMemo(() => {
+    const unique = (values: string[]) => [...new Set(values)].sort((a, b) => a.localeCompare(b, "es"));
+    const usedBrands = unique(items.map(i => i.marcaId || "sin_marca"));
+    return {
+      estados: Object.entries(ESTADO_LABEL).map(([value, label]) => ({ value, label })),
+      marcas: usedBrands.map(value => ({ value, label: value === "sin_marca" ? "Sin marca" : nombreMarca[value] || "Marca sin nombre" })),
+      talles: tallesDeItems(items).map(value => ({ value, label: value })),
+      colores: unique(items.map(colorInventario)).map(value => ({ value, label: value })),
+      categorias: unique(items.map(categoriaInventario)).map(value => ({ value, label: value })),
+      origenes: unique(items.map(i => i.origen)).map(value => ({ value, label: ORIGEN_LABEL[value as InventoryOrigen] })),
+      stock: [{ value: "disponible", label: "Con stock" }, { value: "bajo", label: "Poco stock (1 a 3 unidades)" }, { value: "agotado", label: "Sin stock" }],
+    };
+  }, [items, nombreMarca]);
+  const pagination = useMemo(() => paginarInventario(filtered, page, pageSize), [filtered, page, pageSize]);
+  useEffect(() => { setPage(1); setSelected(new Set()); }, [filters, search]);
   useEffect(() => {
-    if (marcaFilter === "todas" || marcaFilter === "sin_marca") return;
-    if (!marcasConUso.some((m) => m.id === marcaFilter)) setMarcaFilter("todas");
-  }, [marcasConUso, marcaFilter]);
-
-  // Solo se ofrecen los talles que existen en el inventario: una lista fija
-  // mostraría filtros que no devuelven nada.
-  const talles = useMemo(() => tallesDeItems(items), [items]);
-
-  // Si el talle filtrado deja de existir (se borró el último ítem), se limpia.
-  useEffect(() => {
-    if (talleFilter !== "todos" && !talles.includes(talleFilter)) setTalleFilter("todos");
-  }, [talles, talleFilter]);
-
-  // La selección solo tiene sentido sobre lo que se está viendo: si cambia el
-  // filtro, se descartan los ids que ya no están en pantalla.
-  const visibleIds = useMemo(() => new Set(filtered.map((it) => it.id)), [filtered]);
-  const selectedVisibles = useMemo(
-    () => filtered.filter((it) => selected.has(it.id)),
-    [filtered, selected]
-  );
-  const todosSeleccionados = filtered.length > 0 && selectedVisibles.length === filtered.length;
+    const matchingIds = new Set(filtered.map(item => item.id));
+    setSelected(current => [...current].some(id => !matchingIds.has(id)) ? new Set([...current].filter(id => matchingIds.has(id))) : current);
+  }, [filtered]);
+  useEffect(() => { setPage(1); }, [orden, pageSize]);
+  // Clamp after removing the final products on a page; don't render an empty trailing page.
+  useEffect(() => { setPage(current => Math.min(current, pagination.pages)); }, [pagination.pages]);
+  const visibleIds = useMemo(() => new Set(pagination.items.map(it => it.id)), [pagination.items]);
+  const selectedVisibles = useMemo(() => filtered.filter(it => selected.has(it.id)), [filtered, selected]);
+  const todosSeleccionados = pagination.items.length > 0 && pagination.items.every(it => selected.has(it.id));
+  function changePage(next: number) {
+    setPage(next);
+    document.getElementById("inventory-products")?.scrollIntoView({ block: "start" });
+  }
+  function clearFilters() { setFilters(EMPTY_INVENTORY_FILTERS); setSearch(""); }
 
   function toggleUno(id: string) {
     setSelected((prev) => {
@@ -686,92 +663,22 @@ export default function InventarioPage() {
           </div>
         )}
 
-        {/* Toolbar */}
-        {items.length > 0 && (
-          <div className="flex flex-wrap items-center gap-3">
-            <div className="relative w-full sm:flex-1 sm:min-w-64 max-w-md">
-              <Search className="h-3.5 w-3.5 absolute left-3 top-1/2 -translate-y-1/2 text-[var(--color-fg-subtle)]" />
-              <input
-                type="text"
-                placeholder="Buscar por nombre, SKU o variante..."
-                aria-label="Buscar productos por nombre, SKU o variante"
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-                className="w-full h-9 pl-9 pr-3 text-xs bg-[var(--color-bg-elevated)] border border-[var(--color-border)] rounded-[var(--radius)] focus:outline-none focus:border-[var(--color-border-focus)]"
-              />
-            </div>
-            <Segmented
-              size="sm"
-              value={estadoFilter}
-              onChange={(v) => setEstadoFilter(v as InventoryEstado | "todos")}
-              options={[
-                { value: "todos", label: "Todos" },
-                { value: "en_deposito", label: "En depósito" },
-                { value: "en_transito", label: "En tránsito" },
-                { value: "agotado", label: "Agotado" },
-              ]}
-            />
-            {marcasConUso.length > 0 && (
-              <label className="flex items-center gap-2">
-                <span className="text-[11px] uppercase tracking-wide text-[var(--color-fg-muted)]">
-                  Marca
-                </span>
-                <select
-                  value={marcaFilter}
-                  onChange={e => setMarcaFilter(e.target.value)}
-                  aria-label="Filtrar por marca"
-                  className="h-9 max-w-48 px-2 text-xs bg-[var(--color-bg-elevated)] border border-[var(--color-border)] rounded-[var(--radius)] focus:outline-none focus:border-[var(--color-accent)]"
-                >
-                  <option value="todas">Todas las marcas</option>
-                  {marcasConUso.map(m => <option key={m.id} value={m.id}>{m.nombre}</option>)}
-                  {haySinMarca && <option value="sin_marca">Sin marca</option>}
-                </select>
-              </label>
-            )}
-
-            {talles.length > 1 && (
-              <label className="flex items-center gap-2">
-                <span className="text-[11px] uppercase tracking-wide text-[var(--color-fg-muted)]">
-                  Talle
-                </span>
-                <select
-                  value={talleFilter}
-                  onChange={e => setTalleFilter(e.target.value)}
-                  aria-label="Filtrar por talle"
-                  className="h-9 px-2 text-xs bg-[var(--color-bg-elevated)] border border-[var(--color-border)] rounded-[var(--radius)] focus:outline-none focus:border-[var(--color-accent)]"
-                >
-                  <option value="todos">Todos</option>
-                  {talles.map(t => <option key={t} value={t}>{t}</option>)}
-                </select>
-              </label>
-            )}
-
-            <label className="flex items-center gap-2 shrink-0">
-              <span className="text-[11px] uppercase tracking-wide text-[var(--color-fg-muted)]">
-                Ordenar
-              </span>
-              <select
-                value={orden}
-                onChange={(e) => setOrden(e.target.value as OrdenInventario)}
-                aria-label="Ordenar el inventario"
-                className="h-9 px-2 text-xs bg-[var(--color-bg-elevated)] border border-[var(--color-border)] rounded-[var(--radius)] text-[var(--color-fg)] cursor-pointer focus:outline-none focus:border-[var(--color-accent)]"
-              >
-                <option value="reciente">Más reciente</option>
-                <option value="margen">Margen</option>
-                <option value="capital">Capital inmovilizado</option>
-                <option value="stock">Stock</option>
-                <option value="nombre">Nombre</option>
-              </select>
-            </label>
+        {items.length > 0 && <>
+          <div className="flex flex-wrap items-end justify-between gap-3">
+            <label className="relative w-full sm:max-w-md"><span className="sr-only">Buscar productos por nombre, SKU o variante</span><Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[var(--color-fg-muted)]" /><input type="search" placeholder="Buscar por nombre, SKU o variante…" aria-label="Buscar productos por nombre, SKU o variante" value={search} onChange={e => setSearch(e.target.value)} className="h-10 w-full rounded-lg border border-[var(--color-border)] bg-[var(--color-bg-elevated)] pl-9 pr-3 text-sm focus-visible:outline-2" /></label>
+            <label className="flex items-center gap-2 text-xs text-[var(--color-fg-muted)]">Ordenar<select value={orden} onChange={e => setOrden(e.target.value as OrdenInventario)} aria-label="Ordenar el inventario" className="h-10 rounded-lg border border-[var(--color-border)] bg-[var(--color-bg-elevated)] px-3 text-sm focus-visible:outline-2"><option value="reciente">Más reciente</option><option value="margen">Margen</option><option value="capital">Capital inmovilizado</option><option value="stock">Stock</option><option value="nombre">Nombre</option></select></label>
+            <label className="flex items-center gap-2 text-xs text-[var(--color-fg-muted)]">Por página<select aria-label="Productos por página" value={pageSize} onChange={e => setPageSize(Number(e.target.value))} className="h-10 rounded-lg border border-[var(--color-border)] bg-[var(--color-bg-elevated)] px-3 text-sm focus-visible:outline-2">{[10,20,50].map(n => <option key={n} value={n}>{n}</option>)}</select></label>
           </div>
-        )}
+          <InventoryFilters value={filters} onChange={setFilters} options={filterOptions} search={search} onClear={() => setSearch("")} />
+        </>}
 
         {/* Acciones sobre la selección */}
         {selectedVisibles.length > 0 && (
           <div className="sticky top-16 sm:top-20 z-30 flex flex-wrap items-center gap-2 rounded-[var(--radius-lg)] border border-[var(--color-accent)]/40 bg-[var(--color-accent)]/8 backdrop-blur-md px-3 py-2.5">
             <span className="text-xs font-semibold text-[var(--color-accent)]">
-              {selectedVisibles.length} {selectedVisibles.length === 1 ? "seleccionado" : "seleccionados"}
+              {selectedVisibles.length} {selectedVisibles.length === 1 ? "seleccionado" : "seleccionados"} en los resultados
             </span>
+            {selectedVisibles.length < filtered.length && <button type="button" onClick={() => setSelected(new Set(filtered.map(i => i.id)))} className="text-xs underline underline-offset-4 focus-visible:outline-2">Seleccionar los {filtered.length} resultados</button>}
             <div className="flex-1" />
             <Button
               variant="outline"
@@ -819,7 +726,7 @@ export default function InventarioPage() {
           </div>
         )}
 
-        <div className="flex items-center justify-between gap-3"><h2 className="text-base font-semibold">Productos <span className="ml-1 text-sm font-normal text-[var(--color-fg-muted)]">{filtered.length}{filtered.length !== items.length ? ` de ${items.length}` : ""}</span></h2><p className="text-xs text-[var(--color-fg-muted)]">Abrí una prenda para editar su ficha</p></div>
+        <div id="inventory-products" className="flex scroll-mt-24 flex-wrap items-center justify-between gap-3"><h2 className="text-base font-semibold">Productos <span className="ml-1 text-sm font-normal text-[var(--color-fg-muted)]">{filtered.length}{filtered.length !== items.length ? ` de ${items.length}` : ""}</span></h2><p className="text-xs text-[var(--color-fg-muted)]">Abrí una prenda para editar su ficha</p>{pagination.items.length > 0 && <label className="flex w-full items-center gap-2 text-sm lg:hidden"><input type="checkbox" aria-label="Seleccionar productos de esta página" checked={todosSeleccionados} onChange={toggleTodos} className="h-4 w-4 accent-[var(--color-accent)]" />Seleccionar esta página</label>}</div>
         {/* Contenido */}
         {loading ? (
           <div role="status" aria-label="Cargando inventario" className="space-y-3 rounded-xl border border-[var(--color-border)] bg-[var(--color-bg-elevated)] p-4"><span className="sr-only">Cargando productos…</span>{[0,1,2,3].map(i => <div key={i} className="flex items-center gap-4 motion-safe:animate-pulse"><div className="h-12 w-12 rounded-lg bg-[var(--color-bg-muted)]" /><div className="flex-1 space-y-2"><div className="h-3 w-2/5 rounded bg-[var(--color-bg-muted)]" /><div className="h-3 w-1/4 rounded bg-[var(--color-bg-subtle)]" /></div><div className="h-4 w-16 rounded bg-[var(--color-bg-muted)]" /></div>)}</div>
@@ -860,7 +767,7 @@ export default function InventarioPage() {
             icon={<PackageX className="h-6 w-6" />}
             title="Sin resultados"
             description="Probá con otro nombre o quitá los filtros para ver todas las prendas."
-            action={<Button variant="outline" onClick={() => { setSearch(""); setEstadoFilter("todos"); setMarcaFilter("todas"); setTalleFilter("todos"); }}>Limpiar filtros</Button>}
+            action={<Button variant="outline" onClick={clearFilters}>Limpiar filtros</Button>}
           />
         ) : (
           <Card padding="none" className="overflow-hidden">
@@ -874,7 +781,7 @@ export default function InventarioPage() {
                         type="checkbox"
                         checked={todosSeleccionados}
                         onChange={toggleTodos}
-                        aria-label="Seleccionar todos los ítems visibles"
+                        aria-label="Seleccionar productos de esta página"
                         className="accent-[var(--color-accent)] cursor-pointer"
                       />
                     </th>
@@ -889,7 +796,7 @@ export default function InventarioPage() {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-[var(--color-border)]">
-                  {filtered.map((it) => {
+                  {pagination.items.map((it) => {
                     const c = calcInventoryItem(it);
                     return (
                       <tr
@@ -1016,7 +923,7 @@ export default function InventarioPage() {
 
             {/* Mobile / tablet: una tarjeta por item, sin scroll horizontal */}
             <div className="lg:hidden divide-y divide-[var(--color-border)]">
-              {filtered.map((it) => {
+              {pagination.items.map((it) => {
                 const c = calcInventoryItem(it);
                 return (
                   <div
@@ -1141,6 +1048,7 @@ export default function InventarioPage() {
             </div>
           </Card>
         )}
+        {!loading && filtered.length > 0 && <InventoryPagination page={pagination.page} pages={pagination.pages} from={pagination.from} to={pagination.to} total={pagination.total} onPage={changePage} />}
       </main>
 
       {/* Dialog: nuevo / editar */}

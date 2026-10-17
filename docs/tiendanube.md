@@ -2,6 +2,12 @@
 
 En `/inventario`, crear un producto o abrir su nombre o la acción **Editar** muestra un editor de página completa con las secciones **Producto**, **Talles y stock**, **Costos y precio** y **Fotos y tienda**. En **Fotos y tienda** se administran hasta nueve fotos en un único lugar, antes de la descripción pública, la categoría y el peso de envío; la descripción es independiente de las notas internas. El descuento por transferencia y el redondeo del precio de lista se ajustan en **Costos y precio**. La barra inferior conserva las acciones **Crear producto / Guardar cambios**: guardan la ficha en el inventario, sin enviarla ni publicarla en Tiendanube. La primera foto es la portada; **Antes** cambia el orden. Las fotos se guardan como JPEG en PostgreSQL junto con la ficha. No dependen del disco efímero de Docker. Para catálogos grandes conviene migrarlas a almacenamiento de objetos, porque hoy se leen con el inventario.
 
+## Listado de inventario
+
+El listado muestra 10, 20 o 50 productos por página (20 por defecto). Podés combinar estado, marca, talle, color, categoría, origen, disponibilidad y precio de venta por transferencia. Cada filtro admite varias opciones: Bape o Supreme se combina con M o L y con los demás filtros. La disponibilidad se calcula para los talles elegidos; el rango de precio incluye ambos extremos. Los filtros activos se pueden quitar de a uno o limpiar juntos.
+
+Al cambiar de página se conservan los productos seleccionados. La casilla del encabezado selecciona únicamente la página actual; **Seleccionar los N resultados** incluye todas las páginas del resultado filtrado. Cambiar filtros o búsqueda limpia la selección. Las acciones en lote usan los seleccionados; si no hay selección, la preparación y exportación a Tiendanube usan todos los resultados filtrados, no solo la página actual. Los indicadores generales de stock y ventas siguen mostrando el inventario completo.
+
 ## Fotos uniformes antes de importar
 
 El formato del catálogo es **1280 × 1280 px**. Las fotos se centran manteniendo sus proporciones; los espacios restantes quedan blancos. No se recorta el producto, no se estira y no se elimina el fondo original. Las transparencias se convierten a blanco y se corrige la orientación de las fotos al decodificarlas. Es la recomendación para imágenes cuadradas de [Tiendanube Argentina](https://ayuda.tiendanube.com/es_AR/fotos-del-producto/como-adaptar-el-tamano-de-las-imagenes-de-mis-productos).
