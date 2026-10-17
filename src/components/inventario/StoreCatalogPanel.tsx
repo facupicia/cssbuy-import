@@ -1,6 +1,7 @@
 "use client";
 import { useEffect, useRef, useState } from "react";
 import { catalogTarget, parseCatalogChanges, type CatalogChanges, type CatalogProduct } from "@/lib/store-catalog-plan";
+import { UnsavedNavigationGuard } from "@/components/admin/UnsavedNavigationGuard";
 import { fmtARS } from "@/lib/utils";
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
@@ -100,16 +101,21 @@ export function StoreCatalogPanel({ categories, storeId, onBusyChange }: {
     if (!jobs.length && (!changes || !preview.length || preview.length > 100)) return;
     setConfirm(true);
   }
-  return <section aria-label="Catálogo de Tiendanube" className="space-y-4">
-    <div><h3 className="text-lg font-semibold">Editar artículos de Tiendanube</h3><p className="text-sm text-[var(--color-fg-muted)]">Incluye los que cargaste directamente en la tienda. Los cambios de este apartado se aplican al catálogo de Tiendanube; el inventario se edita desde su selección.</p></div>
+  return <section aria-label="Catálogo de Tiendanube" className="space-y-6">
+    <UnsavedNavigationGuard active={!running && !jobs.length && Object.keys(rawChanges).length > 0} />
+    <section aria-label="Seleccionar productos del catálogo" className="space-y-4">
+    <h2 className="text-xl font-semibold">Elegí los productos a editar</h2>
     <div className="flex flex-col items-end gap-2 sm:flex-row"><Input label="Buscar en Tiendanube" value={search} disabled={locked || loading} onChange={e => setSearch(e.target.value)} placeholder="Nombre o SKU" /><Button variant="outline" disabled={locked || loading} onClick={() => load(1)}>Buscar catálogo</Button></div>
     {error && <p role="alert" className="text-sm text-[var(--color-danger)]">{error}</p>}
     {loading && <p role="status">Cargando catálogo…</p>}
     <div className="flex flex-wrap gap-2"><Button size="sm" variant="outline" disabled={locked || !products.length} onClick={() => setSelected(old => ({ ...old, ...Object.fromEntries(products.map(p => [p.id, p])) }))}>Seleccionar esta página</Button><Button size="sm" variant="ghost" disabled={locked} onClick={() => setSelected({})}>Quitar selección del catálogo</Button><span className="self-center text-sm">{Object.keys(selected).length} seleccionados · máximo 100</span></div>
-    <div className="max-h-72 overflow-auto"><table className="w-full text-sm"><caption className="sr-only">Productos del catálogo de Tiendanube</caption><thead><tr><th className="p-2 text-left">Elegir</th><th className="p-2 text-left">Producto</th><th className="p-2 text-right">Precio de lista</th></tr></thead><tbody>{products.map(p => <tr key={p.id} className="border-t border-[var(--color-border)]"><td className="p-2"><input type="checkbox" aria-label={`Editar ${p.name} en Tiendanube`} checked={Boolean(selected[p.id])} disabled={locked} onChange={e => setSelected(old => { const next = { ...old }; if (e.target.checked) next[p.id] = p; else delete next[p.id]; return next; })} /></td><td className="p-2"><span className="block font-medium">{p.name}</span><span className="block text-xs text-[var(--color-fg-muted)]">#{p.id} · {p.visibility === "visible" ? "Publicado" : p.visibility === "unlisted" ? "Por enlace" : "Oculto"} · {p.variants.length} variantes{p.linkedItemId ? " · Vinculado al inventario" : ""}</span></td><td className="p-2 text-right tabular-nums">{price(p)}</td></tr>)}</tbody></table></div>
+    <div className="overflow-auto"><table className="w-full text-sm"><caption className="sr-only">Productos del catálogo de Tiendanube</caption><thead><tr><th className="p-2 text-left">Elegir</th><th className="p-2 text-left">Producto</th><th className="p-2 text-right">Precio de lista</th></tr></thead><tbody>{products.map(p => <tr key={p.id} className="border-t border-[var(--color-border)]"><td className="p-2"><input type="checkbox" aria-label={`Editar ${p.name} en Tiendanube`} checked={Boolean(selected[p.id])} disabled={locked} onChange={e => setSelected(old => { const next = { ...old }; if (e.target.checked) next[p.id] = p; else delete next[p.id]; return next; })} /></td><td className="p-2"><span className="block font-medium">{p.name}</span><span className="block text-xs text-[var(--color-fg-muted)]">#{p.id} · {p.visibility === "visible" ? "Publicado" : p.visibility === "unlisted" ? "Por enlace" : "Oculto"} · {p.variants.length} variantes{p.linkedItemId ? " · Vinculado al inventario" : ""}</span></td><td className="p-2 text-right tabular-nums">{price(p)}</td></tr>)}</tbody></table></div>
+    {!loading && !products.length && !error && <p className="rounded-lg bg-[var(--color-bg-subtle)] p-4 text-sm">No se encontraron productos. Probá otro nombre o SKU, o publicá un producto desde tu inventario.</p>}
     <div className="flex items-center gap-3"><Button size="sm" variant="outline" disabled={locked || loading || page === 1} onClick={() => load(page - 1)}>Página anterior</Button><span className="text-sm">Página {page}</span><Button size="sm" variant="outline" disabled={locked || loading || !hasMore} onClick={() => load(page + 1)}>Página siguiente</Button></div>
-    <fieldset disabled={locked} className="space-y-4 border-t border-[var(--color-border)] pt-4">
-      <legend className="text-sm font-semibold">Campos para modificar</legend>
+    </section>
+    <fieldset disabled={locked} className="space-y-4 rounded-xl border border-[var(--color-border)] p-4 sm:p-6">
+      <legend className="px-2 text-xl font-semibold">Prepará los cambios</legend>
+      <p className="text-sm text-[var(--color-fg-muted)]">Elegí los campos que querés modificar en los {Object.keys(selected).length} productos seleccionados. Primero vas a revisar el resultado.</p>
       <div className="grid gap-3 sm:grid-cols-2">
         <label className="space-y-1 text-sm">Precio de lista<select aria-label="Cambio de precio de lista" className={control} value={priceMode} onChange={e => setPriceMode(e.target.value)}><option value="none">Sin cambio</option><option value="percent">Aumentar o bajar un porcentaje</option><option value="fixed">Fijar el mismo precio</option></select></label>
         {priceMode !== "none" && <Input label={priceMode === "percent" ? "Variación del precio (%)" : "Nuevo precio de lista ($)"} type="number" step="0.01" value={priceValue} onChange={e => setPriceValue(e.target.value)} hint={priceMode === "percent" ? "Usá un número negativo para bajar el precio." : "Se aplica a todas las variantes seleccionadas."} />}

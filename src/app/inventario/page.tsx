@@ -89,7 +89,8 @@ import { InventoryFilters } from "@/components/inventario/InventoryFilters";
 import { InventoryPagination } from "@/components/inventario/InventoryPagination";
 import { EMPTY_INVENTORY_FILTERS, filtrarInventario, paginarInventario, categoriaInventario, colorInventario, type InventoryFilters as InventoryFilterState } from "@/lib/inventory-list";
 import { StoreProductFields } from "@/components/inventario/StoreProductFields";
-import { StorePublishDialog } from "@/components/inventario/StorePublishDialog";
+import { useRouter } from "next/navigation";
+import { adminReturnPath } from "@/lib/admin-navigation";
 import { generarDescripcionTiendaHTML } from "@/lib/descripcion";
 import { tablaDeMarca } from "@/lib/tablas-talle";
 import { precioPublicado, parseVariante } from "@/lib/tiendanube";
@@ -212,11 +213,13 @@ export default function InventarioPage() {
   const [bulkOpen, setBulkOpen] = useState(false);
   const [bulkSaving, setBulkSaving] = useState(false);
   const [exportOpen, setExportOpen] = useState(false);
-  const [publishOpen, setPublishOpen] = useState(false);
+  const router = useRouter();
+  const [publishReturn, setPublishReturn] = useState<string | null>(null);
+  const editQueryHandled = useRef(false);
   useEffect(() => {
-    if (new URLSearchParams(window.location.search).has("tiendanube")) setPublishOpen(true);
-  }, []);
-  const [returnToPublish, setReturnToPublish] = useState(false);
+    const params = new URLSearchParams(window.location.search);
+    if (params.has("tiendanube")) router.replace(`/configuracion?tiendanube=${encodeURIComponent(params.get("tiendanube") || "")}`);
+  }, [router]);
   const [confirmBulkDelete, setConfirmBulkDelete] = useState(false);
   const [orden, setOrden] = useState<OrdenInventario>("reciente");
   const [syncCotOpen, setSyncCotOpen] = useState(false);
@@ -417,7 +420,7 @@ export default function InventarioPage() {
 
   function openNew() {
     setFormError("");
-    setReturnToPublish(false);
+    setPublishReturn(null);
     setEditing(null);
     setForm(EMPTY_FORM);
     setFormOpen(true);
@@ -428,6 +431,22 @@ export default function InventarioPage() {
     setEditing(it);
     setForm(itemToForm(it));
     setFormOpen(true);
+  }
+
+  useEffect(() => {
+    if (loading || editQueryHandled.current) return;
+    const params = new URLSearchParams(window.location.search);
+    const id = params.get("editar");
+    if (!id) return;
+    editQueryHandled.current = true;
+    const item = items.find(it => it.id === id);
+    if (item) { setPublishReturn(adminReturnPath(params.get("volver"))); openEdit(item); }
+    else toast.error("El producto ya no está en el inventario");
+  }, [items, loading]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  function openPublish() {
+    const scope = selectedVisibles.length ? selectedVisibles : filtered;
+    router.push(`/tiendanube/publicar?ids=${encodeURIComponent(scope.map(item => item.id).join(","))}`);
   }
 
   async function submitForm() {
@@ -483,7 +502,7 @@ export default function InventarioPage() {
       }
       setFormOpen(false);
       await load();
-      if (returnToPublish) { setReturnToPublish(false); setPublishOpen(true); }
+      if (publishReturn) router.push(publishReturn);
     } catch (err: any) {
       const message = err?.info?.error || err?.message || "Revisá la conexión y volvé a guardar. Tus cambios siguen en esta ficha.";
       setFormError(message);
@@ -592,7 +611,7 @@ export default function InventarioPage() {
             >
               Importar de CSSBuy
             </Button>
-            <Button variant="outline" size="sm" icon={<Store className="h-3.5 w-3.5" />} onClick={() => { setReturnToPublish(false); setPublishOpen(true); }}>Tiendanube</Button>
+            <Button variant="outline" size="sm" icon={<Store className="h-3.5 w-3.5" />} onClick={openPublish}>Tiendanube</Button>
             <Menu>
               <MenuTrigger asChild>
                 <Button variant="outline" size="sm" icon={<MoreHorizontal className="h-3.5 w-3.5" />}>
@@ -609,7 +628,7 @@ export default function InventarioPage() {
                 <MenuItem icon={<Store className="h-3.5 w-3.5" />} disabled={items.length === 0} onSelect={() => setExportOpen(true)}>
                   Exportar a Tiendanube
                 </MenuItem>
-                <MenuItem icon={<Store className="h-3.5 w-3.5" />} onSelect={() => setPublishOpen(true)}>
+                <MenuItem icon={<Store className="h-3.5 w-3.5" />} onSelect={openPublish}>
                   Preparar y publicar productos
                 </MenuItem>
               </MenuContent>
@@ -702,7 +721,7 @@ export default function InventarioPage() {
               variant="outline"
               size="sm"
               icon={<Store className="h-3.5 w-3.5" />}
-              onClick={() => setPublishOpen(true)}
+              onClick={openPublish}
             >
               A Tiendanube
             </Button>
@@ -1054,7 +1073,7 @@ export default function InventarioPage() {
       {/* Dialog: nuevo / editar */}
       <ProductEditor
         open={formOpen}
-        onOpenChange={next => { setFormOpen(next); if (!next && returnToPublish) { setReturnToPublish(false); setPublishOpen(true); } }}
+        onOpenChange={next => { setFormOpen(next); if (!next && publishReturn) router.push(publishReturn); }}
         error={formError}
         form={form}
         setForm={setForm}
@@ -1113,15 +1132,6 @@ export default function InventarioPage() {
         onApply={aplicarBulk}
       />
 
-      {/* Exportar a Tiendanube: lo seleccionado, o todo lo filtrado */}
-      <StorePublishDialog
-        open={publishOpen}
-        onOpenChange={setPublishOpen}
-        items={selectedVisibles.length > 0 ? selectedVisibles : filtered}
-        marcas={marcas}
-        onChanged={load}
-        onEdit={(item) => { setReturnToPublish(true); openEdit(item); }}
-      />
       <TiendanubeExportDialog
         open={exportOpen}
         onOpenChange={setExportOpen}

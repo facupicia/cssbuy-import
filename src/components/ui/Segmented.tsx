@@ -48,6 +48,7 @@ export function Segmented<T extends string = string>({
           <button
             key={opt.value}
             type="button"
+            aria-pressed={isSelected}
             onClick={() => onChange(opt.value)}
             className={cn(
               "inline-flex items-center justify-center gap-1.5 font-medium rounded-[var(--radius-sm)] transition-all cursor-pointer",

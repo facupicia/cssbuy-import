@@ -34,5 +34,6 @@ export async function DELETE(request: Request) {
   if (!isReportingOrigin(request)) return NextResponse.json({ error: "Origen no permitido" }, { status: 403 });
   const response = NextResponse.json({ ok: true });
   response.cookies.set(STORE_COOKIE, "", { path: "/api", maxAge: 0 });
+  response.cookies.set("reporting_session", "", { path: "/api", maxAge: 0 });
   return response;
 }

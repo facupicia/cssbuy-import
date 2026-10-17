@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
+  Settings,
   Calculator,
   FileText,
   Boxes,
@@ -24,7 +25,7 @@ const links = [
   { href: "/cotizaciones", label: "Cotizaciones", icon: FileText },
   { href: "/inventario", label: "Inventario", icon: Boxes },
   { href: "/publicidad", label: "Publicidad", icon: ChartNoAxesCombined },
-  { href: "/tienda", label: "Tienda", icon: Store },
+  { href: "/tiendanube/publicar", label: "Tienda", icon: Store },
 ];
 
 export function Navbar({
@@ -87,7 +88,7 @@ export function Navbar({
           {/* Navegación (desktop) */}
           <nav className="hidden md:flex items-center gap-1">
             {links.map((link) => {
-              const active = pathname === link.href;
+              const active = pathname === link.href || (link.label === "Tienda" && (pathname.startsWith("/tiendanube") || pathname === "/tienda"));
               const Icon = link.icon;
               return (
                 <Link
@@ -177,6 +178,7 @@ export function Navbar({
               </Menu>
             )}
 
+            <Link href="/configuracion" aria-label="Configuración" title="Configuración" aria-current={pathname === "/configuracion" ? "page" : undefined} className="flex h-10 w-10 items-center justify-center rounded-lg text-[var(--color-fg-muted)] hover:bg-[var(--color-bg-subtle)] hover:text-[var(--color-fg)] focus-visible:outline-2"><Settings className="h-4 w-4" /></Link>
             <button
               onClick={toggleDarkMode}
               className="w-8 h-8 rounded-[var(--radius)] flex items-center justify-center text-[var(--color-fg-muted)] hover:text-[var(--color-fg)] hover:bg-[var(--color-bg-subtle)] border border-[var(--color-border)] transition-colors cursor-pointer"
@@ -193,7 +195,7 @@ export function Navbar({
       <nav className="md:hidden fixed bottom-0 inset-x-0 z-40 border-t border-[var(--color-border)] bg-[var(--color-bg-elevated)]/95 backdrop-blur-md">
         <div className="grid grid-cols-5">
           {links.map((link) => {
-            const active = pathname === link.href;
+            const active = pathname === link.href || (link.label === "Tienda" && (pathname.startsWith("/tiendanube") || pathname === "/tienda"));
             const Icon = link.icon;
             return (
               <Link

@@ -8,7 +8,7 @@ export async function GET(request: Request) {
   const url = new URL(request.url);
   const origin = panelOrigin(request);
   const redirect = (result: string) => {
-    const response = NextResponse.redirect(`${origin}/inventario?tiendanube=${result}`, 303);
+    const response = NextResponse.redirect(`${origin}/configuracion?tiendanube=${result}`, 303);
     response.headers.set("Cache-Control", PRIVATE_HEADERS["Cache-Control"]);
     response.headers.set("Referrer-Policy", "no-referrer");
     response.cookies.set(OAUTH_COOKIE, "", { path: CALLBACK_PATH.slice(0, CALLBACK_PATH.lastIndexOf("/")), maxAge: 0 });

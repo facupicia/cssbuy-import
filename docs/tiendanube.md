@@ -20,6 +20,19 @@ Los archivos del equipo se procesan en el navegador. Para enlaces, `/api/inventa
 
 Desde la acción directa **Tiendanube** o **Herramientas → Preparar y publicar productos** se revisan los productos seleccionados, o los filtrados si no hay selección. Se muestran precio publicado, SKU, stock por talle, validaciones y advertencias. Al editar una ficha desde esta revisión se abre el mismo editor; después de guardar o salir se vuelve a la revisión para decidir el envío. Salir con cambios sin guardar pide confirmar que se descarten. Guardar la ficha no inicia la publicación. La ficha se puede preparar sin credenciales de Tiendanube.
 
+## Centro de Tiendanube
+
+El botón **Tiendanube** abre `/tiendanube/publicar`, una página completa. Conserva en la dirección los IDs seleccionados o filtrados desde Inventario; editar una ficha lleva a `/inventario?editar=…&volver=…` y guardar o cancelar vuelve a esa misma selección. El destino de regreso se limita a pantallas conocidas del panel.
+
+Las tareas tienen páginas separadas y navegación común:
+
+- **Publicar productos**: revisión individual o publicación en lote del inventario, con búsqueda, filtro de fichas completas y estado de vinculación. Cada envío exige confirmar su alcance. Un producto vinculado se identifica como actualización y conserva las advertencias sobre stock.
+- **Editar catálogo**, `/tiendanube/catalogo`: consulta y edición de productos que ya están en Tiendanube. La elección de productos, los campos a modificar y la vista previa están separados. Salir por un enlace con cambios preparados pide descartarlos. La cola iniciada conserva su recuperación por tienda en el navegador.
+- **Personalizar tienda**, `/tienda`: bloques visuales y sus borradores.
+- **Conexión y acceso**, `/configuracion`: ingreso común, cierre global del navegador y configuración de la app privada. El retorno OAuth llega a esta pantalla; los enlaces antiguos con `inventario?tiendanube=…` se redirigen allí.
+
+El único formulario de contraseña está en Configuración, accesible desde el engranaje de la navegación. `/api/admin/session` usa la sesión administrativa existente de una hora y la comparte con publicación, catálogo, personalización, CSSBuy y reportes. La cookie continúa siendo HttpOnly, SameSite estricto y limitada a `/api`; cerrar el acceso elimina también la antigua sesión independiente de publicidad. La clave de integración de solo lectura conserva sus permisos anteriores. Los reportes siguen requiriendo su configuración de servidor. No se cambia ni se expone la contraseña guardada en el servidor.
+
 ## Configuración privada
 
 ### App privada para el plan Esencial
@@ -34,7 +47,7 @@ Crear una app externa en el [Portal de Socios](https://partners.tiendanube.com),
 | URL de redirección | `https://db.vidaeventofiesta.site/api/tiendanube/oauth/callback` |
 | Permisos | Lectura y escritura de productos (`write_products`, que incluye lectura, variantes, imágenes y categorías) |
 
-En **Inventario → Herramientas → Preparar y publicar productos**, ingresar con la contraseña de administración. La sección **Conexión con Tiendanube** permite cargar el ID de la app, la clave secreta, el correo de contacto y el dominio de la tienda. **Guardar app** conserva la configuración cifrada; no solicita autorización ni publica productos. **Autorizar conexión en Tiendanube** abre el administrador de la tienda para que el propietario acepte sus permisos y vuelva automáticamente al inventario.
+En **Configuración**, ingresar con la contraseña de administración. La sección **Conexión con Tiendanube** permite cargar el ID de la app, la clave secreta, el correo de contacto y el dominio de la tienda. **Guardar app** conserva la configuración cifrada; no solicita autorización ni publica productos. **Autorizar conexión en Tiendanube** abre el administrador de la tienda para que el propietario acepte sus permisos y vuelva automáticamente a Configuración.
 
 El callback intercambia el código en el servidor, verifica `write_products`, el ID, el dominio y que la moneda sea ARS, y comprueba lectura de productos. Si se autoriza otra tienda, no se reemplaza la conexión anterior. La primera prueba de escritura se realiza luego desde la vista previa de un producto usando **Guardar oculto**. No se realizan altas ni publicaciones automáticas al conectar.
 
@@ -57,7 +70,7 @@ ADMIN_PASSWORD=
 BUSINESS_APP_ORIGIN=https://tu-panel.example
 ```
 
-La contraseña debe tener al menos 12 caracteres. La sesión de publicación dura una hora, usa una cookie HttpOnly y no comparte la clave de lectura del panel de publicidad. Los tokens nunca se envían al navegador. Reiniciar el servidor al cambiar variables. La interfaz permite comprobar la conexión, ingresar y elegir una categoría existente. No se crean categorías automáticamente. En tiendas con varios depósitos, `TIENDANUBE_LOCATION_ID` debe identificar el depósito representado por este inventario.
+La contraseña debe tener al menos 12 caracteres. La sesión de administración dura una hora y usa una cookie HttpOnly. También permite consultar publicidad; la clave de lectura externa sigue siendo independiente. Los tokens nunca se envían al navegador. Reiniciar el servidor al cambiar variables. Configuración permite ingresar y comprobar la conexión. Publicar productos permite elegir una categoría existente. No se crean categorías automáticamente. En tiendas con varios depósitos, `TIENDANUBE_LOCATION_ID` debe identificar el depósito representado por este inventario.
 
 ## Envío y reintentos
 
@@ -127,7 +140,7 @@ Las fotos se suben por `attachment` o URL HTTPS. Se registran sus IDs para reord
 
 ## Verificación del desarrollo
 
-`npx tsx --test tests/photos.test.ts tests/tiendanube.test.ts tests/publicidad.test.ts tests/store-connection.test.ts` verifica normalización de fotos, márgenes, transparencia, validaciones, protección de enlaces, separación de notas, cálculo de precios, permisos, cifrado, estado OAuth, dominio autorizado, creación y recuperación de IDs remotos con servicios simulados. Con el servidor en el puerto 3001, `node tests/tiendanube-ui.mjs` verifica la galería y el envío y `node tests/tiendanube-connection-ui.mjs` verifica el formulario de conexión y el regreso al inventario, en escritorio y móvil. Ninguno escribe en servicios reales. `npm run build` valida la compilación. El comando de lint preexistente no funciona porque falta `eslint.config.*` en el proyecto.
+`npx tsx --test tests/photos.test.ts tests/tiendanube.test.ts tests/publicidad.test.ts tests/store-connection.test.ts` verifica normalización de fotos, márgenes, transparencia, validaciones, protección de enlaces, separación de notas, cálculo de precios, permisos, cifrado, estado OAuth, dominio autorizado, creación y recuperación de IDs remotos con servicios simulados. Con el servidor en el puerto 3001, `node tests/tiendanube-ui.mjs` verifica la galería y el envío y `node tests/tiendanube-connection-ui.mjs` verifica el formulario de conexión y el regreso a Configuración, en escritorio y móvil. Ninguno escribe en servicios reales. `npm run build` valida la compilación. El comando de lint preexistente no funciona porque falta `eslint.config.*` en el proyecto.
 
 ## Stock y precios
 

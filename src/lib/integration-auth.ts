@@ -1,6 +1,8 @@
 import { createHash, createHmac, timingSafeEqual } from "node:crypto";
 import { NextResponse } from "next/server";
 
+import { storeAuthenticated } from "./admin-session";
+
 export const PRIVATE_HEADERS = { "Cache-Control": "private, no-store" };
 let windowStart = 0;
 let requests = 0;
@@ -40,7 +42,7 @@ export function authorizeIntegration(request: Request): NextResponse | null {
       { status: 503, headers: PRIVATE_HEADERS });
   }
   const supplied = request.headers.get("authorization") ?? "";
-  if (!secretMatches(supplied, `Bearer ${key}`) && !validSession(request, key)) {
+  if (!secretMatches(supplied, `Bearer ${key}`) && !validSession(request, key) && !storeAuthenticated(request)) {
     return NextResponse.json({ error: "Acceso no autorizado." },
       { status: 401, headers: { ...PRIVATE_HEADERS, "WWW-Authenticate": "Bearer" } });
   }

@@ -1,5 +1,7 @@
 "use client";
 import { useCallback, useEffect, useState } from "react";
+import { AdminAccessNotice } from "@/components/admin/AdminAccessNotice";
+import { StoreNavigation } from "@/components/store/StoreNavigation";
 import { Navbar } from "@/components/Navbar";
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
@@ -14,7 +16,7 @@ async function json<T>(url: string, init?: RequestInit): Promise<T> {
 }
 function localTime(iso: string) { if (!iso) return ""; const date = new Date(iso); if (!Number.isFinite(date.getTime())) return ""; return new Date(date.getTime() - date.getTimezoneOffset() * 60000).toISOString().slice(0,16); }
 export default function StorePage() {
-  const [session, setSession] = useState<boolean | null>(null); const [password, setPassword] = useState("");
+  const [session, setSession] = useState<boolean | null>(null);
   const [saved, setSaved] = useState<Saved | null>(null); const [config, setConfig] = useState<WidgetConfig | null>(null);
   const [uploading,setUploading]=useState(false);
   const [kind, setKind] = useState<WidgetKind>("alert"); const [busy, setBusy] = useState(false); const [error, setError] = useState(""); const [notice, setNotice] = useState(""); const [confirm, setConfirm] = useState(false);
@@ -34,11 +36,12 @@ export default function StorePage() {
     setSearching(true); setError(""); try { const result = await json<{ products: Product[]; hasMore: boolean; storeId: string }>(`/api/tiendanube/catalog?page=${nextPage}&q=${encodeURIComponent(query)}`); if (result.storeId !== saved?.storeId) throw new Error("Cambió la tienda conectada. Recargá la página"); setProducts(result.products); setNames(n => ({ ...n, ...Object.fromEntries(result.products.map(p => [p.id,p.name])) })); setPage(nextPage); setMore(result.hasMore); } catch(e) { setError((e as Error).message); } finally { setSearching(false); }
   }
   return <><Navbar /><main className="max-w-7xl mx-auto px-4 sm:px-6 pt-8 pb-24 space-y-8">
+    <StoreNavigation />
     <div className="flex flex-wrap justify-between items-start gap-4"><div><h1 className="text-3xl font-semibold">Personalizar tienda</h1><p className="text-sm text-[var(--color-fg-muted)] mt-2">Prepará los bloques que acompañan a tus productos en Tiendanube.</p></div>{config && <div className="flex gap-3"><Button disabled={busy || uploading} onClick={() => void save(false)}>Guardar borrador</Button><Button variant="primary" disabled={busy || uploading} onClick={() => { try { parseWidgetConfig(config); setConfirm(true); setError(""); } catch(e) { setError((e as Error).message); } }}>Publicar versión</Button></div>}</div>
     {error && <p role="alert" className="rounded-lg border border-[var(--color-danger)] p-4 text-sm text-[var(--color-danger)]">{error}</p>}
     {notice && <p role="status" className="rounded-lg border border-[var(--color-border)] p-4 text-sm">{notice}</p>}
     {session === null && !error && <div className="h-40 bg-[var(--color-bg-subtle)] rounded-xl animate-pulse" aria-label="Cargando configuración" />}
-    {session === false && <form className="max-w-lg space-y-4 border border-[var(--color-border)] rounded-xl p-6" onSubmit={async e => { e.preventDefault(); setBusy(true); setError(""); try { await json("/api/tiendanube/session", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ password }) }); setPassword(""); await load(); } catch(e) { setError((e as Error).message); } finally { setBusy(false); } }}><h2 className="text-lg font-semibold">Acceso de administración</h2><p className="text-sm text-[var(--color-fg-muted)]">Usá la misma contraseña que para publicar productos.</p><Input label="Contraseña" type="password" autoComplete="current-password" value={password} onChange={e => setPassword(e.target.value)} required /><Button type="submit" variant="primary" disabled={busy || uploading}>Ingresar</Button></form>}
+    {session === false && <AdminAccessNotice returnTo="/tienda" />}
     {session && !config && <Button disabled={busy || uploading} onClick={() => void load()}>Reintentar carga</Button>}
     {saved && config && widget && <>
       <div className="rounded-xl bg-[var(--color-bg-subtle)] p-4 space-y-2 text-sm"><p className="font-semibold">{saved.installation?.status === "active" ? `Script activo en Tiendanube · versión ${saved.installation.version ?? "actual"}` : "Activación visual pendiente de verificar en Tiendanube"}</p><p>{saved.installation?.status === "active" ? "Tiendanube confirma la instalación del script. Los cambios pueden demorar hasta diez minutos; verificá un bloque en la tienda después de la primera interacción. La instalación no confirma por sí sola que el bloque se vea." : "Podés editar y guardar. Para que aparezcan los bloques, primero hay que registrar el script de PLUG con NubeSDK en el Portal de Socios."}</p><p className="text-[var(--color-fg-muted)]">{dirty ? "Tenés cambios sin guardar." : "Borrador guardado."} {saved.publishedAt ? `Última publicación: ${new Date(saved.publishedAt).toLocaleString("es-AR")}.` : "Todavía no hay una versión publicada."}</p></div>

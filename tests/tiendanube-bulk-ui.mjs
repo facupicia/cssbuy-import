@@ -45,14 +45,17 @@ try {
     async function open() {
       await page.getByRole("button", { name: "Herramientas", exact: true }).click();
       await page.getByRole("menuitem", { name: "Preparar y publicar productos", exact: true }).click();
-      await page.getByText("Credenciales configuradas", { exact: true }).waitFor();
+      await page.getByText("Tiendanube conectada", { exact: true }).waitFor();
     }
-    await page.goto("http://localhost:3001/inventario"); await open();
-    await page.getByText("Publicación masiva · 3 productos en esta selección", { exact: true }).click();
+    await page.goto(`${process.env.TEST_BASE_URL || "http://localhost:3001"}/inventario`); await open();
+    await page.getByRole("button", { name: "Publicar en lote", exact: true }).click();
     await page.getByRole("button", { name: "Seleccionar listos", exact: true }).click();
     assert.equal(await page.getByLabel("Incluir Campera incompleta en el lote", { exact: true }).isDisabled(), true);
     await page.getByRole("button", { name: "Publicar 2 seleccionados", exact: true }).click(); assert.equal(uploads.length, 0);
     await page.getByRole("button", { name: "Confirmar lote de publicación", exact: true }).click();
+    await page.getByRole("link", { name: "Configuración", exact: true }).click();
+    await page.getByRole("status").filter({ hasText: "Hay un envío en curso" }).waitFor();
+    assert.ok(page.url().includes("/tiendanube/publicar"));
     await page.getByText("Lote terminado: 1 completados y 1 con error.", { exact: true }).waitFor();
     assert.equal(uploads.length, 2); assert.equal(uploads[1].productId, "200"); assert.equal(uploads[0].storeId, "99");
     await page.getByRole("button", { name: "Seleccionar fallidos", exact: true }).click();
@@ -60,7 +63,7 @@ try {
     await page.getByRole("button", { name: "Confirmar lote de publicación", exact: true }).click();
     await page.getByText("Lote terminado: 1 completados y 0 con error.", { exact: true }).waitFor();
     assert.equal(uploads.filter(u => u.id === base.id).length, 1);
-    await page.getByRole("button", { name: "Editar catálogo de Tiendanube", exact: true }).click();
+    await page.getByRole("link", { name: "Editar catálogo", exact: true }).click();
     await page.getByText("Remera remota", { exact: true }).waitFor();
     await page.getByRole("button", { name: "Seleccionar esta página", exact: true }).click();
     await page.getByLabel("Cambio de precio de lista", { exact: true }).selectOption("percent");
@@ -69,8 +72,7 @@ try {
     await page.getByRole("button", { name: "Confirmar edición del catálogo", exact: true }).click();
     await page.getByText("0 completados · 1 con error · 1 pendientes.", { exact: true }).waitFor();
     const firstOperation = catalogAttempts[0].operationId;
-    await page.reload(); await open();
-    await page.getByRole("button", { name: "Editar catálogo de Tiendanube", exact: true }).click();
+    await page.reload();
     await page.getByText("Lote recuperado. Podés revisar sus resultados y retomar los pendientes.", { exact: true }).waitFor();
     await page.getByRole("button", { name: "Reintentar pendientes y fallidos", exact: true }).click();
     await page.getByRole("button", { name: "Confirmar edición del catálogo", exact: true }).click();
@@ -80,7 +82,8 @@ try {
     assert.deepEqual(catalogAttempts[1].changes, { price: { mode: "percent", value: 10 } });
     assert.equal(await page.evaluate(() => document.documentElement.scrollWidth > innerWidth), false);
     await page.getByRole("button", { name: "Nueva edición / actualizar catálogo", exact: true }).scrollIntoViewIfNeeded();
-    await page.getByRole("dialog", { name: "Preparar productos para Tiendanube" }).screenshot({ path: `.impeccable/review/tiendanube-bulk-${width}.png` });
+    await page.evaluate(async () => { window.scrollTo(0,0); await new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r))); });
+    await page.screenshot({ path: `.impeccable/review/tiendanube-bulk-${width}.png`, fullPage: true });
     await page.close(); console.log(`Tiendanube lotes ${width}px: publicación, errores parciales, catálogo remoto y recuperación tras recarga OK`);
   }
 } finally { await browser.close(); }

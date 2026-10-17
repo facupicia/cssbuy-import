@@ -55,8 +55,8 @@ export function StoreInventoryBatch({ items, marcas, links, storeId, enabled, bu
     } catch { setProgress("El envío terminó, pero no se pudo refrescar la lista. Comprobá la conexión antes de continuar."); }
     finally { setRunning(false); onBusyChange(false); }
   }
-  return <details className="space-y-3 rounded-lg border border-[var(--color-border)] p-3">
-    <summary className="cursor-pointer text-sm font-semibold">Publicación masiva · {items.length} productos en esta selección</summary>
+  return <section aria-label="Publicación en lote" className="space-y-3 rounded-lg border border-[var(--color-border)] p-3">
+    <h2 className="text-lg font-semibold">Publicación masiva · {items.length} productos en esta selección</h2>
     <p className="text-sm text-[var(--color-fg-muted)]">Elegí los productos listos para crear o actualizar en Tiendanube. Se envían ficha, fotos, precios y stock del inventario.</p>
     <div className="flex flex-wrap gap-2">
       <Button size="sm" variant="outline" disabled={busy} onClick={() => setSelected(new Set(items.filter(ready).map(i => i.id)))}>Seleccionar listos</Button>
@@ -79,5 +79,5 @@ export function StoreInventoryBatch({ items, marcas, links, storeId, enabled, bu
     <ConfirmDialog open={confirm !== null} onOpenChange={v => { if (!v) setConfirm(null); }} title={`${confirm === "visible" ? "Publicar" : "Guardar ocultos"} ${chosen.length} productos`}
       description="Se enviarán los productos marcados de la vista previa, con sus fotos, precios y stock. Cada producto tendrá su propio resultado; los errores no deshacen los que ya terminaron."
       variant="primary" confirmText="Confirmar lote de publicación" onConfirm={run} />
-  </details>;
+  </section>;
 }

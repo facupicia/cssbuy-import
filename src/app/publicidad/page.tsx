@@ -1,10 +1,11 @@
 "use client";
 
-import { useCallback, useEffect, useState, type FormEvent } from "react";
+import { useCallback, useEffect, useState } from "react";
+import Link from "next/link";
+import { AdminAccessNotice } from "@/components/admin/AdminAccessNotice";
 import { Navbar } from "@/components/Navbar";
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
-import { Card } from "@/components/ui/Card";
 import type { normalizeInsight } from "@/lib/meta-report";
 import { DEFAULT_SELLING_COSTS, type productAdEconomics, type SellingCosts } from "@/lib/profitability";
 
@@ -30,7 +31,6 @@ const COST_LABELS: Record<keyof SellingCosts, string> = {
 
 export default function PublicidadPage() {
   const [unlocked, setUnlocked] = useState(false);
-  const [password, setPassword] = useState("");
   const [range, setRange] = useState(initialRange);
   const [costs, setCosts] = useState({ ...DEFAULT_SELLING_COSTS });
   const [appliedCosts, setAppliedCosts] = useState<SellingCosts | null>(null);
@@ -38,7 +38,6 @@ export default function PublicidadPage() {
   const [products, setProducts] = useState<Product[] | null>(null);
   const [campaignError, setCampaignError] = useState("");
   const [costError, setCostError] = useState("");
-  const [loginError, setLoginError] = useState("");
   const [loading, setLoading] = useState(false);
   const [reportedRange, setReportedRange] = useState<typeof range | null>(null);
 
@@ -80,30 +79,6 @@ export default function PublicidadPage() {
     return () => { active = false; };
   }, [unlocked, loadReports]);
 
-  async function login(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault(); setLoading(true); setLoginError("");
-    try {
-      const response = await fetch("/api/publicidad/session", {
-        method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ password }),
-      });
-      const body = await response.json();
-      if (!response.ok) throw new Error(body.error);
-      setPassword(""); setUnlocked(true);
-      await loadReports();
-    } catch (error) { setLoginError(error instanceof Error ? error.message : "No se pudo abrir el panel."); }
-    finally { setLoading(false); }
-  }
-
-  async function logout() {
-    setLoading(true); setLoginError("");
-    try {
-      const response = await fetch("/api/publicidad/session", { method: "DELETE" });
-      if (!response.ok) throw new Error("No se pudo cerrar la sesión. Reintentá.");
-      setUnlocked(false); setCampaigns(null); setProducts(null);
-    } catch (error) { setLoginError((error as Error).message); }
-    finally { setLoading(false); }
-  }
-
   return <>
     <Navbar />
     <main className="max-w-7xl mx-auto px-4 sm:px-6 py-8 pb-24 space-y-8">
@@ -112,19 +87,10 @@ export default function PublicidadPage() {
           <h1 className="text-3xl font-semibold text-balance">Publicidad y rentabilidad</h1>
           <p className="text-sm text-[var(--color-fg-muted)] max-w-2xl text-pretty">Consultá el rendimiento de Meta y calculá cuánto podés pagar por una venta con los costos de tu inventario.</p>
         </div>
-        {unlocked && <Button variant="outline" disabled={loading} onClick={logout}>Cerrar sesión</Button>}
+        <Link href="/configuracion" className="text-sm underline underline-offset-4">Gestionar acceso</Link>
       </div>
 
-      {!unlocked ? <Card padding="lg" className="max-w-lg space-y-4">
-        <h2 className="text-xl font-semibold">Abrir panel privado</h2>
-        <p className="text-sm text-[var(--color-fg-muted)]">Usá la contraseña de administración configurada para este negocio.</p>
-        <form onSubmit={login} className="space-y-4">
-          <Input label="Contraseña de administración" type="password" autoComplete="current-password" required value={password} onChange={e => setPassword(e.target.value)} />
-          {loginError && <p role="alert" className="text-sm text-[var(--color-danger)]">{loginError}</p>}
-          <Button type="submit" disabled={loading}>{loading ? "Abriendo panel…" : "Abrir panel"}</Button>
-        </form>
-      </Card> : <>
-        {loginError && <p role="alert" className="text-sm text-[var(--color-danger)]">{loginError}</p>}
+      {!unlocked ? <AdminAccessNotice returnTo="/publicidad" /> : <>
         <form onSubmit={e => { e.preventDefault(); void loadReports(); }} className="space-y-6">
           <div className="flex flex-wrap items-end gap-4">
             <div><Input label="Desde" type="date" required value={range.since} max={range.until} onChange={e => setRange({ ...range, since: e.target.value })} /></div>

@@ -19,7 +19,7 @@ try {
       const ok = value => route.fulfill({ contentType: "application/json", body: JSON.stringify(value) });
       if (url.pathname === "/api/inventario") return ok({ items: [] });
       if (url.pathname === "/api/marcas") return ok({ marcas: [] });
-      if (url.pathname === "/api/tiendanube/session") {
+      if ((url.pathname === "/api/tiendanube/session" || url.pathname === "/api/admin/session")) {
         if (request.method() === "POST") { authenticated = true; return ok({ ok: true }); }
         return ok({ configured, authenticated, adminConfigured: true, storeId: configured && authenticated ? "99" : undefined });
       }
@@ -33,12 +33,10 @@ try {
       return ok({});
     });
     await page.route("https://plugrosario.xyz/admin/apps/123/authorize*", route => route.fulfill({ contentType: "text/html", body: "<h1>Autorización de prueba</h1>" }));
-    await page.goto("http://localhost:3001/inventario");
-    await page.getByRole("button", { name: "Herramientas", exact: true }).click();
-    await page.getByRole("menuitem", { name: "Preparar y publicar productos", exact: true }).click();
+    await page.goto(`${process.env.TEST_BASE_URL || "http://localhost:3001"}/configuracion`);
     await page.getByLabel("Contraseña de administración", { exact: true }).fill("contraseña-de-prueba");
-    await page.getByRole("button", { name: "Ingresar", exact: true }).click();
-    const dialog = page.getByRole("dialog");
+    await page.getByRole("button", { name: "Habilitar acceso", exact: true }).click();
+    const dialog = page.getByRole("main");
     await dialog.getByLabel("URL de retorno para configurar en Tiendanube", { exact: true }).waitFor();
     assert.equal(await dialog.getByLabel("URL de retorno para configurar en Tiendanube", { exact: true }).inputValue(), callbackUrl);
     await dialog.getByLabel("Correo de contacto de la integración", { exact: true }).fill("contacto@example.com");
@@ -50,14 +48,15 @@ try {
     assert.equal(await dialog.getByLabel("Clave secreta de la aplicación", { exact: true }).inputValue(), "");
     assert.ok(!(await dialog.innerText()).includes(savedApp.clientSecret));
     await dialog.getByRole("button", { name: "Autorizar conexión en Tiendanube", exact: true }).scrollIntoViewIfNeeded();
-    await dialog.screenshot({ path: `.impeccable/review/conexion-${width}.png` });
+    await page.evaluate(async () => { window.scrollTo(0,0); await new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r))); });
+    await page.screenshot({ path: `.impeccable/review/conexion-${width}.png`, fullPage: true });
     assert.equal(await page.evaluate(() => document.documentElement.scrollWidth > innerWidth), false);
     await dialog.getByRole("button", { name: "Autorizar conexión en Tiendanube", exact: true }).click();
     await page.waitForURL("https://plugrosario.xyz/admin/apps/123/authorize?state=test");
     configured = true;
-    await page.goto("http://localhost:3001/inventario?tiendanube=connected");
-    await page.getByRole("dialog").getByText("Tiendanube conectada. Ya podés elegir categorías y preparar un producto para enviarlo.", { exact: true }).waitFor();
-    await page.getByRole("dialog").getByText("PLUG", { exact: true }).waitFor();
+    await page.goto(`${process.env.TEST_BASE_URL || "http://localhost:3001"}/inventario?tiendanube=connected`);
+    await page.getByRole("main").getByText("Tiendanube conectada. Ya podés publicar productos o editar el catálogo.", { exact: true }).waitFor();
+    await page.getByRole("main").getByText("PLUG", { exact: true }).waitFor();
     assert.deepEqual(errors, []);
     console.log(`Conexión ${width}px: ingreso antes de conectar, app privada, clave oculta, autorización y regreso al inventario OK`);
     await page.close();

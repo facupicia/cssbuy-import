@@ -53,13 +53,14 @@ try {
     await page.goto(`${process.env.TEST_BASE_URL || "http://localhost:3001"}/inventario`);
     await page.getByRole("button", { name: "Herramientas" }).click();
     await page.getByRole("menuitem", { name: "Preparar y publicar productos" }).click();
-    const preview = page.getByRole("dialog");
+    const preview = page.getByRole("main");
     await preview.getByText("La ficha está completa.").waitFor();
     assert.ok(!(await preview.innerText()).includes("NOTA INTERNA CONFIDENCIAL"));
     assert.equal(await preview.getByRole("button", { name: "Publicar producto", exact: true }).isDisabled(), true);
-    await preview.screenshot({ path: `${output}/tiendanube-${viewport.width}.png` });
+    await page.evaluate(async () => { window.scrollTo(0,0); await new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r))); });
+    await page.screenshot({ path: `${output}/tiendanube-${viewport.width}.png`, fullPage: true });
     assert.equal(await page.evaluate(() => document.documentElement.scrollWidth > window.innerWidth), false);
-    await preview.getByRole("button", { name: "Editar ficha", exact: true }).click();
+    await preview.getByRole("button", { name: "Editar ficha en inventario", exact: true }).click();
     const editor = page.getByRole("main", { name: "Editar producto", exact: true });
     await editor.getByRole("tab", { name: /^Fotos y tienda/ }).click();
     await editor.getByLabel("Descripción pública", { exact: true }).fill("Descripción editada desde el panel");
@@ -99,8 +100,8 @@ try {
     assert.ok(Math.abs(pixels[middle] - 87) <= 5);
     assert.equal(item.notas, "NOTA INTERNA CONFIDENCIAL");
     connected = true;
-    await page.getByRole("dialog").getByRole("button", { name: "Comprobar conexión", exact: true }).click();
-    await page.getByRole("dialog").getByText("Credenciales configuradas", { exact: true }).waitFor();
+    await page.getByRole("main").getByRole("button", { name: "Comprobar conexión", exact: true }).click();
+    await page.getByRole("main").getByText("Tiendanube conectada", { exact: true }).waitFor();
     await page.getByRole("button", { name: "Guardar oculto", exact: true }).click();
     assert.equal(sent, null);
     await page.getByRole("button", { name: "Confirmar envío oculto", exact: true }).click();

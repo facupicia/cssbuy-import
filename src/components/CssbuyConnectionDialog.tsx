@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import type { CssbuyOrder, CssbuyTransaction } from "@/lib/types";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "./ui/Dialog";
 import { Button } from "./ui/Button";
-import { Input } from "./ui/Input";
+import { AdminAccessNotice } from "./admin/AdminAccessNotice";
 
 type SyncData = { orders: CssbuyOrder[]; records: CssbuyTransaction[]; imported: number; inserted: number; updated: number;
   warning: string | null; lastSync: { synced_at: string; orders_count: number; records_count: number | null; records_warning?: string | null } | null };
@@ -29,7 +29,6 @@ export function CssbuyConnectionDialog({ open, onOpenChange, onSynced, onBusyCha
   open: boolean; onOpenChange: (open: boolean) => void; onSynced: (data: SyncData) => void; onBusyChange: (busy: boolean) => void;
 }) {
   const [authenticated, setAuthenticated] = useState(false);
-  const [password, setPassword] = useState("");
   const [available, setAvailable] = useState(false);
   const [checking, setChecking] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -52,15 +51,6 @@ export function CssbuyConnectionDialog({ open, onOpenChange, onSynced, onBusyCha
     finally { setChecking(false); }
   }
   useEffect(() => { if (open) { setError(""); setMessage(""); void check(); } }, [open]); // eslint-disable-line react-hooks/exhaustive-deps
-  async function login() {
-    setBusy(true); setError("");
-    try {
-      const response = await fetch("/api/tiendanube/session", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ password }) });
-      const data = await response.json(); if (!response.ok) throw new Error(data.error || "No se pudo ingresar.");
-      setPassword(""); await check();
-    } catch (e) { setError(e instanceof Error ? e.message : "No se pudo ingresar."); }
-    finally { setBusy(false); }
-  }
   async function sync() {
     setBusy(true); onBusyChange(true); setError(""); setWarning(""); setMessage("Leyendo pedidos y movimientos desde tu sesión de CSSBuy…");
     try {
@@ -76,10 +66,7 @@ export function CssbuyConnectionDialog({ open, onOpenChange, onSynced, onBusyCha
       <DialogHeader><DialogTitle>Conectar CSSBuy</DialogTitle><DialogDescription>Traé tus pedidos, pesos, fotos y movimientos a la calculadora desde Chrome.</DialogDescription></DialogHeader>
       <div className="space-y-4 text-sm">
         <p>La sesión queda en CSSBuy. El conector solo lee tus datos cuando iniciás una sincronización.</p>
-        {!authenticated && <div className="space-y-3">
-          <Input label="Contraseña de administración" type="password" autoComplete="current-password" value={password} onChange={e => setPassword(e.target.value)} hint="La misma que usás para conectar Tiendanube." />
-          <Button disabled={busy || !password} onClick={login}>Ingresar</Button>
-        </div>}
+        {!authenticated && <AdminAccessNotice returnTo={typeof window !== "undefined" ? window.location.pathname : "/"} />}
         <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg bg-[var(--color-bg-subtle)] p-3">
           <span>{checking ? "Comprobando conector…" : available ? "Conector de Chrome detectado" : "Falta instalar el conector en Chrome"}</span>
           <Button variant="outline" size="sm" disabled={checking || busy} onClick={check}>Comprobar conector</Button>
