@@ -88,7 +88,7 @@ export function Navbar({
           {/* Navegación (desktop) */}
           <nav className="hidden md:flex items-center gap-1">
             {links.map((link) => {
-              const active = pathname === link.href || (link.label === "Tienda" && (pathname.startsWith("/tiendanube") || pathname === "/tienda"));
+              const active = pathname === link.href || (link.href === "/" && pathname.startsWith("/calculadora/")) || (link.label === "Tienda" && (pathname.startsWith("/tiendanube") || pathname === "/tienda"));
               const Icon = link.icon;
               return (
                 <Link
@@ -195,7 +195,7 @@ export function Navbar({
       <nav className="md:hidden fixed bottom-0 inset-x-0 z-40 border-t border-[var(--color-border)] bg-[var(--color-bg-elevated)]/95 backdrop-blur-md">
         <div className="grid grid-cols-5">
           {links.map((link) => {
-            const active = pathname === link.href || (link.label === "Tienda" && (pathname.startsWith("/tiendanube") || pathname === "/tienda"));
+            const active = pathname === link.href || (link.href === "/" && pathname.startsWith("/calculadora/")) || (link.label === "Tienda" && (pathname.startsWith("/tiendanube") || pathname === "/tienda"));
             const Icon = link.icon;
             return (
               <Link

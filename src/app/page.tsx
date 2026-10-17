@@ -66,6 +66,7 @@ import { ProductsTable } from "@/components/ProductsTable";
 import { Menu, MenuTrigger, MenuContent, MenuItem, MenuSeparator, MenuLabel } from "@/components/ui/Menu";
 import { StatTile } from "@/components/ui/StatTile";
 import { EmptyState } from "@/components/ui/EmptyState";
+import { CalculatorNavigation } from "@/components/calculadora/CalculatorNavigation";
 import { Navbar } from "@/components/Navbar";
 import { WarehouseScraperModal } from "@/components/WarehouseScraperModal";
 import { RecordScraperModal } from "@/components/RecordScraperModal";
@@ -755,6 +756,7 @@ export default function CalculatorPage() {
       />
 
       <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 py-6 pb-24 md:pb-6 space-y-6">
+        <CalculatorNavigation />
         {/* Top Header & Fast Actions */}
         <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
           <div className="min-w-0">
@@ -1233,6 +1235,7 @@ export default function CalculatorPage() {
                           </div>
                         )}
                         <div className="min-w-0 flex-1">
+                          <Link href={`/calculadora/proveedores?nuevo=1&nombre=${encodeURIComponent(order.vendedor || "")}&referencia=${encodeURIComponent(order.url || "")}`} className="inline-flex min-h-10 items-center gap-2 text-xs font-medium text-[var(--color-accent)] underline underline-offset-4" aria-label={`Guardar vendedor de ${order.producto}`}>Guardar vendedor</Link>
                           <div className="flex items-center justify-between gap-1 mb-0.5">
                             <span className="font-mono font-bold text-[11px] text-[var(--color-fg)]">
                               #{order.oid}
