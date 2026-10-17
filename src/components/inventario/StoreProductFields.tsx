@@ -9,11 +9,13 @@ import { normalizePhotoFile, normalizePhotoSource } from "@/lib/normalize-photo-
 import { PRODUCT_PHOTO_SIZE } from "@/lib/photo-format";
 import { inferCategoryName } from "@/lib/store-category";
 
-export function StoreProductFields({ value, onChange, image, onBusyChange, productName = "" }: {
+export function StoreProductFields({ value, onChange, image, onBusyChange, productName = "", embedded = false, showPricing = true }: {
   value?: StoreProductProfile | null;
   onChange: (value: StoreProductProfile | ((current: StoreProductProfile) => StoreProductProfile)) => void;
   image?: string; onBusyChange?: (busy: boolean) => void;
   productName?: string;
+  embedded?: boolean;
+  showPricing?: boolean;
 }) {
   const profile = value ?? EMPTY_STORE_PROFILE;
   const [url, setUrl] = useState("");
@@ -55,20 +57,8 @@ export function StoreProductFields({ value, onChange, image, onBusyChange, produ
     } catch (e) { setError(e instanceof Error ? e.message : "No se pudieron normalizar las fotos"); }
     finally { stopProcessing(); }
   }
-  return <section className="space-y-4 rounded-lg border border-[var(--color-border)] p-4" aria-label="Ficha para la tienda">
-    <div><h3 className="text-base font-semibold">Ficha para la tienda</h3><p className="text-sm text-[var(--color-fg-muted)]">La descripción y las fotos se muestran a tus clientes. Las notas quedan para uso interno.</p></div>
-    <div className="space-y-2">
-      <label htmlFor="store-description" className="text-sm font-medium">Descripción pública</label>
-      <textarea id="store-description" rows={5} maxLength={10000} value={profile.descripcion} onChange={e => change("descripcion", e.target.value)}
-        placeholder="Describí el material, el calce y los detalles de la prenda." className="w-full rounded-lg border border-[var(--color-border)] bg-[var(--color-bg-elevated)] p-3 text-sm focus-visible:outline-2 focus-visible:outline-offset-2" />
-      <p className="text-xs text-[var(--color-fg-muted)]">Opcional. Si lo dejás vacío, se usa la descripción automática con la tabla de talles de la marca.</p>
-    </div>
-    <div className="grid gap-4 sm:grid-cols-2">
-      <Input label="Categoría para exportar" value={profile.categoria || inferCategoryName(productName) || ""} onChange={e => onChange({ ...profile, categoria: e.target.value, categoriaId: null })} placeholder="Ropa > Camperas" hint="Se completa según el nombre y se vincula con tu categoría de Tiendanube. Podés cambiarla." />
-      <Input label="Peso de envío (kg)" type="number" min={0} max={1000} step="0.001" value={profile.pesoKg || ""} onChange={e => change("pesoKg", Number(e.target.value))} hint="Se completa con el peso guardado. Podés ajustarlo para incluir el embalaje." />
-      <Input label="Descuento por transferencia (%)" type="number" min={0} max={90} value={profile.descuentoPct} onChange={e => change("descuentoPct", Number(e.target.value))} hint="El precio publicado se ajusta para conservar tu precio de venta." />
-      <Input label="Redondear precio a ($)" type="number" min={0} max={100000} step={100} value={profile.redondearA} onChange={e => change("redondearA", Number(e.target.value))} hint="Usá 0 para no redondear." />
-    </div>
+  return <section className={embedded ? "space-y-6" : "space-y-4 rounded-lg border border-[var(--color-border)] p-4"} aria-label="Ficha para la tienda">
+    <div>{!embedded && <h3 className="text-base font-semibold">Ficha para la tienda</h3>}<p className="text-sm text-[var(--color-fg-muted)]">La descripción y las fotos se muestran a tus clientes. Las notas quedan para uso interno.</p></div>
     <div className="space-y-3">
       <div><h4 className="text-sm font-medium">Fotos del producto ({photos.length}/9)</h4><p className="text-xs text-[var(--color-fg-muted)]">Cargá más fotos y elegí la portada antes de enviar el producto a Tiendanube.</p></div>
       <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg bg-[var(--color-bg-subtle)] p-3">
@@ -112,5 +102,20 @@ export function StoreProductFields({ value, onChange, image, onBusyChange, produ
       <div className="flex flex-col items-end gap-2 sm:flex-row"><Input label="O agregar por enlace" disabled={busy} value={url} onChange={e => setUrl(e.target.value)} placeholder="https://…" /><Button type="button" variant="outline" disabled={busy || photos.length >= 9} onClick={addUrl}>Agregar foto</Button></div>
       {error && <p role="alert" className="text-sm text-[var(--color-danger)]">{error}</p>}
     </div>
+    <div className="space-y-2">
+      <label htmlFor="store-description" className="text-sm font-medium">Descripción pública</label>
+      <textarea id="store-description" rows={5} maxLength={10000} value={profile.descripcion} onChange={e => change("descripcion", e.target.value)}
+        placeholder="Describí el material, el calce y los detalles de la prenda." className="w-full rounded-lg border border-[var(--color-border)] bg-[var(--color-bg-elevated)] p-3 text-sm focus-visible:outline-2 focus-visible:outline-offset-2" />
+      <p className="text-xs text-[var(--color-fg-muted)]">Opcional. Si lo dejás vacío, se usa la descripción automática con la tabla de talles de la marca.</p>
+    </div>
+    <div className="grid gap-4 sm:grid-cols-2">
+      <Input label="Categoría para exportar" value={profile.categoria || inferCategoryName(productName) || ""} onChange={e => onChange({ ...profile, categoria: e.target.value, categoriaId: null })} placeholder="Ropa > Camperas" hint="Se completa según el nombre y se vincula con tu categoría de Tiendanube. Podés cambiarla." />
+      <Input label="Peso de envío (kg)" type="number" min={0} max={1000} step="0.001" value={profile.pesoKg || ""} onChange={e => change("pesoKg", Number(e.target.value))} hint="Se completa con el peso guardado. Podés ajustarlo para incluir el embalaje." />
+      {showPricing && <>
+      <Input label="Descuento por transferencia (%)" type="number" min={0} max={90} value={profile.descuentoPct} onChange={e => change("descuentoPct", Number(e.target.value))} hint="El precio publicado se ajusta para conservar tu precio de venta." />
+      <Input label="Redondear precio a ($)" type="number" min={0} max={100000} step={100} value={profile.redondearA} onChange={e => change("redondearA", Number(e.target.value))} hint="Usá 0 para no redondear." />
+      </>}
+    </div>
+
   </section>;
 }

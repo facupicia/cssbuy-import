@@ -5,6 +5,7 @@ import {
   useEffect,
   useMemo,
   useCallback,
+  useRef,
   type Dispatch,
   type SetStateAction,
 } from "react";
@@ -27,6 +28,7 @@ import {
   Tag,
   Hash,
   MoreHorizontal,
+  ArrowLeft,
 } from "lucide-react";
 import {
   InventoryItem,
@@ -86,6 +88,9 @@ import { MarcasDialog } from "@/components/inventario/MarcasDialog";
 import { DescripcionDialog } from "@/components/inventario/DescripcionDialog";
 import { StoreProductFields } from "@/components/inventario/StoreProductFields";
 import { StorePublishDialog } from "@/components/inventario/StorePublishDialog";
+import { generarDescripcionTiendaHTML } from "@/lib/descripcion";
+import { tablaDeMarca } from "@/lib/tablas-talle";
+import { precioPublicado, parseVariante } from "@/lib/tiendanube";
 import { EMPTY_STORE_PROFILE, sanitizeStoreProfile } from "@/lib/store-product";
 
 /* ── Formulario de ítem ──────────────────────────────────────────────── */
@@ -190,6 +195,7 @@ export default function InventarioPage() {
   const [editing, setEditing] = useState<InventoryItem | null>(null);
   const [form, setForm] = useState<FormState>(EMPTY_FORM);
   const [saving, setSaving] = useState(false);
+  const [formError, setFormError] = useState("");
 
   const [ventaFor, setVentaFor] = useState<InventoryItem | null>(null);
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
@@ -433,6 +439,7 @@ export default function InventarioPage() {
   /* ── Acciones ─────────────────────────────────────────────────────── */
 
   function openNew() {
+    setFormError("");
     setReturnToPublish(false);
     setEditing(null);
     setForm(EMPTY_FORM);
@@ -440,12 +447,14 @@ export default function InventarioPage() {
   }
 
   function openEdit(it: InventoryItem) {
+    setFormError("");
     setEditing(it);
     setForm(itemToForm(it));
     setFormOpen(true);
   }
 
   async function submitForm() {
+    setFormError("");
     try { sanitizeStoreProfile(form.tienda); }
     catch (e) { toast.error(e instanceof Error ? e.message : "Revisá la ficha de tienda"); return; }
     if (!form.nombre.trim()) {
@@ -490,18 +499,18 @@ export default function InventarioPage() {
       };
       if (editing) {
         await fetcherPatch(`/api/inventario/${editing.id}`, payload);
-        toast.success("Ítem actualizado");
+        toast.success("Producto actualizado");
       } else {
         await fetcherPost("/api/inventario", { ...payload, origen: "manual" });
-        toast.success("Ítem agregado al inventario");
+        toast.success("Producto creado en inventario");
       }
       setFormOpen(false);
       await load();
       if (returnToPublish) { setReturnToPublish(false); setPublishOpen(true); }
     } catch (err: any) {
-      toast.error("No se pudo guardar", {
-        description: err?.info?.error || err?.message,
-      });
+      const message = err?.info?.error || err?.message || "Revisá la conexión y volvé a guardar. Tus cambios siguen en esta ficha.";
+      setFormError(message);
+      toast.error("No se pudo guardar", { description: message });
     } finally {
       setSaving(false);
     }
@@ -577,7 +586,7 @@ export default function InventarioPage() {
     <div className="min-h-screen bg-[var(--color-bg)] flex flex-col">
       <Navbar />
 
-      <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 py-6 pb-24 md:pb-6 space-y-6">
+      <main hidden={formOpen} className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 py-6 pb-24 md:pb-6 space-y-6">
         {/* Header */}
         <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
           <div>
@@ -585,7 +594,7 @@ export default function InventarioPage() {
               Inventario
             </h1>
             <p className="text-xs sm:text-sm text-[var(--color-fg-muted)] mt-0.5">
-              Consultá tus prendas, talles, stock, costos y precios de venta.
+              Administrá tus prendas y sus existencias. Creá o editá una ficha y publicala cuando esté lista.
             </p>
           </div>
 
@@ -596,7 +605,7 @@ export default function InventarioPage() {
               icon={<Plus className="h-3.5 w-3.5" />}
               onClick={openNew}
             >
-              Nuevo ítem
+              Crear producto
             </Button>
             <Button
               variant="outline"
@@ -606,6 +615,7 @@ export default function InventarioPage() {
             >
               Importar de CSSBuy
             </Button>
+            <Button variant="outline" size="sm" icon={<Store className="h-3.5 w-3.5" />} onClick={() => { setReturnToPublish(false); setPublishOpen(true); }}>Tiendanube</Button>
             <Menu>
               <MenuTrigger asChild>
                 <Button variant="outline" size="sm" icon={<MoreHorizontal className="h-3.5 w-3.5" />}>
@@ -769,7 +779,7 @@ export default function InventarioPage() {
               icon={<Pencil className="h-3.5 w-3.5" />}
               onClick={() => setBulkOpen(true)}
             >
-              Editar
+              Editar selección
             </Button>
             <Button
               variant="outline"
@@ -809,11 +819,10 @@ export default function InventarioPage() {
           </div>
         )}
 
+        <div className="flex items-center justify-between gap-3"><h2 className="text-base font-semibold">Productos <span className="ml-1 text-sm font-normal text-[var(--color-fg-muted)]">{filtered.length}{filtered.length !== items.length ? ` de ${items.length}` : ""}</span></h2><p className="text-xs text-[var(--color-fg-muted)]">Abrí una prenda para editar su ficha</p></div>
         {/* Contenido */}
         {loading ? (
-          <div className="p-12 flex justify-center">
-            <Spinner className="h-8 w-8" />
-          </div>
+          <div role="status" aria-label="Cargando inventario" className="space-y-3 rounded-xl border border-[var(--color-border)] bg-[var(--color-bg-elevated)] p-4"><span className="sr-only">Cargando productos…</span>{[0,1,2,3].map(i => <div key={i} className="flex items-center gap-4 motion-safe:animate-pulse"><div className="h-12 w-12 rounded-lg bg-[var(--color-bg-muted)]" /><div className="flex-1 space-y-2"><div className="h-3 w-2/5 rounded bg-[var(--color-bg-muted)]" /><div className="h-3 w-1/4 rounded bg-[var(--color-bg-subtle)]" /></div><div className="h-4 w-16 rounded bg-[var(--color-bg-muted)]" /></div>)}</div>
         ) : items.length === 0 ? (
           <EmptyState
             icon={<Boxes className="h-6 w-6" />}
@@ -821,7 +830,7 @@ export default function InventarioPage() {
             description={
               error
                 ? "Revisá la conexión a Postgres y volvé a intentar."
-                : "Cargá ítems a mano o importalos desde tus órdenes de CSSBuy sincronizadas."
+                : "Creá tu primera prenda o importá una compra de CSSBuy. Después podrás cargar talles, fotos y precios en su ficha."
             }
             action={
               !error && (
@@ -840,7 +849,7 @@ export default function InventarioPage() {
                     icon={<Plus className="h-3.5 w-3.5" />}
                     onClick={openNew}
                   >
-                    Nuevo ítem
+                    Crear producto
                   </Button>
                 </div>
               )
@@ -850,7 +859,8 @@ export default function InventarioPage() {
           <EmptyState
             icon={<PackageX className="h-6 w-6" />}
             title="Sin resultados"
-            description="Ningún ítem coincide con el filtro o la búsqueda."
+            description="Probá con otro nombre o quitá los filtros para ver todas las prendas."
+            action={<Button variant="outline" onClick={() => { setSearch(""); setEstadoFilter("todos"); setMarcaFilter("todas"); setTalleFilter("todos"); }}>Limpiar filtros</Button>}
           />
         ) : (
           <Card padding="none" className="overflow-hidden">
@@ -915,9 +925,7 @@ export default function InventarioPage() {
                             )}
                             <div className="min-w-0">
                               <div className="flex items-center gap-1.5">
-                                <span className="font-medium text-[var(--color-fg)] truncate max-w-[220px]">
-                                  {it.nombre}
-                                </span>
+                                <button type="button" onClick={() => openEdit(it)} className="font-semibold text-sm text-[var(--color-fg)] truncate max-w-[220px] text-left hover:underline focus-visible:outline-2 focus-visible:outline-offset-2">{it.nombre}</button>
                                 {!c.tallesCalc && parseTalle(it.variante) && (
                                   <span className="shrink-0 px-1.5 py-0.5 rounded-[var(--radius-xs)] bg-[var(--color-bg-muted)] text-[10px] font-mono font-semibold text-[var(--color-fg-muted)]">
                                     {parseTalle(it.variante)}
@@ -994,39 +1002,9 @@ export default function InventarioPage() {
                         </td>
                         <td className="py-2.5 px-3">
                           <div className="flex items-center justify-end gap-1">
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              className="h-7 px-2"
-                              icon={<ShoppingCart className="h-3.5 w-3.5" />}
-                              disabled={c.stock === 0}
-                              onClick={() => setVentaFor(it)}
-                              title="Registrar venta"
-                            />
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              className="h-7 px-2"
-                              icon={<FileText className="h-3.5 w-3.5" />}
-                              onClick={() => setFichaDe(it)}
-                              title="Ver la ficha que va a Tiendanube"
-                              aria-label="Ver ficha"
-                            />
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              className="h-7 px-2"
-                              icon={<Pencil className="h-3.5 w-3.5" />}
-                              onClick={() => openEdit(it)}
-                              title="Editar"
-                            />
-                            <button
-                              onClick={() => setConfirmDeleteId(it.id)}
-                              className="h-7 px-2 flex items-center text-[var(--color-fg-subtle)] hover:text-[var(--color-danger)] rounded transition-colors cursor-pointer"
-                              title="Eliminar"
-                            >
-                              <Trash2 className="h-3.5 w-3.5" />
-                            </button>
+                            <Button variant="outline" size="sm" onClick={() => openEdit(it)}>Editar</Button>
+                            <Menu><MenuTrigger asChild><Button variant="ghost" size="sm" aria-label={`Más acciones de ${it.nombre}`} icon={<MoreHorizontal className="h-4 w-4" />} /></MenuTrigger><MenuContent><MenuItem icon={<ShoppingCart className="h-4 w-4" />} disabled={c.stock === 0} onSelect={() => setVentaFor(it)}>Registrar venta</MenuItem><MenuItem icon={<FileText className="h-4 w-4" />} onSelect={() => setFichaDe(it)}>Ver ficha pública</MenuItem><MenuItem icon={<Trash2 className="h-4 w-4" />} onSelect={() => setConfirmDeleteId(it.id)}>Eliminar del inventario</MenuItem></MenuContent></Menu>
+
                           </div>
                         </td>
                       </tr>
@@ -1068,9 +1046,7 @@ export default function InventarioPage() {
                       )}
                       <div className="min-w-0 flex-1">
                         <div className="flex items-center gap-1.5">
-                          <span className="font-medium text-sm text-[var(--color-fg)] truncate">
-                            {it.nombre}
-                          </span>
+                          <button type="button" onClick={() => openEdit(it)} className="font-semibold text-sm text-[var(--color-fg)] truncate text-left hover:underline focus-visible:outline-2 focus-visible:outline-offset-2">{it.nombre}</button>
                           {!c.tallesCalc && parseTalle(it.variante) && (
                             <span className="shrink-0 px-1.5 py-0.5 rounded-[var(--radius-xs)] bg-[var(--color-bg-muted)] text-[10px] font-mono font-semibold text-[var(--color-fg-muted)]">
                               {parseTalle(it.variante)}
@@ -1155,45 +1131,9 @@ export default function InventarioPage() {
                       </div>
                     </div>
 
-                    {/* Acciones del producto */}
-                    <div className="flex items-center justify-end gap-2">
-                      <div className="flex items-center gap-1.5 shrink-0">
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          icon={<ShoppingCart className="h-3.5 w-3.5" />}
-                          disabled={c.stock === 0}
-                          onClick={() => setVentaFor(it)}
-                        >
-                          Vender
-                        </Button>
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          className="px-2"
-                          icon={<FileText className="h-4 w-4" />}
-                          onClick={() => setFichaDe(it)}
-                          title="Ver la ficha que va a Tiendanube"
-                          aria-label="Ver ficha"
-                        />
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          className="px-2"
-                          icon={<Pencil className="h-4 w-4" />}
-                          onClick={() => openEdit(it)}
-                          title="Editar item"
-                          aria-label="Editar item"
-                        />
-                        <button
-                          onClick={() => setConfirmDeleteId(it.id)}
-                          className="px-2 py-1.5 flex items-center text-[var(--color-fg-subtle)] hover:text-[var(--color-danger)] rounded-[var(--radius-sm)] transition-colors cursor-pointer"
-                          title="Eliminar item"
-                          aria-label="Eliminar item"
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </button>
-                      </div>
+                    <div className="flex items-center justify-between gap-2">
+                      <Button variant="outline" size="sm" icon={<ShoppingCart className="h-4 w-4" />} disabled={c.stock === 0} onClick={() => setVentaFor(it)}>Registrar venta</Button>
+                      <div className="flex items-center gap-1"><Button variant="outline" size="sm" icon={<Pencil className="h-4 w-4" />} onClick={() => openEdit(it)}>Editar</Button><Menu><MenuTrigger asChild><Button variant="ghost" size="sm" aria-label={`Más acciones de ${it.nombre}`} icon={<MoreHorizontal className="h-4 w-4" />} /></MenuTrigger><MenuContent><MenuItem icon={<FileText className="h-4 w-4" />} onSelect={() => setFichaDe(it)}>Ver ficha pública</MenuItem><MenuItem icon={<Trash2 className="h-4 w-4" />} onSelect={() => setConfirmDeleteId(it.id)}>Eliminar del inventario</MenuItem></MenuContent></Menu></div>
                     </div>
                   </div>
                 );
@@ -1204,9 +1144,10 @@ export default function InventarioPage() {
       </main>
 
       {/* Dialog: nuevo / editar */}
-      <ItemFormDialog
+      <ProductEditor
         open={formOpen}
-        onOpenChange={setFormOpen}
+        onOpenChange={next => { setFormOpen(next); if (!next && returnToPublish) { setReturnToPublish(false); setPublishOpen(true); } }}
+        error={formError}
         form={form}
         setForm={setForm}
         editing={Boolean(editing)}
@@ -1382,7 +1323,8 @@ const GRID_TALLES =
 const INPUT_TALLE =
   "w-full h-7 px-1.5 text-xs bg-[var(--color-bg)] border border-[var(--color-border)] rounded-[var(--radius-sm)] focus:outline-none focus:border-[var(--color-accent)]";
 
-function ItemFormDialog({
+function ProductEditor({
+  error,
   open,
   onOpenChange,
   form,
@@ -1394,6 +1336,7 @@ function ItemFormDialog({
   skusEnUso,
   onSubmit,
 }: {
+  error: string;
   open: boolean;
   onOpenChange: (open: boolean) => void;
   form: FormState;
@@ -1409,9 +1352,38 @@ function ItemFormDialog({
   const set = <K extends keyof FormState>(key: K, val: FormState[K]) =>
     setForm((f) => ({ ...f, [key]: val }));
 
-  const [nuevoTalleTxt, setNuevoTalleTxt] = useState("");
   const [processingPhotos, setProcessingPhotos] = useState(false);
+  const [confirmSingle, setConfirmSingle] = useState(false);
+  const [section, setSection] = useState("product");
+  const [initialSnapshot, setInitialSnapshot] = useState("");
+  const [confirmLeave, setConfirmLeave] = useState(false);
+  const [validation, setValidation] = useState("");
+  const pendingHref = useRef<string | null>(null);
+  const previousScroll = useRef(0);
+  const unifiedStock = useRef(false);
+  useEffect(() => {
+    if (open) { previousScroll.current = window.scrollY; setInitialSnapshot(JSON.stringify(form)); setSection("product"); setValidation(""); setConfirmLeave(false); pendingHref.current = null; unifiedStock.current = false; window.scrollTo(0, 0); }
+    else if (initialSnapshot) { window.scrollTo(0, previousScroll.current); setInitialSnapshot(""); }
+    // Capture the starting state only when opening this editor.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open]);
+  useEffect(() => {
+    if (!open) return;
+    const changed = initialSnapshot !== "" && JSON.stringify(form) !== initialSnapshot;
+    const unload = (e: BeforeUnloadEvent) => { if (changed || saving || processingPhotos) e.preventDefault(); };
+    const navigate = (e: MouseEvent) => {
+      const anchor = (e.target as Element).closest?.("a[href]") as HTMLAnchorElement | null;
+      if (!anchor || anchor.target === "_blank" || anchor.href === window.location.href || (!changed && !saving && !processingPhotos)) return;
+      e.preventDefault(); e.stopPropagation();
+      if (!saving && !processingPhotos) { pendingHref.current = anchor.href; setConfirmLeave(true); }
+    };
+    window.addEventListener("beforeunload", unload); document.addEventListener("click", navigate, true);
+    return () => { window.removeEventListener("beforeunload", unload); document.removeEventListener("click", navigate, true); };
+  }, [open, form, initialSnapshot, saving, processingPhotos]);
+  const [nuevoTalleTxt, setNuevoTalleTxt] = useState("");
   const [cotizacionAbierta, setCotizacionAbierta] = useState(false);
+  useEffect(() => { setValidation(""); }, [form]);
+  useEffect(() => { if (validation || error) document.getElementById("product-editor-error")?.focus(); }, [validation, error, section]);
 
   useEffect(() => {
     if (!open) setCotizacionAbierta(false);
@@ -1474,9 +1446,23 @@ function ItemFormDialog({
     setTalles((ts) => ts.filter((_, i) => i !== index));
   }
 
+  function editableColor() {
+    const pair = form.variante.split(";").find(p => /^(color|colores|colour|颜色)\s*:/i.test(p.trimStart()));
+    return pair ? pair.slice(pair.indexOf(":") + 1) : varianteSinTalle(form.variante) ?? "";
+  }
+  function setVariant(color: string, talle: string) {
+    const extras = parseVariante(form.variante).filter(p => !["Color", "Talle", "Variante"].includes(p.nombre));
+    set("variante", [...(color.trim() ? [`Color:${color}`] : []), ...(!form.modoTalles && talle.trim() ? [`Talle:${canonizar(talle)}`] : []), ...extras.map(p => `${p.nombre}:${p.valor}`)].join(";"));
+  }
   function cambiarModo(multi: boolean) {
+    if (multi && !form.modoTalles && (editing || unifiedStock.current) && form.cantidadInicial > 0 && !parseTalle(form.variante)) {
+      setValidation("Indicá el talle de las unidades actuales antes de pasar a varios talles. Así se conserva su stock.");
+      return;
+    }
+    if (!multi) unifiedStock.current = true;
     setForm((f) => {
-      if (!multi || f.talles.length > 0) return { ...f, modoTalles: multi };
+      if (!multi) return { ...f, modoTalles: false, talles: [], variante: f.talles.length === 1 ? `${f.variante};Talle:${f.talles[0].talle}` : f.variante };
+      if (f.talles.length > 0) return { ...f, modoTalles: true };
       // Si la variante ya tenía talle, arranca la lista con las unidades cargadas
       // y la variante se queda con el color: el talle ahora vive en la lista.
       const talle = parseTalle(f.variante);
@@ -1522,17 +1508,55 @@ function ItemFormDialog({
     updatedAt: "",
   });
 
+  if (!open) return null;
+  const photos = form.tienda.fotos.length ? form.tienda.fotos : form.imagen ? [form.imagen] : [];
+  const currentBrand = nombreDeMarca[form.marcaId];
+  const table = tablaDeMarca(currentBrand);
+  const dirty = initialSnapshot !== "" && JSON.stringify(form) !== initialSnapshot;
+  const sections = [
+    { id: "product", label: "Producto", description: "Nombre, marca y color" },
+    { id: "stock", label: "Talles y stock", description: "Unidades y ubicación" },
+    { id: "price", label: "Costos y precio", description: "Costo, venta y margen" },
+    { id: "store", label: "Fotos y tienda", description: "Ficha pública y envío" },
+  ];
+  const active = sections.find(s => s.id === section)!;
+  const close = () => { if (saving || processingPhotos) return; pendingHref.current = null; if (dirty) setConfirmLeave(true); else onOpenChange(false); };
+  function save() {
+    setValidation("");
+    if (!form.nombre.trim()) { setSection("product"); setValidation("Escribí el nombre del producto para guardarlo."); return; }
+    if (form.modoTalles && !form.talles.length) { setSection("stock"); setValidation("Agregá al menos un talle o elegí Una variante."); return; }
+    const quantities = form.modoTalles ? form.talles : [form];
+    if (quantities.some(t => !Number.isInteger(t.cantidadInicial) || !Number.isInteger(t.cantidadVendida) || t.cantidadInicial < 0 || t.cantidadVendida < 0 || t.cantidadVendida > t.cantidadInicial)) { setSection("stock"); setValidation("Revisá las unidades: usá números enteros y no registres más ventas que unidades recibidas."); return; }
+    if ([form.costoUnitARS, form.costoUnitUSD, form.precioVentaARS].some(n => !Number.isFinite(n) || n < 0)) { setSection("price"); setValidation("Los costos y el precio deben ser números iguales o mayores a cero."); return; }
+    try { sanitizeStoreProfile(form.tienda); } catch (e) { setSection("store"); setValidation(e instanceof Error ? e.message : "Revisá la ficha de tienda."); return; }
+    onSubmit();
+  }
   return (
-    <Dialog open={open} onOpenChange={next => { if (!processingPhotos && !saving) onOpenChange(next); }}>
-      <DialogContent className="max-w-2xl max-h-[88vh] flex flex-col">
-        <DialogHeader>
-          <DialogTitle>{editing ? "Editar ítem" : "Nuevo ítem de inventario"}</DialogTitle>
-          <DialogDescription>
-            Configurá el producto, sus talles disponibles, costos y precios de venta.
-          </DialogDescription>
-        </DialogHeader>
-
-        <div className="space-y-4 overflow-y-auto pr-1">
+    <main aria-label={editing ? "Editar producto" : "Crear producto"} className="mx-auto w-full max-w-7xl px-4 py-6 pb-28 sm:px-6 md:pb-8">
+      <div className="mb-6">
+        <button type="button" onClick={close} disabled={saving || processingPhotos} className="mb-4 inline-flex items-center gap-2 text-sm text-[var(--color-fg-muted)] hover:text-[var(--color-fg)] focus-visible:outline-2 focus-visible:outline-offset-4 disabled:opacity-50"><ArrowLeft className="h-4 w-4" />Volver al inventario</button>
+        <div className="flex flex-wrap items-start justify-between gap-4">
+          <div className="min-w-0"><h1 className="text-2xl font-semibold tracking-tight break-words">{editing ? form.nombre || "Editar producto" : "Crear producto"}</h1><p className="mt-2 text-sm text-[var(--color-fg-muted)]">{editing ? "Editando una prenda del inventario." : "Creá la ficha de una prenda y agregá sus talles."} Guardar conserva los datos en el inventario.</p></div>
+          <span role="status" className={`rounded-full px-3 py-1 text-xs font-medium ${dirty ? "bg-[var(--color-warning-soft)] text-[var(--color-warning)]" : "bg-[var(--color-bg-subtle)] text-[var(--color-fg-muted)]"}`}>{dirty ? "Cambios sin guardar" : editing ? "Sin cambios" : "Producto nuevo"}</span>
+        </div>
+      </div>
+      <div className="grid items-start gap-6 lg:grid-cols-[208px_minmax(0,1fr)_256px]">
+        <nav aria-label="Secciones del producto" className="min-w-0 lg:sticky lg:top-24">
+          <div role="tablist" aria-label="Editar ficha del producto" className="grid grid-cols-2 gap-1 rounded-xl bg-[var(--color-bg-subtle)] p-1 lg:grid-cols-1">
+            {sections.map((s, index) => <button key={s.id} id={`product-tab-${s.id}`} type="button" role="tab" aria-label={s.label} aria-selected={section === s.id} aria-controls={`product-panel-${s.id}`} tabIndex={section === s.id ? 0 : -1} onClick={() => setSection(s.id)} onKeyDown={e => {
+              const delta = e.key === "ArrowRight" || e.key === "ArrowDown" ? 1 : e.key === "ArrowLeft" || e.key === "ArrowUp" ? -1 : 0;
+              if (!delta && e.key !== "Home" && e.key !== "End") return;
+              e.preventDefault(); const next = e.key === "Home" ? 0 : e.key === "End" ? sections.length - 1 : (index + delta + sections.length) % sections.length;
+              setSection(sections[next].id); document.getElementById(`product-tab-${sections[next].id}`)?.focus();
+            }} className={`shrink-0 rounded-lg px-3 py-3 text-left text-sm focus-visible:outline-2 focus-visible:outline-offset-2 ${section === s.id ? "bg-[var(--color-bg-elevated)] font-semibold text-[var(--color-fg)]" : "text-[var(--color-fg-muted)] hover:bg-[var(--color-bg-hover)]"}`}><span className="block">{s.label}</span><span className="mt-1 hidden text-xs font-normal text-[var(--color-fg-muted)] lg:block">{s.description}</span></button>)}
+          </div>
+          <p className="mt-4 hidden px-3 text-xs leading-relaxed text-[var(--color-fg-muted)] lg:block">La publicación en Tiendanube se revisa por separado después de guardar.</p>
+        </nav>
+        <div className="min-w-0 rounded-xl border border-[var(--color-border)] bg-[var(--color-bg-elevated)] p-4 sm:p-6">
+          <div className="mb-6"><h2 className="text-lg font-semibold">{active.label}</h2><p className="mt-1 text-sm text-[var(--color-fg-muted)]">{({product:"Identificá la prenda. Cada ficha puede reunir varios talles del mismo color.",stock:"Cargá las unidades recibidas y las ya vendidas por talle.",price:"Definí el costo por unidad y el precio de venta por transferencia.",store:"Prepará lo que verá el cliente y los datos necesarios para el envío."} as Record<string,string>)[section]}</p></div>
+          {(validation || error) && <p id="product-editor-error" tabIndex={-1} role="alert" className="mb-6 rounded-lg bg-[var(--color-danger-soft)] p-3 text-sm text-[var(--color-danger)]">{validation || error}</p>}
+          <fieldset disabled={saving || processingPhotos} className="min-w-0">
+          <section role="tabpanel" id="product-panel-product" aria-labelledby="product-tab-product" hidden={section !== "product"} className="space-y-6">
           <Input
             label="Nombre del producto"
             value={form.nombre}
@@ -1540,8 +1564,41 @@ function ItemFormDialog({
             placeholder="Ej: Remera Boxy Fit Heavyweight"
           />
 
+          <div className="grid gap-4 sm:grid-cols-2">
+            <label className="block space-y-1.5">
+              <span className="block text-xs font-medium text-[var(--color-fg-muted)] tracking-wide uppercase">
+                Marca
+              </span>
+              <select aria-label="Marca"
+                value={form.marcaId}
+                onChange={(e) => set("marcaId", e.target.value)}
+                className="w-full h-9 px-2 text-sm bg-[var(--color-bg-elevated)] border border-[var(--color-border)] rounded-[var(--radius)] text-[var(--color-fg)] cursor-pointer focus:outline-none focus:border-[var(--color-accent)]"
+              >
+                <option value="">Sin marca</option>
+                {marcas.map((m) => (
+                  <option key={m.id} value={m.id}>
+                    {m.nombre}
+                  </option>
+                ))}
+              </select>
+              {marcas.length === 0 && (
+                <span className="block text-[11px] text-[var(--color-fg-subtle)]">
+                  Todavía no cargaste marcas. Se cargan desde Herramientas → Administrar marcas.
+                </span>
+              )}
+            </label>              <Input
+                label="Color"
+                value={editableColor()}
+                onChange={e => setVariant(e.target.value, parseTalle(form.variante) || "")}
+                placeholder="Ej: Negro"
+              />
+          </div>
+          <Input label="Referencia del proveedor" value={form.link} onChange={e => set("link", e.target.value)} placeholder="https://…" hint="Opcional. Es el enlace de origen de la prenda; queda para uso interno." />
+          <Input label="Notas internas" value={form.notas} onChange={e => set("notas", e.target.value)} placeholder="Detalles para vos o tu equipo" hint="Estas notas no se envían a la tienda." />
+          </section>
+          <section role="tabpanel" id="product-panel-stock" aria-labelledby="product-tab-stock" hidden={section !== "stock"} className="space-y-6">
           {/* Talles: uno solo (con su variante) o varios con stock propio */}
-          <div className="rounded-[var(--radius)] border border-[var(--color-border)] p-3 space-y-3">
+          <div className="space-y-6">
             <div className="flex flex-wrap items-center justify-between gap-2">
               <div>
                 <p className="text-xs font-medium text-[var(--color-fg-muted)] tracking-wide uppercase">
@@ -1549,28 +1606,22 @@ function ItemFormDialog({
                 </p>
                 <p className="text-[11px] text-[var(--color-fg-subtle)]">
                   {form.modoTalles
-                    ? "Cada talle lleva sus propias unidades; el total del ítem es la suma."
-                    : "Un solo talle o variante por ítem."}
+                    ? "Cada talle lleva sus propias unidades; el stock total se calcula automáticamente."
+                    : "Una variante de la prenda con su stock."}
                 </p>
               </div>
               <Segmented
                 size="sm"
                 value={form.modoTalles ? "multiples" : "unico"}
-                onChange={(v) => cambiarModo(v === "multiples")}
+                onChange={(v) => { if (v === "unico" && form.modoTalles && form.talles.length > 1) setConfirmSingle(true); else cambiarModo(v === "multiples"); }}
                 options={[
-                  { value: "unico", label: "Talle único" },
+                  { value: "unico", label: "Una variante" },
                   { value: "multiples", label: "Varios talles" },
                 ]}
               />
             </div>
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-              <Input
-                label={form.modoTalles ? "Color / detalle" : "Variante"}
-                value={form.variante}
-                onChange={(e) => set("variante", e.target.value)}
-                placeholder={form.modoTalles ? "Ej: Negro" : "Color, talle…"}
-              />
+            <div className="grid grid-cols-1 gap-3">
               <div className="flex items-end gap-2">
                 <Input
                   label={form.modoTalles ? "SKU base" : "SKU"}
@@ -1603,6 +1654,7 @@ function ItemFormDialog({
               </div>
             </div>
 
+            {!form.modoTalles && <Input label="Talle de esta variante" value={parseTalle(form.variante) || ""} onChange={e => setVariant(editableColor(), e.target.value)} placeholder="Ej: M, XL o Único" hint="Para cargar varios talles de esta prenda, elegí Varios talles." />}
             {form.modoTalles ? (
               <div className="space-y-3">
                 <div className="space-y-1.5">
@@ -1771,21 +1823,34 @@ function ItemFormDialog({
             )}
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
             <Input
-              label="Link"
-              value={form.link}
-              onChange={(e) => set("link", e.target.value)}
-              placeholder="https://…"
+              label="Ubicación"
+              value={form.ubicacion}
+              onChange={(e) => set("ubicacion", e.target.value)}
+              placeholder="Estante, caja…"
             />
-            <Input
-              label="Imagen (URL)"
-              value={form.imagen}
-              onChange={(e) => set("imagen", e.target.value)}
-              placeholder="https://…"
-            />
+
+
+            <div className="sm:col-span-2 space-y-1.5">
+              <label className="block text-xs font-medium text-[var(--color-fg-muted)] tracking-wide uppercase">
+                Estado
+              </label>
+              <Segmented
+                size="sm"
+                value={form.estado}
+                onChange={(v) => set("estado", v as InventoryEstado)}
+                options={[
+                  { value: "en_deposito", label: "En depósito" },
+                  { value: "en_transito", label: "En tránsito" },
+                  { value: "agotado", label: "Agotado" },
+                ]}
+              />
+            </div>
           </div>
 
+          </section>
+          <section role="tabpanel" id="product-panel-price" aria-labelledby="product-tab-price" hidden={section !== "price"} className="space-y-6">
           <div className="flex items-center justify-between gap-2 -mb-1">
             <span className="text-xs font-medium text-[var(--color-fg-muted)] tracking-wide uppercase">
               Costo y precio
@@ -1837,54 +1902,13 @@ function ItemFormDialog({
             />
           </div>
 
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-            <Input
-              label="Ubicación"
-              value={form.ubicacion}
-              onChange={(e) => set("ubicacion", e.target.value)}
-              placeholder="Estante, caja…"
-            />
-            <label className="block space-y-1.5">
-              <span className="block text-xs font-medium text-[var(--color-fg-muted)] tracking-wide uppercase">
-                Marca
-              </span>
-              <select
-                value={form.marcaId}
-                onChange={(e) => set("marcaId", e.target.value)}
-                className="w-full h-9 px-2 text-sm bg-[var(--color-bg-elevated)] border border-[var(--color-border)] rounded-[var(--radius)] text-[var(--color-fg)] cursor-pointer focus:outline-none focus:border-[var(--color-accent)]"
-              >
-                <option value="">Sin marca</option>
-                {marcas.map((m) => (
-                  <option key={m.id} value={m.id}>
-                    {m.nombre}
-                  </option>
-                ))}
-              </select>
-              {marcas.length === 0 && (
-                <span className="block text-[11px] text-[var(--color-fg-subtle)]">
-                  Todavía no cargaste marcas. Se cargan desde el botón Marcas.
-                </span>
-              )}
-            </label>
-
-            <div className="col-span-2 space-y-1.5">
-              <label className="block text-xs font-medium text-[var(--color-fg-muted)] tracking-wide uppercase">
-                Estado
-              </label>
-              <Segmented
-                size="sm"
-                value={form.estado}
-                onChange={(v) => set("estado", v as InventoryEstado)}
-                options={[
-                  { value: "en_deposito", label: "En depósito" },
-                  { value: "en_transito", label: "En tránsito" },
-                  { value: "agotado", label: "Agotado" },
-                ]}
-              />
-            </div>
-          </div>
-
+          <div className="grid gap-4 sm:grid-cols-2"><Input label="Descuento por transferencia (%)" type="number" min={0} max={90} value={form.tienda.descuentoPct} onChange={e => set("tienda", {...form.tienda, descuentoPct:Number(e.target.value)})} hint="Debe coincidir con el descuento configurado en Tiendanube." /><Input label="Redondear precio de lista a ($)" type="number" min={0} max={100000} step={100} value={form.tienda.redondearA} onChange={e => set("tienda", {...form.tienda, redondearA:Number(e.target.value)})} hint="Dejá 0 para conservar el precio calculado." /></div>
+          <dl className="grid gap-4 rounded-lg bg-[var(--color-bg-subtle)] p-4 sm:grid-cols-2"><div><dt className="text-xs text-[var(--color-fg-muted)]">Margen por unidad, antes de publicidad y comisiones</dt><dd className="mt-1 text-lg font-semibold tabular-nums">{fmtPct(preview.margenUnitPct)}</dd></div><div><dt className="text-xs text-[var(--color-fg-muted)]">Precio de lista para Tiendanube</dt><dd className="mt-1 text-lg font-semibold tabular-nums">{fmtARS(precioPublicado(form.precioVentaARS, form.tienda.descuentoPct, form.tienda.redondearA))}</dd></div></dl>
+          <p className="text-xs leading-relaxed text-[var(--color-fg-muted)]">El precio de lista contempla el descuento por transferencia configurado arriba. Guardar aquí no cambia los precios de Tiendanube.</p>
+          </section>
+          <section role="tabpanel" id="product-panel-store" aria-labelledby="product-tab-store" hidden={section !== "store"} className="space-y-6">
           <StoreProductFields
+            embedded showPricing={false}
             value={form.tienda}
             productName={form.nombre}
             image={form.imagen}
@@ -1895,42 +1919,24 @@ function ItemFormDialog({
             })}
           />
 
-          <Input
-            label="Notas internas"
-            value={form.notas}
-            onChange={(e) => set("notas", e.target.value)}
-            placeholder="Opcional"
-          />
-
-          {/* Preview */}
-          <div className="grid grid-cols-3 gap-3 p-3 bg-[var(--color-bg-subtle)] rounded-[var(--radius)] text-xs">
-            <div>
-              <span className="text-[11px] text-[var(--color-fg-muted)] uppercase">Stock total</span>
-              <p className="font-bold font-mono tnum text-sm">{preview.stock}</p>
-            </div>
-            <div>
-              <span className="text-[11px] text-[var(--color-fg-muted)] uppercase">Margen unit.</span>
-              <p className="font-bold font-mono tnum text-sm">{fmtPct(preview.margenUnitPct)}</p>
-            </div>
-            <div>
-              <span className="text-[11px] text-[var(--color-fg-muted)] uppercase">Gan. potencial</span>
-              <p className="font-bold font-mono tnum text-sm text-[var(--color-success)]">
-                {fmtARS(preview.gananciaPotencialARS)}
-              </p>
-            </div>
+          <section aria-label="Descripción pública automática" className="space-y-3"><h3 className="text-base font-semibold">Descripción que verá el cliente</h3><p className="text-xs text-[var(--color-fg-muted)]">{table ? `Tabla de talles de ${table.marca} incluida.` : "Asigná una marca con tabla para incluir las medidas del proveedor."}</p><div className="min-w-0 overflow-x-auto rounded-lg border border-[var(--color-border)] bg-white p-4 text-stone-900" dangerouslySetInnerHTML={{__html: generarDescripcionTiendaHTML({...form,id:"preview",origen:"manual",createdAt:"",updatedAt:"",talles:form.modoTalles?form.talles:null}, currentBrand)}} /></section>
+          </section>
+          </fieldset>
+        </div>
+        <aside aria-label="Resumen del producto" className="hidden min-w-0 space-y-6 lg:sticky lg:top-24 lg:block">
+          <div className="overflow-hidden rounded-xl border border-[var(--color-border)] bg-[var(--color-bg-elevated)]">
+            {photos[0] ? <img src={photos[0]} alt={form.nombre || "Portada de la prenda"} className="aspect-square w-full bg-white object-contain" referrerPolicy="no-referrer" /> : <div className="flex aspect-square flex-col items-center justify-center gap-3 bg-[var(--color-bg-subtle)] text-[var(--color-fg-muted)]"><Boxes className="h-8 w-8" strokeWidth={1.5} /><span className="text-xs">Agregá fotos en Fotos y tienda</span></div>}
+            <div className="space-y-2 p-4"><p className="font-semibold break-words">{form.nombre || "Tu nuevo producto"}</p><p className="text-sm text-[var(--color-fg-muted)]">{currentBrand || "Sin marca"} · {parseColor(form.variante) || varianteSinTalle(form.variante) || "Sin color"}</p><p className="text-xl font-semibold tabular-nums">{fmtARS(form.precioVentaARS)}</p><p className="text-xs text-[var(--color-fg-muted)]">Precio por transferencia</p></div>
           </div>
-        </div>
-
-        <div className="mt-4 flex items-center justify-end gap-2 pt-3 border-t border-[var(--color-border)]">
-          <Button variant="outline" onClick={() => onOpenChange(false)} disabled={saving || processingPhotos}>
-            Cancelar
-          </Button>
-          <Button variant="primary" loading={saving} disabled={processingPhotos} onClick={onSubmit}>
-            {editing ? "Guardar cambios" : "Agregar al inventario"}
-          </Button>
-        </div>
-      </DialogContent>
-    </Dialog>
+          <dl className="space-y-3 px-1 text-sm"><div className="flex justify-between gap-2"><dt className="text-[var(--color-fg-muted)]">Disponibles</dt><dd className="font-semibold tabular-nums">{preview.stock} unidades</dd></div><div className="flex justify-between gap-2"><dt className="text-[var(--color-fg-muted)]">Talles</dt><dd className="text-right">{form.modoTalles ? form.talles.map(t => t.talle).join(", ") || "Sin cargar" : parseTalle(form.variante) || "Una variante"}</dd></div><div className="flex justify-between gap-2"><dt className="text-[var(--color-fg-muted)]">Tabla de talles</dt><dd className={table ? "text-[var(--color-accent)]" : "text-[var(--color-warning)]"}>{table ? "Incluida" : "Pendiente"}</dd></div></dl>
+        </aside>
+      </div>
+      <div className="fixed bottom-16 left-0 right-0 z-30 border-t border-[var(--color-border)] bg-[var(--color-bg-elevated)] md:bottom-0">
+        <div className="mx-auto flex max-w-7xl items-center justify-between gap-3 px-4 py-3 sm:px-6"><span className="hidden text-xs text-[var(--color-fg-muted)] sm:block">{processingPhotos ? "Preparando fotos…" : "Se guarda en tu inventario"}</span><div className="ml-auto flex gap-2"><Button variant="outline" onClick={close} disabled={saving || processingPhotos}>Cancelar</Button><Button variant="primary" className="whitespace-nowrap" loading={saving} disabled={processingPhotos} onClick={save}>{editing ? "Guardar cambios" : "Crear producto"}</Button></div></div>
+      </div>
+      <ConfirmDialog open={confirmSingle} onOpenChange={setConfirmSingle} title="¿Unificar el stock en una variante?" description="Las unidades recibidas y vendidas se conservarán como totales. Al guardar, se reemplazará el desglose por talle por una sola variante." confirmText="Usar una variante" onConfirm={() => { cambiarModo(false); setConfirmSingle(false); }} />
+      <ConfirmDialog open={confirmLeave} onOpenChange={next => { setConfirmLeave(next); if (!next) pendingHref.current = null; }} title="¿Descartar los cambios sin guardar?" cancelText="Seguir editando" description="Los datos que modificaste en esta ficha no se conservarán." confirmText="Descartar cambios" onConfirm={() => { const href = pendingHref.current; pendingHref.current = null; setConfirmLeave(false); onOpenChange(false); if (href) window.location.assign(href); }} />
+    </main>
   );
 }
 

@@ -1,6 +1,6 @@
 # Productos y Tiendanube
 
-En `/inventario`, **Agregar / Editar ítem → Ficha para la tienda** permite guardar una descripción pública independiente de las notas internas, hasta nueve fotos, categoría, peso y ajustes de precio. La primera foto es la portada; **Antes** cambia el orden. Las fotos se guardan como JPEG en PostgreSQL junto con la ficha. No dependen del disco efímero de Docker. Para catálogos grandes conviene migrarlas a almacenamiento de objetos, porque hoy se leen con el inventario.
+En `/inventario`, crear un producto o abrir su nombre o la acción **Editar** muestra un editor de página completa con las secciones **Producto**, **Talles y stock**, **Costos y precio** y **Fotos y tienda**. En **Fotos y tienda** se administran hasta nueve fotos en un único lugar, antes de la descripción pública, la categoría y el peso de envío; la descripción es independiente de las notas internas. El descuento por transferencia y el redondeo del precio de lista se ajustan en **Costos y precio**. La barra inferior conserva las acciones **Crear producto / Guardar cambios**: guardan la ficha en el inventario, sin enviarla ni publicarla en Tiendanube. La primera foto es la portada; **Antes** cambia el orden. Las fotos se guardan como JPEG en PostgreSQL junto con la ficha. No dependen del disco efímero de Docker. Para catálogos grandes conviene migrarlas a almacenamiento de objetos, porque hoy se leen con el inventario.
 
 ## Fotos uniformes antes de importar
 
@@ -12,7 +12,7 @@ Las fotos nuevas, incluidas las agregadas por enlace HTTPS, se normalizan autom�
 
 Los archivos del equipo se procesan en el navegador. Para enlaces, `/api/inventario/fotos/normalizar` descarga exclusivamente imágenes de sitios HTTPS públicos: valida DNS y cada redirección, fija la IP de la conexión, bloquea redes internas y limita tamaño, duración, cantidad de solicitudes y operaciones simultáneas. No requiere las credenciales de Tiendanube. Algunos sitios restringen descargas externas; en ese caso se puede subir el archivo desde el equipo.
 
-En **Herramientas → Preparar y publicar productos** se revisan los productos seleccionados, o los filtrados si no hay selección. Se muestran precio publicado, SKU, stock por talle, validaciones y advertencias. La ficha se puede preparar sin credenciales de Tiendanube.
+Desde la acción directa **Tiendanube** o **Herramientas → Preparar y publicar productos** se revisan los productos seleccionados, o los filtrados si no hay selección. Se muestran precio publicado, SKU, stock por talle, validaciones y advertencias. Al editar una ficha desde esta revisión se abre el mismo editor; después de guardar o salir se vuelve a la revisión para decidir el envío. Salir con cambios sin guardar pide confirmar que se descarten. Guardar la ficha no inicia la publicación. La ficha se puede preparar sin credenciales de Tiendanube.
 
 ## Configuración privada
 

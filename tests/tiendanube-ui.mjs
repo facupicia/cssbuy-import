@@ -50,7 +50,7 @@ try {
       }
       return ok({});
     });
-    await page.goto("http://localhost:3001/inventario");
+    await page.goto(`${process.env.TEST_BASE_URL || "http://localhost:3001"}/inventario`);
     await page.getByRole("button", { name: "Herramientas" }).click();
     await page.getByRole("menuitem", { name: "Preparar y publicar productos" }).click();
     const preview = page.getByRole("dialog");
@@ -60,7 +60,8 @@ try {
     await preview.screenshot({ path: `${output}/tiendanube-${viewport.width}.png` });
     assert.equal(await page.evaluate(() => document.documentElement.scrollWidth > window.innerWidth), false);
     await preview.getByRole("button", { name: "Editar ficha", exact: true }).click();
-    const editor = page.getByRole("dialog", { name: "Editar ítem", exact: true });
+    const editor = page.getByRole("main", { name: "Editar producto", exact: true });
+    await editor.getByRole("tab", { name: /^Fotos y tienda/ }).click();
     await editor.getByLabel("Descripción pública", { exact: true }).fill("Descripción editada desde el panel");
     await editor.getByLabel("Subir fotos desde tu equipo").setInputFiles([
       { name: "prenda-horizontal.png", mimeType: "image/png", buffer: png },
