@@ -449,6 +449,11 @@ export default function InventarioPage() {
     router.push(`/tiendanube/publicar?ids=${encodeURIComponent(scope.map(item => item.id).join(","))}`);
   }
 
+  function openPhotoUpdates() {
+    const scope = selectedVisibles.length ? selectedVisibles : filtered;
+    router.push(`/tiendanube/publicar?accion=fotos&ids=${encodeURIComponent(scope.map(item => item.id).join(","))}`);
+  }
+
   async function submitForm() {
     setFormError("");
     try { sanitizeStoreProfile(form.tienda); }
@@ -612,6 +617,7 @@ export default function InventarioPage() {
               Importar de CSSBuy
             </Button>
             <Button variant="outline" size="sm" icon={<Store className="h-3.5 w-3.5" />} onClick={openPublish}>Tiendanube</Button>
+            <Button variant="outline" size="sm" disabled={!filtered.length} onClick={openPhotoUpdates}>Actualizar fotos en Tiendanube</Button>
             <Menu>
               <MenuTrigger asChild>
                 <Button variant="outline" size="sm" icon={<MoreHorizontal className="h-3.5 w-3.5" />}>

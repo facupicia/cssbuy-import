@@ -13,6 +13,7 @@ import { Input } from "@/components/ui/Input";
 import Link from "next/link";
 import { AdminAccessNotice } from "@/components/admin/AdminAccessNotice";
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
+import { StorePhotoUpdates } from "@/components/inventario/StorePhotoUpdates";
 import { StoreInventoryBatch } from "@/components/inventario/StoreInventoryBatch";
 import { StoreCatalogPanel } from "@/components/inventario/StoreCatalogPanel";
 import { Segmented } from "@/components/ui/Segmented";
@@ -65,6 +66,7 @@ export function StorePublishWorkspace({ mode, items, marcas, onChanged, onEdit, 
   }, []);
   useEffect(() => {
     let cancelled = false;
+    if (new URLSearchParams(window.location.search).get("accion") === "fotos") setView("photos");
     const result = new URLSearchParams(window.location.search).get("tiendanube");
     if (result) {
       const cleanUrl = new URL(window.location.href); cleanUrl.searchParams.delete("tiendanube");
@@ -105,10 +107,11 @@ export function StorePublishWorkspace({ mode, items, marcas, onChanged, onEdit, 
             ? <StoreCatalogPanel storeId={session.storeId} categories={categories} onBusyChange={setBusy} />
             : <p className="text-sm">Ingresá y conectá tu tienda para consultar y editar su catálogo.</p>)}
           {mode === "publish" && <div className="space-y-6">
-          <fieldset disabled={busy}><legend className="sr-only">Modo de publicación</legend><Segmented value={view} onChange={value => { if (!busy) setView(value); }} options={[{ value: "single", label: "Revisar un producto" }, { value: "batch", label: "Publicar en lote" }]} /></fieldset>
+          <fieldset disabled={busy}><legend className="sr-only">Modo de publicación</legend><Segmented className="flex-wrap" value={view} onChange={value => { if (!busy) setView(value); }} options={[{ value: "single", label: "Revisar un producto" }, { value: "batch", label: "Publicar en lote" }, { value: "photos", label: "Actualizar fotos" }]} /></fieldset>
           <div className="grid items-end gap-4 sm:grid-cols-2"><Input label="Buscar en esta selección" value={search} disabled={busy} onChange={e => setSearch(e.target.value)} placeholder="Nombre, marca o SKU" /><label className="space-y-2 text-sm"><span className="block font-medium">Estado en Tiendanube</span><select className="h-10 w-full rounded-lg border border-[var(--color-border)] bg-[var(--color-bg-elevated)] px-3" value={status} disabled={busy || !session?.authenticated || checking} onChange={e => setStatus(e.target.value)}><option value="all">Todos los productos</option><option value="new">Nuevos, sin vincular</option><option value="linked">Vinculados, para actualizar</option></select></label></div>
           <label className="flex min-h-10 items-center gap-2 text-sm"><input type="checkbox" checked={readyOnly} onChange={e => setReadyOnly(e.target.checked)} disabled={busy} />Mostrar solo fichas completas</label>
-          {view === "batch" ?
+          {view === "photos" ? <StorePhotoUpdates items={visible} links={links} storeId={session?.storeId} enabled={Boolean(session?.authenticated && session.configured && !checking)} busy={busy} onBusyChange={setBusy} onRefresh={async () => { await refresh(); await onChanged(); }} />
+          : view === "batch" ?
           <StoreInventoryBatch items={visible} marcas={marcas} links={links} storeId={session?.storeId} enabled={Boolean(session?.authenticated && session.configured && !checking)} busy={busy} onBusyChange={setBusy} onRefresh={async () => { await refresh(); await onChanged(); }} />
           : <div className="grid gap-6 md:grid-cols-[minmax(0,1fr)_minmax(0,2fr)]">
             <div className="space-y-2">

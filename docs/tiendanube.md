@@ -33,6 +33,20 @@ Las tareas tienen páginas separadas y navegación común:
 
 El único formulario de contraseña está en Configuración, accesible desde el engranaje de la navegación. `/api/admin/session` usa la sesión administrativa existente de una hora y la comparte con publicación, catálogo, personalización, CSSBuy y reportes. La cookie continúa siendo HttpOnly, SameSite estricto y limitada a `/api`; cerrar el acceso elimina también la antigua sesión independiente de publicidad. La clave de integración de solo lectura conserva sus permisos anteriores. Los reportes siguen requiriendo su configuración de servidor. No se cambia ni se expone la contraseña guardada en el servidor.
 
+## Actualizar solo las fotos de productos existentes
+
+El botón **Actualizar fotos en Tiendanube**, en Inventario, lleva a `/tiendanube/publicar?accion=fotos` y conserva los IDs seleccionados, o todos los resultados filtrados si no hay selección. También está la pestaña **Actualizar fotos** junto a la revisión individual y la publicación en lote.
+
+Se muestran los productos, el ID remoto y la cantidad de fotos guardadas. Los vinculados con fotos válidas quedan seleccionados inicialmente. Para productos cargados anteriormente en la tienda, **Buscar productos ya publicados** permite elegir explícitamente su publicación existente por nombre, ID, variante y SKU, con una miniatura de la foto actual. Se excluyen publicaciones vinculadas a otras fichas. El vínculo se guarda al confirmar el envío; consultar el catálogo no cambia productos.
+
+**Actualizar fotos de N productos** abre la confirmación. El endpoint privado `/api/tiendanube/photos` envía únicamente imágenes al producto existente: conserva stock, precios, promociones, descripción, variantes, URL y visibilidad. No exige completar campos de una publicación nueva como precio, categoría o peso. Nunca crea un producto remoto ni lo oculta durante el envío.
+
+El orden de la galería local define las primeras posiciones y la portada. Se retiran únicamente fotos gestionadas por este panel que ya no estén en la galería local; las fotos cargadas directamente en Tiendanube se conservan. Una galería vacía se bloquea para evitar borrar accidentalmente todas las fotos. Las subidas se identifican por hash y metadatos SEO en el alta, con compatibilidad de lectura del marcador anterior; un reintento recupera imágenes cuya respuesta de creación se perdió. DELETE admite respuesta sin cuerpo (204).
+
+Se comprueban cuenta, origen, versión local, tienda, vínculo e ID remoto. Los bloqueos por ficha y producto remoto se comparten con la publicación completa y la edición del catálogo. La actualización de fotos tiene su propia fecha `photos_synced_at`: no se presenta como una sincronización completa de precio y stock. Los lotes son secuenciales, tienen resultado por producto y se pueden detener después del actual. Errores de autenticación, permisos, límites o servicio detienen el lote y los fallidos y pendientes quedan seleccionados para reintentar. Mantener la pantalla abierta; si se recarga, se puede volver a seleccionar y enviar sin duplicar las subidas reconocidas.
+
+La API no proporciona una transacción para toda la galería: ante un fallo pueden quedar fotos ya aplicadas. La confirmación y los resultados distinguen esta actualización de la publicación completa. Pruebas: `tests/store-photos.test.ts` y las pruebas existentes de publicación y catálogo, con Tiendanube simulada.
+
 ## Configuración privada
 
 ### App privada para el plan Esencial

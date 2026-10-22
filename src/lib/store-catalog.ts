@@ -24,7 +24,7 @@ export async function listStoreCatalog(page: number, search: string) {
   const products = await storeRequest<Raw[]>(`/products?${query}`, "GET", undefined, connection);
   await ensureStoreLinks();
   const links = await getPool().query("SELECT item_id,product_id FROM tiendanube_links WHERE store_id=$1 AND product_id IS NOT NULL", [connection.storeId]);
-  return { storeId: connection.storeId, products: products.map(p => ({ ...catalogProduct(p), linkedItemId: links.rows.find(l => String(l.product_id) === String(p.id))?.item_id })), hasMore: products.length === 30 };
+  return { storeId: connection.storeId, products: products.map(p => ({ ...catalogProduct(p), thumbnail: p.images?.[0]?.src || null, linkedItemId: links.rows.find(l => String(l.product_id) === String(p.id))?.item_id })), hasMore: products.length === 30 };
 }
 
 type Step = { variantId?: number; body: Raw; before: Raw };

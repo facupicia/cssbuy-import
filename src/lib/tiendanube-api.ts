@@ -1,7 +1,7 @@
 import { createHash } from "node:crypto";
 import type { PoolClient } from "pg";
 import { ensureSchema, getInventoryItem, getInventoryItems, getMarcas, getPool } from "./db";
-import { storePhotos, storeReadiness, storeVariants } from "./store-product";
+import { storePhotos, storeReadiness, storeVariants, validPhoto } from "./store-product";
 import { generarDescripcionTiendaHTML } from "./descripcion";
 import { loadStoreCredentials, type StoreCredentials } from "./store-connection";
 import { withStoreCategory } from "./store-category";
@@ -23,13 +23,14 @@ export async function storeRequest<T>(path: string, method = "GET", body?: unkno
     const labels: Record<number, string> = { 401: "Credenciales de Tiendanube inválidas", 403: "La aplicación necesita permisos de lectura y escritura de productos", 404: "No se encontró el recurso en Tiendanube. Revisá el vínculo antes de reintentar", 422: "Tiendanube rechazó los datos. Revisá categorías, variantes, peso y fotos", 429: "Tiendanube alcanzó su límite de solicitudes. Esperá un minuto y reintentá" };
     throw new StoreApiError(labels[response.status] ?? "Tiendanube no pudo completar la operación", [401, 403, 422, 429].includes(response.status) ? response.status : 502);
   }
-  return response.json() as Promise<T>;
+  const text = await response.text();
+  return (text ? JSON.parse(text) : undefined) as T;
 }
 
 type Translation = Record<string, string>;
 export interface RemoteVariant { id: number; sku: string; values: Translation[] }
-export interface RemoteProduct { id: number; variants: RemoteVariant[]; attributes: Translation[]; images: { id: number; alt?: string }[]; published: boolean; handle: Translation }
-export interface StoreLink { product_id: string | null; synced_at: string | null; visibility: string | null; error: string | null }
+export interface RemoteProduct { id: number; variants: RemoteVariant[]; attributes: Translation[]; images: { id: number; alt?: string | Translation; position?: number }[]; published: boolean; handle: Translation }
+export interface StoreLink { product_id: string | null; synced_at: string | null; visibility: string | null; error: string | null; photos_synced_at?: string | null }
 
 let schema: Promise<void> | null = null;
 export async function ensureStoreLinks() {
@@ -38,6 +39,7 @@ export async function ensureStoreLinks() {
       store_id TEXT NOT NULL, item_id UUID NOT NULL REFERENCES inventory_items(id) ON DELETE CASCADE,
       product_id TEXT, synced_at TIMESTAMPTZ, visibility TEXT, error TEXT,
       images JSONB NOT NULL DEFAULT '{}'::jsonb, PRIMARY KEY (store_id, item_id), UNIQUE (store_id, product_id))`);
+    await getPool().query("ALTER TABLE tiendanube_links ADD COLUMN IF NOT EXISTS photos_synced_at TIMESTAMPTZ");
   }).catch(e => { schema = null; throw e; });
   return schema;
 }
@@ -45,7 +47,7 @@ export async function getStoreLinks(): Promise<Record<string, StoreLink>> {
   const credentials = await loadStoreCredentials();
   if (!credentials) return {};
   await ensureStoreLinks();
-  const result = await getPool().query("SELECT item_id, product_id, synced_at, visibility, error FROM tiendanube_links WHERE store_id=$1", [credentials.storeId]);
+  const result = await getPool().query("SELECT item_id, product_id, synced_at, visibility, error, photos_synced_at FROM tiendanube_links WHERE store_id=$1", [credentials.storeId]);
   return Object.fromEntries(result.rows.map(r => [r.item_id, r]));
 }
 export async function getStoreCategories(connection?: StoreCredentials) {
@@ -135,36 +137,11 @@ export async function syncStoreProduct(itemId: string, publish: boolean, expecte
     // Removed sizes remain in the store at zero stock, preserving their identity/history.
     const keys = new Set(variants.map(v => variantKey(v.props.map(p => p.valor))));
     for (const v of remote.variants) if (!keys.has(variantKey(v.values.map(translated)))) await request(`/products/${remote.id}/variants/${v.id}`, "PUT", stockBody(0));
-    const imageMap: Record<string, number> = link.images ?? {};
-    const desired = new Set<string>();
-    for (const [position, photo] of storePhotos(item).entries()) {
-      const hash = createHash("sha256").update(photo).digest("hex");
-      desired.add(hash);
-      // Alt marker recovers an image POST whose response was lost.
-      const marker = `${item.nombre} | PLUG ${hash}`;
-      const mapped = imageMap[hash];
-      const existing = (remote.images?.some(i => i.id === mapped) ? mapped : undefined)
-        ?? remote.images?.find(i => i.alt === marker)?.id;
-      if (existing) {
-        imageMap[hash] = existing;
-        await request(`/products/${remote.id}/images/${existing}`, "PUT", { position: position + 1 });
-      } else {
-        const data = photo.match(/^data:image\/(jpeg|png|webp);base64,(.+)$/);
-        const image = await request<{ id: number }>(`/products/${remote.id}/images`, "POST", { position: position + 1, alt: marker,
-          ...(data ? { attachment: data[2], filename: `producto.${data[1] === "jpeg" ? "jpg" : data[1]}` } : { src: photo }) });
-        imageMap[hash] = image.id;
-      }
-      await client.query("UPDATE tiendanube_links SET images=$3 WHERE store_id=$1 AND item_id=$2", [credentials.storeId, itemId, JSON.stringify(imageMap)]);
-    }
-    for (const [hash, id] of Object.entries(imageMap)) if (!desired.has(hash)) {
-      if (remote.images?.some(i => i.id === id)) await request(`/products/${remote.id}/images/${id}`, "DELETE");
-      delete imageMap[hash];
-      await client.query("UPDATE tiendanube_links SET images=$3 WHERE store_id=$1 AND item_id=$2", [credentials.storeId, itemId, JSON.stringify(imageMap)]);
-    }
+    await syncManagedPhotos(client, credentials, itemId, item.nombre, storePhotos(item), remote, link.images ?? {});
     const current = await getInventoryItem(itemId);
     if (current?.updatedAt !== item.updatedAt) throw new StoreApiError("El producto cambió durante el envío. Quedó oculto: revisá la vista previa y reintentá", 409);
     await request(`/products/${remote.id}`, "PUT", { published: publish });
-    await client.query("UPDATE tiendanube_links SET synced_at=now(), visibility=$3, error=NULL WHERE store_id=$1 AND item_id=$2", [credentials.storeId, itemId, publish ? "visible" : "hidden"]);
+    await client.query("UPDATE tiendanube_links SET synced_at=now(), photos_synced_at=now(), visibility=$3, error=NULL WHERE store_id=$1 AND item_id=$2", [credentials.storeId, itemId, publish ? "visible" : "hidden"]);
     return { productId: remote.id, published: publish };
   } catch (error) {
     if (locked) await client.query("UPDATE tiendanube_links SET error=$3 WHERE store_id=$1 AND item_id=$2", [credentials.storeId, itemId, error instanceof StoreApiError ? error.message : "Error al enviar el producto. Reintentá desde la vista previa"]).catch(() => undefined);
@@ -172,6 +149,90 @@ export async function syncStoreProduct(itemId: string, publish: boolean, expecte
   } finally {
     if (productLock) await client.query("SELECT pg_advisory_unlock(hashtextextended($1, 0))", [productLock]).catch(() => undefined);
     if (locked) await client.query("SELECT pg_advisory_unlock(hashtextextended($1, 0))", [lock]).catch(() => undefined);
+    client.release();
+  }
+}
+
+/** Only the images owned by this panel are reordered or removed. */
+async function syncManagedPhotos(client: PoolClient, credentials: StoreCredentials, itemId: string, name: string, photos: string[], remote: RemoteProduct, imageMap: Record<string, number>) {
+  const request = <T>(path: string, method = "GET", body?: unknown) => storeRequest<T>(path, method, body, credentials);
+  const persist = () => client.query("UPDATE tiendanube_links SET images=$3 WHERE store_id=$1 AND item_id=$2", [credentials.storeId, itemId, JSON.stringify(imageMap)]);
+  const remoteImages = remote.images ?? [];
+  // Recover successful uploads with a lost response, including after a rename.
+  for (const image of remoteImages) {
+    const alternatives = typeof image.alt === "string" ? [image.alt] : Object.values(image.alt ?? {});
+    const hash = alternatives.map(alt => alt.match(/\| PLUG ([a-f0-9]{64})$/)?.[1]).find(Boolean);
+    if (hash) imageMap[hash] = image.id;
+  }
+  const desired = new Set<string>();
+  let uploaded = 0, removed = 0;
+  for (const [position, photo] of photos.entries()) {
+    const hash = createHash("sha256").update(photo).digest("hex");
+    desired.add(hash);
+    const existing = remoteImages.find(image => image.id === imageMap[hash]);
+    if (existing) {
+      if (existing.position !== position + 1) await request(`/products/${remote.id}/images/${existing.id}`, "PUT", { position: position + 1 });
+    } else {
+      const data = photo.match(/^data:image\/(jpeg|png|webp);base64,(.+)$/);
+      const image = await request<{ id: number }>(`/products/${remote.id}/images`, "POST", {
+        position: position + 1, seo: { es: { alt: `${name} | PLUG ${hash}` } },
+        ...(data ? { attachment: data[2], filename: `producto.${data[1] === "jpeg" ? "jpg" : data[1]}` } : { src: photo }),
+      });
+      imageMap[hash] = image.id; uploaded++;
+    }
+    await persist();
+  }
+  for (const [hash, id] of Object.entries(imageMap)) if (!desired.has(hash)) {
+    if (remoteImages.some(image => image.id === id)) { await request(`/products/${remote.id}/images/${id}`, "DELETE"); removed++; }
+    delete imageMap[hash]; await persist();
+  }
+  return { uploaded, removed, photos: photos.length };
+}
+
+/** Update a previewed, existing link. Never creates products or writes variants. */
+export async function syncStorePhotos(itemId: string, expectedUpdatedAt: string, expectedProductId: string, expectedStoreId: string, linkExisting = false) {
+  const credentials = await loadStoreCredentials();
+  if (!credentials) throw new StoreApiError("Conectá tu Tiendanube antes de actualizar las fotos", 503);
+  if (credentials.storeId !== expectedStoreId) throw new StoreApiError("La tienda conectada cambió. Actualizá la vista previa", 409);
+  await ensureStoreLinks();
+  const client = await getPool().connect();
+  const locks: string[] = [];
+  const lock = async (key: string) => {
+    const result = await client.query("SELECT pg_try_advisory_lock(hashtextextended($1, 0)) AS locked", [key]);
+    if (!result.rows[0].locked) throw new StoreApiError("Este producto ya se está actualizando. Esperá a que termine", 409);
+    locks.push(key);
+  };
+  try {
+    await lock(`tiendanube:${credentials.storeId}:${itemId}`);
+    const item = await getInventoryItem(itemId);
+    if (!item) throw new StoreApiError("El producto ya no está en el inventario", 404);
+    if (item.updatedAt !== expectedUpdatedAt) throw new StoreApiError("La ficha cambió. Actualizá la vista previa antes de enviar las fotos", 409);
+    const photos = storePhotos(item);
+    if (!photos.length || photos.length > 9 || photos.some(photo => !validPhoto(photo))) throw new StoreApiError("Guardá entre una y nueve fotos válidas antes de actualizar", 422);
+    const link = (await client.query("SELECT * FROM tiendanube_links WHERE store_id=$1 AND item_id=$2", [credentials.storeId, itemId])).rows[0];
+    if (!link?.product_id && !linkExisting) throw new StoreApiError("Este producto todavía no está vinculado con Tiendanube. Revisá su publicación primero", 409);
+    if (link?.product_id && String(link.product_id) !== expectedProductId) throw new StoreApiError("El vínculo cambió. Actualizá la vista previa", 409);
+    await lock(`tiendanube:product:${credentials.storeId}:${expectedProductId}`);
+    const remote = await storeRequest<RemoteProduct>(`/products/${expectedProductId}`, "GET", undefined, credentials);
+    if (String(remote.id) !== expectedProductId) throw new StoreApiError("Tiendanube devolvió otro producto. Revisá el vínculo", 409);
+    if (!link?.product_id) {
+      try {
+        const saved = await client.query(`INSERT INTO tiendanube_links (store_id,item_id,product_id) VALUES ($1,$2,$3)
+          ON CONFLICT (store_id,item_id) DO UPDATE SET product_id=EXCLUDED.product_id
+          WHERE tiendanube_links.product_id IS NULL RETURNING product_id`, [credentials.storeId, itemId, expectedProductId]);
+        if (!saved.rows.length) throw new StoreApiError("El vínculo cambió. Actualizá la vista previa", 409);
+      } catch (error) {
+        if ((error as { code?: string }).code === "23505") throw new StoreApiError("Ese producto de Tiendanube ya está vinculado con otra ficha del inventario", 409);
+        throw error;
+      }
+    }
+    const result = await syncManagedPhotos(client, credentials, itemId, item.nombre, photos, remote, link?.images ?? {});
+    const current = await getInventoryItem(itemId);
+    if (current?.updatedAt !== expectedUpdatedAt) throw new StoreApiError("La ficha cambió durante el envío. Algunas fotos pueden haberse actualizado; revisá y reintentá", 409);
+    await client.query("UPDATE tiendanube_links SET photos_synced_at=now() WHERE store_id=$1 AND item_id=$2", [credentials.storeId, itemId]);
+    return { productId: remote.id, ...result };
+  } finally {
+    for (const key of locks.reverse()) await client.query("SELECT pg_advisory_unlock(hashtextextended($1, 0))", [key]).catch(() => undefined);
     client.release();
   }
 }
