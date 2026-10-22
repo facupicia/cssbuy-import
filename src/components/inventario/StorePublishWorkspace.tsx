@@ -130,7 +130,7 @@ export function StorePublishWorkspace({ mode, items, marcas, onChanged, onEdit, 
               {readiness && <div className="space-y-2 text-sm" aria-live="polite">{readiness.errors.length > 0 && <div><h4 className="font-medium">Para completar la ficha</h4><ul className="list-disc space-y-1 pl-4">{readiness.errors.map(e => <li key={e}>{e}</li>)}</ul></div>}{readiness.warnings.length > 0 && <ul className="list-disc space-y-1 pl-4 text-[var(--color-warning)]">{readiness.warnings.map(w => <li key={w}>{w}</li>)}</ul>}{readiness.ready && <p className="text-[var(--color-accent)]">La ficha está completa.</p>}</div>}
               {photos.length > 0 ? <div className="flex snap-x gap-3 overflow-x-auto">{photos.map((src, i) => <div key={i} className="w-48 shrink-0 snap-start">
                 {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img src={src} alt={`${item.nombre}, foto ${i + 1}`} className="aspect-square w-full rounded-lg bg-[var(--color-bg-subtle)] object-contain" referrerPolicy="no-referrer" />
+                <img src={src} loading="lazy" decoding="async" alt={`${item.nombre}, foto ${i + 1}`} className="aspect-square w-full rounded-lg bg-[var(--color-bg-subtle)] object-contain" referrerPolicy="no-referrer" />
               </div>)}</div> : <p className="rounded-lg bg-[var(--color-bg-subtle)] p-4 text-sm">Agregá las fotos desde Editar ficha en inventario.</p>}
               <dl className="grid grid-cols-2 gap-4 text-sm"><div><dt className="text-[var(--color-fg-muted)]">Precio publicado</dt><dd className="text-xl font-semibold tabular-nums">{fmtARS(variants[0]?.price ?? 0)}</dd></div><div><dt className="text-[var(--color-fg-muted)]">Precio objetivo por transferencia</dt><dd className="font-medium tabular-nums">{fmtARS(item.precioVentaARS)}</dd></div></dl>
               <p className="text-xs text-[var(--color-fg-muted)]">Descuento previsto: {item.tienda?.descuentoPct ?? EMPTY_STORE_PROFILE.descuentoPct}%. Configurá ese descuento en Tiendanube. El envío actualiza el precio de lista y quita el precio promocional de las variantes enviadas.</p>
@@ -138,7 +138,10 @@ export function StorePublishWorkspace({ mode, items, marcas, onChanged, onEdit, 
               {categories.length > 0 && <div className="space-y-2"><label htmlFor="remote-category" className="text-sm font-medium">Categoría en Tiendanube</label><select id="remote-category" disabled={busy} value={item.tienda?.categoriaId ?? ""} className="w-full rounded-lg border border-[var(--color-border)] bg-[var(--color-bg-elevated)] p-3 text-sm" onChange={async e => {
                 const category = categories.find(c => c.id === Number(e.target.value)); if (!category) return;
                 setBusy(true); setError("");
-                try { await json(`/api/inventario/${item.id}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ tienda: { ...(item.tienda ?? EMPTY_STORE_PROFILE), categoriaId: category.id, categoria: category.name } }) }); await onChanged(); }
+                try {
+                  const full = item.mediaDeferred ? (await json<{ item: InventoryItem }>(`/api/inventario/${item.id}`)).item : item;
+                  await json(`/api/inventario/${item.id}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ tienda: { ...(full.tienda ?? EMPTY_STORE_PROFILE), categoriaId: category.id, categoria: category.name } }) }); await onChanged();
+                }
                 catch(e) { setError(e instanceof Error ? e.message : "No se pudo guardar la categoría"); } finally { setBusy(false); }
               }}><option value="" disabled>Elegí una categoría de la tienda</option>{categories.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}</select>{!item.tienda?.categoriaId && item.tienda?.categoria && <p className="text-xs text-[var(--color-warning)]">No se encontró una categoría única para {item.tienda.categoria}. Creala en Tiendanube o elegí otra categoría.</p>}</div>}
 

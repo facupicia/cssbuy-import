@@ -1,3 +1,5 @@
+import { deferInventoryMedia } from "@/lib/inventory-media";
+import { PRIVATE_HEADERS } from "@/lib/integration-auth";
 import { storeGuard } from "@/lib/store-auth";
 import { NextResponse } from "next/server";
 import {
@@ -21,7 +23,7 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
   try {
     const item = await getInventoryItem(id);
     if (!item) return NextResponse.json({ error: "No encontrado" }, { status: 404 });
-    return NextResponse.json({ item });
+    return NextResponse.json({ item }, { headers: PRIVATE_HEADERS });
   } catch (err) {
     return NextResponse.json(
       { error: err instanceof Error ? err.message : "Error" },
@@ -43,7 +45,7 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
     }
     const item = await updateInventoryItem(id, input);
     if (!item) return NextResponse.json({ error: "No encontrado" }, { status: 404 });
-    return NextResponse.json({ item });
+    return NextResponse.json({ item: deferInventoryMedia(item) }, { headers: PRIVATE_HEADERS });
   } catch (err) {
     console.error("Error actualizando ítem de inventario:", err);
     return NextResponse.json(

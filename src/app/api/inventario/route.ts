@@ -1,8 +1,10 @@
+import { deferInventoryMedia } from "@/lib/inventory-media";
 import { storeGuard } from "@/lib/store-auth";
 import { NextResponse } from "next/server";
 import { isPgConfigured, getInventoryItems, insertInventoryItem } from "@/lib/db";
 import { sanitizeInventoryInput, suggestEstado } from "@/lib/inventory";
 import { readStoreJson } from "@/lib/store-auth";
+import { PRIVATE_HEADERS } from "@/lib/integration-auth";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -18,8 +20,8 @@ export async function GET(request: Request) {
     return NextResponse.json({ ...NO_DB, items: [] }, { status: 500 });
   }
   try {
-    const items = await getInventoryItems();
-    return NextResponse.json({ items });
+    const items = await getInventoryItems({ media: "urls" });
+    return NextResponse.json({ items }, { headers: PRIVATE_HEADERS });
   } catch (err) {
     console.error("Error leyendo inventario:", err);
     return NextResponse.json(
@@ -52,7 +54,7 @@ export async function POST(request: Request) {
         input.origen ??= "manual";
         created.push(await insertInventoryItem(input));
       }
-      return NextResponse.json({ items: created, count: created.length });
+      return NextResponse.json({ items: created.map(item => deferInventoryMedia(item)), count: created.length }, { headers: PRIVATE_HEADERS });
     }
 
     const input = sanitizeInventoryInput(body ?? {});
@@ -65,7 +67,7 @@ export async function POST(request: Request) {
     input.origen ??= "manual";
 
     const item = await insertInventoryItem(input);
-    return NextResponse.json({ item });
+    return NextResponse.json({ item: deferInventoryMedia(item) }, { headers: PRIVATE_HEADERS });
   } catch (err) {
     console.error("Error creando ítem de inventario:", err);
     return NextResponse.json(

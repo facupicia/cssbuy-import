@@ -211,6 +211,8 @@ export interface StoreProductProfile {
 }
 
 export interface InventoryItem {
+  /** List responses reference private images; edit with the full detail first. */
+  mediaDeferred?: boolean;
   id: string;
   nombre: string;
   sku?: string | null;

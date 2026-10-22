@@ -35,7 +35,7 @@ export async function POST(request: Request) {
     const sobrescribir = body?.sobrescribir === true;
     const preview = body?.preview === true;
 
-    const [todos, marcas] = await Promise.all([getInventoryItems(), getMarcas()]);
+    const [todos, marcas] = await Promise.all([getInventoryItems({ media: "none" }), getMarcas()]);
     const nombreDeMarca = Object.fromEntries(marcas.map((m) => [m.id, m.nombre]));
 
     // El lote se calcula sobre el inventario completo para que el correlativo y

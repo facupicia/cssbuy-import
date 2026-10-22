@@ -18,7 +18,7 @@ export async function GET(request: Request) {
     return NextResponse.json({ error: "Inventario pendiente de configurar." }, { status: 503, headers: PRIVATE_HEADERS });
   }
   try {
-    const products = (await getInventoryItems()).map(item => productAdEconomics(item, assumptions));
+    const products = (await getInventoryItems({ media: "none" })).map(item => productAdEconomics(item, assumptions));
     return NextResponse.json({ currency: "ARS", generatedAt: new Date().toISOString(), assumptions,
       scope: "Una unidad por pedido. Costos actuales; no representa ventas atribuidas ni ganancia neta.",
       products }, { headers: PRIVATE_HEADERS });

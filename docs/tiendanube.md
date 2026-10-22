@@ -1,12 +1,22 @@
 # Productos y Tiendanube
 
-En `/inventario`, crear un producto o abrir su nombre o la acción **Editar** muestra un editor de página completa con las secciones **Producto**, **Talles y stock**, **Costos y precio** y **Fotos y tienda**. En **Fotos y tienda** se administran hasta nueve fotos en un único lugar, antes de la descripción pública, la categoría y el peso de envío; la descripción es independiente de las notas internas. El descuento por transferencia y el redondeo del precio de lista se ajustan en **Costos y precio**. La barra inferior conserva las acciones **Crear producto / Guardar cambios**: guardan la ficha en el inventario, sin enviarla ni publicarla en Tiendanube. La primera foto es la portada; **Antes** cambia el orden. Las fotos se guardan como JPEG en PostgreSQL junto con la ficha. No dependen del disco efímero de Docker. Para catálogos grandes conviene migrarlas a almacenamiento de objetos, porque hoy se leen con el inventario.
+En `/inventario`, crear un producto o abrir su nombre o la acción **Editar** muestra un editor de página completa con las secciones **Producto**, **Talles y stock**, **Costos y precio** y **Fotos y tienda**. En **Fotos y tienda** se administran hasta nueve fotos en un único lugar, antes de la descripción pública, la categoría y el peso de envío; la descripción es independiente de las notas internas. El descuento por transferencia y el redondeo del precio de lista se ajustan en **Costos y precio**. La barra inferior conserva las acciones **Crear producto / Guardar cambios**: guardan la ficha en el inventario, sin enviarla ni publicarla en Tiendanube. La primera foto es la portada; **Antes** cambia el orden. Las fotos se guardan como JPEG en PostgreSQL junto con la ficha. No dependen del disco efímero de Docker. El listado usa referencias privadas livianas; las galerías completas se consultan al abrir una ficha. Para catálogos grandes se puede migrar el almacenamiento a objetos sin cambiar este flujo.
 
 ## Listado de inventario
 
 El listado muestra 10, 20 o 50 productos por página (20 por defecto). Podés combinar estado, marca, talle, color, categoría, origen, disponibilidad y precio de venta por transferencia. Cada filtro admite varias opciones: Bape o Supreme se combina con M o L y con los demás filtros. La disponibilidad se calcula para los talles elegidos; el rango de precio incluye ambos extremos. Los filtros activos se pueden quitar de a uno o limpiar juntos.
 
 Al cambiar de página se conservan los productos seleccionados. La casilla del encabezado selecciona únicamente la página actual; **Seleccionar los N resultados** incluye todas las páginas del resultado filtrado. Cambiar filtros o búsqueda limpia la selección. Las acciones en lote usan los seleccionados; si no hay selección, la preparación y exportación a Tiendanube usan todos los resultados filtrados, no solo la página actual. Los indicadores generales de stock y ventas siguen mostrando el inventario completo.
+
+## Carga liviana del inventario
+
+El listado `/api/inventario` proyecta en SQL la metadata, la cantidad de fotos y referencias privadas versionadas; no devuelve el base64 de las galerías ni la imagen duplicada del ítem. La paginación y los filtros conservan todos los datos comerciales disponibles sin descargar las fotos completas. Los lectores de reportes, SKU e importaciones también omiten los medios.
+
+Las miniaturas se sirven como WebP de hasta 256 px desde `/api/inventario/[id]/photos/[index]?v=…&size=thumb`. Tienen carga diferida, decodificación asíncrona, ETag y caché privada que varía por cookie. La generación reutiliza una caché acotada de 8 MB/128 miniaturas y comparte los trabajos en curso. Los enlaces externos se redirigen sin descargarlos desde el servidor. Todas las imágenes del inventario requieren sesión; los endpoints públicos de la tienda son independientes.
+
+Al editar o abrir una ficha pública se carga el detalle completo del producto elegido. Guardar no persiste las URLs internas como fotos originales: esas referencias solo se aceptan en las vistas de lectura. La edición de categorías desde publicación recupera primero el detalle completo. Las respuestas de creación y actualización tampoco devuelven copias del base64. El envío a Tiendanube sigue leyendo las fotos originales desde el servidor y conserva su calidad.
+
+`tests/inventory-media.integration.test.ts` verifica el contrato liviano, bytes del listado, miniaturas, ETag, privacidad, enlaces externos y conservación de originales con PostgreSQL temporal. La comparación de tamaños de esa prueba es de un fixture, no una medición del inventario de producción.
 
 ## Fotos uniformes antes de importar
 

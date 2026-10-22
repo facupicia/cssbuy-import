@@ -5,6 +5,7 @@ import { canonizar, varianteSinTalle } from "./variantes";
 import { descripcionATexto, generarDescripcionTiendaHTML } from "./descripcion";
 import { DEFAULT_TRANSFER_DISCOUNT_PCT, newStoreProfile } from "./store-defaults";
 import { tablaDeMarca } from "./tablas-talle";
+import { isInventoryPhotoUrl } from "./inventory-media";
 
 export const EMPTY_STORE_PROFILE: StoreProductProfile = newStoreProfile();
 
@@ -63,7 +64,7 @@ export function storeReadiness(item: InventoryItem, brand?: string) {
   if (!Number.isFinite(item.precioVentaARS) || item.precioVentaARS <= 0) errors.push("Definí un precio de venta mayor a cero");
   const photos = storePhotos(item);
   if (!photos.length) errors.push("Agregá al menos una foto");
-  if (photos.some(f => !validPhoto(f))) errors.push("Revisá los enlaces de las fotos: deben usar HTTPS");
+  if (photos.some(f => !validPhoto(f) && !(item.mediaDeferred && isInventoryPhotoUrl(f)))) errors.push("Revisá los enlaces de las fotos: deben usar HTTPS");
   if (!descripcionATexto(generarDescripcionTiendaHTML(item, brand))) errors.push("No se pudo generar la descripción pública");
   if (!item.tienda?.categoria.trim() && !item.tienda?.categoriaId) errors.push("Elegí una categoría");
   if (!brand) errors.push("Asigná una marca");

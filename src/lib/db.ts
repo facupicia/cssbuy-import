@@ -1,4 +1,5 @@
 import { Pool } from "pg";
+import { deferInventoryMedia } from "./inventory-media";
 import { fillInventoryWeights } from "./inventory-weight";
 import { withStoreCategory } from "./store-category";
 import { isValidCssbuyOrder, cssbuyStateLabel } from "./cssbuy-status";
@@ -337,6 +338,8 @@ export async function ensureInventoryTable(): Promise<void> {
 }
 
 interface InventoryRow {
+  photo_count?: number;
+  has_image?: boolean;
   id: string;
   nombre: string;
   sku: string | null;
@@ -391,12 +394,33 @@ const INVENTORY_COLS = `id, nombre, sku, variante, imagen, link, cantidad_inicia
   cantidad_vendida, costo_unit_usd, costo_unit_ars, precio_venta_ars, estado,
   ubicacion, notas, origen, origen_ref, marca_id, talles, tienda, created_at, updated_at`;
 
-export async function getInventoryItems(): Promise<InventoryItem[]> {
+export async function getInventoryItems(options: { media?: "full" | "urls" | "none" } = {}): Promise<InventoryItem[]> {
   await ensureSchema();
+  const deferred = options.media === "urls" || options.media === "none";
+  // Exclude base64 in SQL so pg and Node never materialize complete galleries
+  // for a list, report, SKU check, or batch preview.
+  const columns = deferred ? INVENTORY_COLS.replace("variante, imagen,", "variante, NULL::text AS imagen,")
+    .replace("talles, tienda,", "talles, (tienda - 'fotos') AS tienda,") + `,
+      CASE WHEN jsonb_typeof(tienda->'fotos')='array' THEN jsonb_array_length(tienda->'fotos') ELSE 0 END AS photo_count,
+      (imagen IS NOT NULL AND imagen <> '') AS has_image` : INVENTORY_COLS;
   const res = await getPool().query(
-    `SELECT ${INVENTORY_COLS} FROM inventory_items ORDER BY created_at DESC`
+    `SELECT ${columns} FROM inventory_items ORDER BY created_at DESC`
   );
-  return hydrateInventoryWeights(res.rows.map(mapInventoryRow));
+  return hydrateInventoryWeights(res.rows.map((row: InventoryRow) => {
+    const item = mapInventoryRow(row);
+    if (!deferred) return item;
+    const count = row.photo_count || (row.has_image ? 1 : 0);
+    return deferInventoryMedia(item, count, options.media === "urls");
+  }));
+}
+
+export async function getInventoryPhoto(id: string, index: number) {
+  await ensureSchema();
+  const result = await getPool().query(`SELECT updated_at,
+    CASE WHEN jsonb_typeof(tienda->'fotos')='array' AND jsonb_array_length(tienda->'fotos')>0
+      THEN tienda->'fotos'->>$2::int ELSE CASE WHEN $2::int=0 THEN imagen END END AS source
+    FROM inventory_items WHERE id=$1`, [id, index]);
+  return result.rows[0] as { source: string | null; updated_at: Date } | undefined;
 }
 
 async function hydrateInventoryWeights(items: InventoryItem[]): Promise<InventoryItem[]> {

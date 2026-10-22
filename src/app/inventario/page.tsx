@@ -426,11 +426,23 @@ export default function InventarioPage() {
     setFormOpen(true);
   }
 
-  function openEdit(it: InventoryItem) {
-    setFormError("");
-    setEditing(it);
-    setForm(itemToForm(it));
-    setFormOpen(true);
+  const [openingId, setOpeningId] = useState<string | null>(null);
+  const opening = useRef(false);
+  async function readFullItem(it: InventoryItem) {
+    return it.mediaDeferred ? (await fetcher<{ item: InventoryItem }>(`/api/inventario/${it.id}`)).item : it;
+  }
+  async function openEdit(it: InventoryItem) {
+    if (opening.current) return;
+    opening.current = true; setOpeningId(it.id);
+    try {
+      const full = await readFullItem(it);
+      setFormError(""); setEditing(full); setForm(itemToForm(full)); setFormOpen(true);
+    } catch { toast.error("No se pudo abrir la ficha. Reintentá; tus fotos siguen guardadas."); }
+    finally { opening.current = false; setOpeningId(null); }
+  }
+  async function openSheet(it: InventoryItem) {
+    try { setFichaDe(await readFullItem(it)); }
+    catch { toast.error("No se pudo abrir la ficha pública. Reintentá."); }
   }
 
   useEffect(() => {
@@ -587,6 +599,7 @@ export default function InventarioPage() {
     <div className="min-h-screen bg-[var(--color-bg)] flex flex-col">
       <Navbar />
 
+      {openingId && <p role="status" className="mx-auto max-w-7xl px-4 py-3 text-sm">Abriendo ficha y sus fotos…</p>}
       <main hidden={formOpen} className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 py-6 pb-24 md:pb-6 space-y-6">
         {/* Header */}
         <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
@@ -847,6 +860,7 @@ export default function InventarioPage() {
                               // eslint-disable-next-line @next/next/no-img-element
                               <img
                                 src={it.imagen}
+                                  loading="lazy" decoding="async"
                                 alt=""
                                 className="w-8 h-8 rounded object-cover border border-[var(--color-border)] flex-shrink-0"
                               />
@@ -935,7 +949,7 @@ export default function InventarioPage() {
                         <td className="py-2.5 px-3">
                           <div className="flex items-center justify-end gap-1">
                             <Button variant="outline" size="sm" onClick={() => openEdit(it)}>Editar</Button>
-                            <Menu><MenuTrigger asChild><Button variant="ghost" size="sm" aria-label={`Más acciones de ${it.nombre}`} icon={<MoreHorizontal className="h-4 w-4" />} /></MenuTrigger><MenuContent><MenuItem icon={<ShoppingCart className="h-4 w-4" />} disabled={c.stock === 0} onSelect={() => setVentaFor(it)}>Registrar venta</MenuItem><MenuItem icon={<FileText className="h-4 w-4" />} onSelect={() => setFichaDe(it)}>Ver ficha pública</MenuItem><MenuItem icon={<Trash2 className="h-4 w-4" />} onSelect={() => setConfirmDeleteId(it.id)}>Eliminar del inventario</MenuItem></MenuContent></Menu>
+                            <Menu><MenuTrigger asChild><Button variant="ghost" size="sm" aria-label={`Más acciones de ${it.nombre}`} icon={<MoreHorizontal className="h-4 w-4" />} /></MenuTrigger><MenuContent><MenuItem icon={<ShoppingCart className="h-4 w-4" />} disabled={c.stock === 0} onSelect={() => setVentaFor(it)}>Registrar venta</MenuItem><MenuItem icon={<FileText className="h-4 w-4" />} onSelect={() => void openSheet(it)}>Ver ficha pública</MenuItem><MenuItem icon={<Trash2 className="h-4 w-4" />} onSelect={() => setConfirmDeleteId(it.id)}>Eliminar del inventario</MenuItem></MenuContent></Menu>
 
                           </div>
                         </td>
@@ -968,6 +982,7 @@ export default function InventarioPage() {
                         // eslint-disable-next-line @next/next/no-img-element
                         <img
                           src={it.imagen}
+                                  loading="lazy" decoding="async"
                           alt=""
                           className="w-11 h-11 rounded-[var(--radius-sm)] object-cover border border-[var(--color-border)] shrink-0"
                         />
@@ -1065,7 +1080,7 @@ export default function InventarioPage() {
 
                     <div className="flex items-center justify-between gap-2">
                       <Button variant="outline" size="sm" icon={<ShoppingCart className="h-4 w-4" />} disabled={c.stock === 0} onClick={() => setVentaFor(it)}>Registrar venta</Button>
-                      <div className="flex items-center gap-1"><Button variant="outline" size="sm" icon={<Pencil className="h-4 w-4" />} onClick={() => openEdit(it)}>Editar</Button><Menu><MenuTrigger asChild><Button variant="ghost" size="sm" aria-label={`Más acciones de ${it.nombre}`} icon={<MoreHorizontal className="h-4 w-4" />} /></MenuTrigger><MenuContent><MenuItem icon={<FileText className="h-4 w-4" />} onSelect={() => setFichaDe(it)}>Ver ficha pública</MenuItem><MenuItem icon={<Trash2 className="h-4 w-4" />} onSelect={() => setConfirmDeleteId(it.id)}>Eliminar del inventario</MenuItem></MenuContent></Menu></div>
+                      <div className="flex items-center gap-1"><Button variant="outline" size="sm" icon={<Pencil className="h-4 w-4" />} onClick={() => openEdit(it)}>Editar</Button><Menu><MenuTrigger asChild><Button variant="ghost" size="sm" aria-label={`Más acciones de ${it.nombre}`} icon={<MoreHorizontal className="h-4 w-4" />} /></MenuTrigger><MenuContent><MenuItem icon={<FileText className="h-4 w-4" />} onSelect={() => void openSheet(it)}>Ver ficha pública</MenuItem><MenuItem icon={<Trash2 className="h-4 w-4" />} onSelect={() => setConfirmDeleteId(it.id)}>Eliminar del inventario</MenuItem></MenuContent></Menu></div>
                     </div>
                   </div>
                 );

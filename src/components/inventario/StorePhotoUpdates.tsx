@@ -7,6 +7,7 @@ import { storePhotos, validPhoto } from "@/lib/store-product";
 import type { CatalogProduct } from "@/lib/store-catalog-plan";
 import { Button } from "@/components/ui/Button";
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
+import { isInventoryPhotoUrl } from "@/lib/inventory-media";
 
 export function StorePhotoUpdates({ items, links, storeId, enabled, busy, onBusyChange, onRefresh }: {
   items: InventoryItem[]; links: Record<string, StoreLink>; storeId?: string;
@@ -37,7 +38,7 @@ export function StorePhotoUpdates({ items, links, storeId, enabled, busy, onBusy
     finally { setLoadingCatalog(false); }
   }
   const productId = (item: InventoryItem) => links[item.id]?.product_id || matches[item.id];
-  const eligible = items.filter(item => productId(item) && storePhotos(item).length > 0 && storePhotos(item).length <= 9 && storePhotos(item).every(validPhoto));
+  const eligible = items.filter(item => productId(item) && storePhotos(item).length > 0 && storePhotos(item).length <= 9 && storePhotos(item).every(photo => validPhoto(photo) || Boolean(item.mediaDeferred && isInventoryPhotoUrl(photo))));
   const selected = selection ?? new Set(eligible.map(item => item.id));
   const chosen = eligible.filter(item => selected.has(item.id));
 

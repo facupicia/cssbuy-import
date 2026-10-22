@@ -93,7 +93,7 @@ export async function syncStoreProduct(itemId: string, publish: boolean, expecte
     if (!item.tienda?.categoriaId) throw new StoreApiError("Seleccioná una categoría de Tiendanube en la ficha", 422);
     const variants = storeVariants(item);
     const skuSet = new Set(variants.map(v => v.sku));
-    const duplicate = (await getInventoryItems()).find(other => other.id !== item.id && storeVariants(other).some(v => skuSet.has(v.sku)));
+    const duplicate = (await getInventoryItems({ media: "none" })).find(other => other.id !== item.id && storeVariants(other).some(v => skuSet.has(v.sku)));
     if (duplicate) throw new StoreApiError(`Hay SKU compartidos con ${duplicate.nombre}. Corregilos antes de enviar`, 422);
     const attributes = variants[0].props.map(p => ({ es: p.nombre }));
     const stockBody = (stock: number) => ({ inventory_levels: [{ stock, ...(credentials.locationId ? { location_id: credentials.locationId } : {}) }] });

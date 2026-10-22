@@ -34,7 +34,7 @@ export async function GET(request: Request) {
   const denied = await storeGuard(request); if (denied) return denied;
   if (!isPgConfigured()) return NextResponse.json({ ...NO_DB, diffs: [] }, { status: 500 });
   try {
-    const [items, cotizaciones] = await Promise.all([getInventoryItems(), leerCotizaciones()]);
+    const [items, cotizaciones] = await Promise.all([getInventoryItems({ media: "none" }), leerCotizaciones()]);
     const plan = planificarSync(items, cotizaciones);
     return NextResponse.json({
       ...plan,
@@ -58,7 +58,7 @@ export async function POST(request: Request) {
     const body = await request.json().catch(() => ({}));
     const soloIds: string[] | null = Array.isArray(body?.ids) ? body.ids : null;
 
-    const [items, cotizaciones] = await Promise.all([getInventoryItems(), leerCotizaciones()]);
+    const [items, cotizaciones] = await Promise.all([getInventoryItems({ media: "none" }), leerCotizaciones()]);
     const objetivo = soloIds ? items.filter((i) => soloIds.includes(i.id)) : items;
 
     const plan = planificarSync(objetivo, cotizaciones);
