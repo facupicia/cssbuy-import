@@ -7,7 +7,7 @@ export const runtime="nodejs";
 export const dynamic="force-dynamic";
 let active=0,start=0,calls=0;
 async function handle(request:Request) {
-  const denied=storeGuard(request);if(denied)return denied;
+  const denied=await storeGuard(request);if(denied)return denied;
   if(Date.now()-start>60000){start=Date.now();calls=0;}if(++calls>300||active>=3)return NextResponse.json({error:"Esperá un momento antes de continuar la subida"},{status:429,headers:{...PRIVATE_HEADERS,"Retry-After":"10"}});
   active++;
   try {

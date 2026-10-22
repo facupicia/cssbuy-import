@@ -1,3 +1,4 @@
+import { storeGuard } from "@/lib/store-auth";
 import { NextResponse } from "next/server";
 import {
   isPgConfigured,
@@ -29,7 +30,8 @@ async function leerCotizaciones(): Promise<Cotizacion[]> {
 }
 
 /** Previsualiza qué cambiaría, sin tocar nada. */
-export async function GET() {
+export async function GET(request: Request) {
+  const denied = await storeGuard(request); if (denied) return denied;
   if (!isPgConfigured()) return NextResponse.json({ ...NO_DB, diffs: [] }, { status: 500 });
   try {
     const [items, cotizaciones] = await Promise.all([getInventoryItems(), leerCotizaciones()]);
@@ -50,6 +52,7 @@ export async function GET() {
 
 /** Aplica los cambios. Opcionalmente acotado a `ids`. */
 export async function POST(request: Request) {
+  const denied = await storeGuard(request); if (denied) return denied;
   if (!isPgConfigured()) return NextResponse.json(NO_DB, { status: 500 });
   try {
     const body = await request.json().catch(() => ({}));

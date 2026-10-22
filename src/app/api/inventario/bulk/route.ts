@@ -1,3 +1,4 @@
+import { storeGuard } from "@/lib/store-auth";
 import { NextResponse } from "next/server";
 import { isPgConfigured, bulkUpdateInventory, bulkDeleteInventory } from "@/lib/db";
 import { sanitizeInventoryInput, type BulkPriceOp, type BulkTextOp } from "@/lib/inventory";
@@ -17,6 +18,7 @@ const NO_DB = { error: "Postgres no configurado para el inventario." };
  * costo de cada fila y no se puede expresar como un valor único.
  */
 export async function PATCH(request: Request) {
+  const denied = await storeGuard(request); if (denied) return denied;
   if (!isPgConfigured()) return NextResponse.json(NO_DB, { status: 500 });
 
   try {
@@ -53,6 +55,7 @@ export async function PATCH(request: Request) {
 }
 
 export async function POST(request: Request) {
+  const denied = await storeGuard(request); if (denied) return denied;
   if (!isPgConfigured()) return NextResponse.json(NO_DB, { status: 500 });
 
   try {

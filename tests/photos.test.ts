@@ -1,3 +1,4 @@
+import { mockAccount } from "./helpers/account";
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import sharp from "sharp";
@@ -47,12 +48,13 @@ test("enlaces bloquean credenciales, direcciones locales y DNS hacia redes priva
   await assert.rejects(() => downloadPhoto("https://example.com/a.jpg"), /sitio público/);
 });
 
-test("normalización de enlaces exige el origen del panel y valida antes de descargar", async () => {
+test("normalización de enlaces exige el origen del panel y valida antes de descargar", async t => {
+  const cookie = mockAccount(t);
   const old = process.env.BUSINESS_APP_ORIGIN;
   process.env.BUSINESS_APP_ORIGIN = "https://panel.example";
   try {
     const request = (origin: string, url: string) => new Request("https://panel.example/api/inventario/fotos/normalizar", {
-      method: "POST", headers: { origin, "Content-Type": "application/json" }, body: JSON.stringify({ url }),
+      method: "POST", headers: { origin, cookie, "Content-Type": "application/json" }, body: JSON.stringify({ url }),
     });
     assert.equal((await POST(request("https://evil.example", "https://example.com/photo.jpg"))).status, 403);
     assert.equal((await POST(request("https://panel.example", "https://127.0.0.1/photo.jpg"))).status, 400);

@@ -1,3 +1,4 @@
+import { storeGuard } from "@/lib/store-auth";
 import { NextRequest, NextResponse } from "next/server";
 import { syncCssbuyOrders, rawItemsToRows } from "@/lib/cssbuy-sync";
 import { isPgConfigured, getCssbuyOrders, rowToCssbuyOrder, upsertCssbuyOrders, ensureCssbuyOrdersTable } from "@/lib/db";
@@ -7,7 +8,8 @@ export const maxDuration = 300; // 5 min: la 1ª corrida puede requerir login ma
 
 let running = false;
 
-export async function GET() {
+export async function GET(request: Request) {
+  const denied = await storeGuard(request); if (denied) return denied;
   if (!isPgConfigured()) {
     return NextResponse.json({ ok: false, orders: [], message: "Postgres no configurado" });
   }
@@ -22,6 +24,7 @@ export async function GET() {
 }
 
 export async function POST(request: NextRequest) {
+  const denied = await storeGuard(request); if (denied) return denied;
   if (!isPgConfigured()) {
     return NextResponse.json(
       { ok: false, message: "Postgres no configurado. Completá PGHOST/PGUSER/PGPASSWORD/PGDATABASE en .env.local" },

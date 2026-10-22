@@ -7,7 +7,7 @@ import { storeRequest } from "@/lib/tiendanube-api";
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 export async function GET(request: Request) {
-  const denied = storeGuard(request); if (denied) return denied;
+  const denied = await storeGuard(request); if (denied) return denied;
   try {
     const config = await readWidgets(await widgetStoreId());
     let installation: { status: string; scriptId?: number; version?: number } = { status: "unavailable" };
@@ -21,7 +21,7 @@ export async function GET(request: Request) {
   catch { return NextResponse.json({ error: "No se pudo cargar la configuración. Verificá la conexión con Tiendanube y reintentá" }, { status: 503, headers: PRIVATE_HEADERS }); }
 }
 export async function POST(request: Request) {
-  const denied = storeGuard(request); if (denied) return denied;
+  const denied = await storeGuard(request); if (denied) return denied;
   let body; let config;
   try {
     body = await readStoreJson(request, 300 * 1024);

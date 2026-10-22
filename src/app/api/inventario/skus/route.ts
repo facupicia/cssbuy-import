@@ -1,3 +1,4 @@
+import { storeGuard } from "@/lib/store-auth";
 import { NextResponse } from "next/server";
 import {
   isPgConfigured,
@@ -25,6 +26,7 @@ const NO_DB = { error: "Postgres no configurado." };
  *   - preview: calcula y devuelve sin escribir.
  */
 export async function POST(request: Request) {
+  const denied = await storeGuard(request); if (denied) return denied;
   if (!isPgConfigured()) return NextResponse.json(NO_DB, { status: 500 });
 
   try {

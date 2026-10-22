@@ -11,7 +11,7 @@ function failure(error: unknown) {
     { status: error instanceof StoreApiError ? error.status : 500, headers: PRIVATE_HEADERS });
 }
 export async function GET(request: Request) {
-  const denied = storeGuard(request);
+  const denied = await storeGuard(request);
   if (denied) return denied;
   try {
     if (new URL(request.url).searchParams.get("resource") === "categories") return NextResponse.json({ categories: await getStoreCategories() }, { headers: PRIVATE_HEADERS });
@@ -19,7 +19,7 @@ export async function GET(request: Request) {
   } catch (e) { return failure(e); }
 }
 export async function POST(request: Request) {
-  const denied = storeGuard(request);
+  const denied = await storeGuard(request);
   if (denied) return denied;
   let body: Record<string, unknown>;
   try { body = await readStoreJson(request); }

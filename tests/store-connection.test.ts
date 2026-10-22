@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import { Pool } from "pg";
 import { encryptStoreCredentials, decryptStoreCredentials, loadStoreCredentials } from "../src/lib/store-connection";
 import { parseOAuthApp, finishStoreOAuth } from "../src/lib/store-oauth";
-import { storeSession } from "../src/lib/store-auth";
+import { mockAccount } from "./helpers/account";
 import { GET as settings, POST as saveApp, DELETE as disconnect } from "../src/app/api/tiendanube/connection/route";
 import { POST as startOAuth } from "../src/app/api/tiendanube/oauth/start/route";
 import { GET as callback } from "../src/app/api/tiendanube/oauth/callback/route";
@@ -63,7 +63,7 @@ test("OAuth privado: guarda secretos cifrados, exige sesión, verifica tienda y 
     if (input.includes("/products?")) return ok([]);
     throw new Error("Unexpected API path");
   });
-  const cookie = `store_session=${storeSession(password)}`;
+  const cookie = mockAccount(t);
   const request = (path: string, method = "GET", body?: unknown, authenticated = true, origin = "https://panel.example") => new Request(`https://panel.example${path}`, {
     method, headers: { cookie: authenticated ? cookie : "", origin, "Content-Type": "application/json" }, ...(body ? { body: JSON.stringify(body) } : {}),
   });

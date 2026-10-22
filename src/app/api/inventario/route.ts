@@ -1,3 +1,4 @@
+import { storeGuard } from "@/lib/store-auth";
 import { NextResponse } from "next/server";
 import { isPgConfigured, getInventoryItems, insertInventoryItem } from "@/lib/db";
 import { sanitizeInventoryInput, suggestEstado } from "@/lib/inventory";
@@ -11,7 +12,8 @@ const NO_DB = {
     "Postgres no configurado. Completá PGHOST/PGUSER/PGPASSWORD/PGDATABASE en .env.local para usar el inventario.",
 };
 
-export async function GET() {
+export async function GET(request: Request) {
+  const denied = await storeGuard(request); if (denied) return denied;
   if (!isPgConfigured()) {
     return NextResponse.json({ ...NO_DB, items: [] }, { status: 500 });
   }
@@ -28,6 +30,7 @@ export async function GET() {
 }
 
 export async function POST(request: Request) {
+  const denied = await storeGuard(request); if (denied) return denied;
   if (!isPgConfigured()) {
     return NextResponse.json(NO_DB, { status: 500 });
   }

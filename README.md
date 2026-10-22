@@ -25,6 +25,12 @@ npm run dev
 
 La app estará disponible en [http://localhost:3001](http://localhost:3001).
 
+## Cuenta de usuario
+
+El panel requiere iniciar sesión. En el primer ingreso creá tu cuenta con email y contraseña usando la clave de administración actual una sola vez. Podés recordar la sesión por 30 días, cambiar tu contraseña y cerrar sesiones de otros dispositivos desde Configuración. Conservá `ADMIN_PASSWORD` en el servidor: sigue protegiendo la conexión con Tiendanube.
+
+Ver [alta inicial, configuración, sesiones y recuperación](docs/usuarios.md).
+
 ## Conexión con CSSBuy desde Chrome
 
 El botón **Sincronizar órdenes** usa el conector de Chrome para traer pedidos,
@@ -49,7 +55,7 @@ NEXT_PUBLIC_SUPABASE_ANON_KEY=tu-anon-key
 SUPABASE_SERVICE_ROLE_KEY=tu-service-role-key
 ```
 
-*Si no configurás Supabase, la aplicación funciona al 100% en modo LocalStorage / Offline.*
+*Supabase es opcional para cotizaciones. El acceso al panel requiere PostgreSQL y la configuración de autenticación indicada arriba.*
 
 ### Sincronizador local anterior (opcional)
 

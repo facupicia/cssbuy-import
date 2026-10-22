@@ -1,3 +1,4 @@
+import { storeGuard } from "@/lib/store-auth";
 import { NextResponse } from "next/server";
 import { supabaseAdmin, isSupabaseConfigured } from "@/lib/supabase";
 import {
@@ -43,7 +44,8 @@ function mapPgRow(row: CotizacionRow): Cotizacion {
  *   2) Supabase, si está configurado
  *   3) localStorage del navegador (el cliente hace el fallback)
  */
-export async function GET() {
+export async function GET(request: Request) {
+  const denied = await storeGuard(request); if (denied) return denied;
   if (isPgConfigured()) {
     try {
       const rows = await getCotizaciones();
@@ -94,6 +96,7 @@ export async function GET() {
 }
 
 export async function POST(request: Request) {
+  const denied = await storeGuard(request); if (denied) return denied;
   try {
     const body = await request.json();
     const { nombre, fx, envio, aduana, productos, resultados } = body;

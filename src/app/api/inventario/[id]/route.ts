@@ -1,3 +1,4 @@
+import { storeGuard } from "@/lib/store-auth";
 import { NextResponse } from "next/server";
 import {
   isPgConfigured,
@@ -13,7 +14,8 @@ export const dynamic = "force-dynamic";
 
 const NO_DB = { error: "Postgres no configurado para el inventario." };
 
-export async function GET(_req: Request, { params }: { params: Promise<{ id: string }> }) {
+export async function GET(request: Request, { params }: { params: Promise<{ id: string }> }) {
+  const denied = await storeGuard(request); if (denied) return denied;
   const { id } = await params;
   if (!isPgConfigured()) return NextResponse.json(NO_DB, { status: 500 });
   try {
@@ -29,6 +31,7 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
 }
 
 export async function PATCH(request: Request, { params }: { params: Promise<{ id: string }> }) {
+  const denied = await storeGuard(request); if (denied) return denied;
   const { id } = await params;
   if (!isPgConfigured()) return NextResponse.json(NO_DB, { status: 500 });
   try {
@@ -50,7 +53,8 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
   }
 }
 
-export async function DELETE(_req: Request, { params }: { params: Promise<{ id: string }> }) {
+export async function DELETE(request: Request, { params }: { params: Promise<{ id: string }> }) {
+  const denied = await storeGuard(request); if (denied) return denied;
   const { id } = await params;
   if (!isPgConfigured()) return NextResponse.json(NO_DB, { status: 500 });
   try {

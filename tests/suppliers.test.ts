@@ -2,7 +2,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { Pool } from "pg";
 import { EMPTY_SUPPLIER, filterSuppliers, parseSupplier, supplierUrl, type Supplier } from "../src/lib/suppliers";
-import { storeSession } from "../src/lib/admin-session";
+import { mockAccount } from "./helpers/account";
 import { GET, POST, PATCH, DELETE } from "../src/app/api/proveedores/route";
 import { adminReturnPath } from "../src/lib/admin-navigation";
 
@@ -39,8 +39,9 @@ test("agenda privada persiste notas; rechaza cambios concurrentes y enlaces de t
     if (sql.startsWith("DELETE")) { assert.ok(sql.includes("version=$2")); return { rows: stale ? [] : [{ id }], rowCount: stale ? 0 : 1 }; }
     return { rows: [] };
   });
+  const cookie = mockAccount(t);
   const body = { ...EMPTY_SUPPLIER, nombre: "Fábrica", tipo: "fabrica", notas: "Talles amplios" };
-  const request = (method = "GET", payload?: unknown, authenticated = true, origin = "https://panel.example") => new Request("https://panel.example/api/proveedores", { method, headers: { origin, cookie: authenticated ? `store_session=${storeSession(process.env.ADMIN_PASSWORD!)}` : "", "Content-Type": "application/json" }, ...(payload ? { body: JSON.stringify(payload) } : {}) });
+  const request = (method = "GET", payload?: unknown, authenticated = true, origin = "https://panel.example") => new Request("https://panel.example/api/proveedores", { method, headers: { origin, cookie: authenticated ? cookie : "", "Content-Type": "application/json" }, ...(payload ? { body: JSON.stringify(payload) } : {}) });
   try {
     assert.equal((await GET(request("GET", undefined, false))).status, 401);
     assert.equal((await POST(request("POST", body, true, "https://evil.example"))).status, 403);

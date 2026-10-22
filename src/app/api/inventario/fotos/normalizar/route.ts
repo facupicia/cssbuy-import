@@ -1,3 +1,4 @@
+import { storeGuard } from "@/lib/store-auth";
 import { NextResponse } from "next/server";
 import { isReportingOrigin, PRIVATE_HEADERS } from "@/lib/integration-auth";
 import { readStoreJson } from "@/lib/store-auth";
@@ -10,6 +11,7 @@ let requests = 0;
 let active = 0;
 
 export async function POST(request: Request) {
+  const denied = await storeGuard(request); if (denied) return denied;
   if (!isReportingOrigin(request)) return NextResponse.json({ error: "Origen no permitido" }, { status: 403, headers: PRIVATE_HEADERS });
   if (Date.now() - start >= 60000) { start = Date.now(); requests = 0; }
   if (++requests > 30 || active >= 2) return NextResponse.json({ error: "Esperá un minuto antes de procesar más fotos" }, { status: 429, headers: { ...PRIVATE_HEADERS, "Retry-After": "60" } });

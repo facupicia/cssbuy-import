@@ -8,12 +8,12 @@ export const dynamic = "force-dynamic";
 let running = false;
 let lastImport = 0;
 export async function GET(request: Request) {
-  const denied = storeGuard(request); if (denied) return denied;
+  const denied = await storeGuard(request); if (denied) return denied;
   try { return NextResponse.json(await bridgeStatus(), { headers: PRIVATE_HEADERS }); }
   catch { return NextResponse.json({ error: "No se pudo consultar la conexión CSSBuy" }, { status: 503, headers: PRIVATE_HEADERS }); }
 }
 export async function POST(request: Request) {
-  const denied = storeGuard(request); if (denied) return denied;
+  const denied = await storeGuard(request); if (denied) return denied;
   let payload;
   try { payload = parseBridgePayload(await readStoreJson(request, 16 * 1024 * 1024)); }
   catch (e) { return NextResponse.json({ error: e instanceof Error ? e.message : "Datos inválidos" }, { status: 400, headers: PRIVATE_HEADERS }); }

@@ -6,7 +6,7 @@ import { beginStoreOAuth, OAUTH_COOKIE } from "@/lib/store-oauth";
 
 export const runtime = "nodejs";
 export async function POST(request: Request) {
-  const denied = storeGuard(request); if (denied) return denied;
+  const denied = await storeGuard(request); if (denied) return denied;
   try {
     if (environmentStoreCredentials()) return NextResponse.json({ error: "La conexión se administra desde el servidor" }, { status: 409 });
     const app = await loadStoreOAuthApp();

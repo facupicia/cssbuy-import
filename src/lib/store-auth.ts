@@ -2,19 +2,16 @@ import { NextResponse } from "next/server";
 import { isReportingOrigin, PRIVATE_HEADERS } from "./integration-auth";
 
 import { storeAuthenticated } from "./admin-session";
-export { STORE_COOKIE, storeSession, storeAuthenticated } from "./admin-session";
-let attempts = 0;
-let start = 0;
-export function storeGuard(request: Request) {
+export { storeAuthenticated } from "./admin-session";
+export async function storeGuard(request: Request) {
   if (request.method !== "GET" && !isReportingOrigin(request)) return NextResponse.json({ error: "Origen no permitido" }, { status: 403, headers: PRIVATE_HEADERS });
-  if (!storeAuthenticated(request)) return NextResponse.json({ error: "Ingresá la contraseña de administración para continuar" }, { status: 401, headers: PRIVATE_HEADERS });
+  try {
+    if (!await storeAuthenticated(request)) return NextResponse.json({ error: "Iniciá sesión con tu cuenta para continuar" }, { status: 401, headers: PRIVATE_HEADERS });
+  } catch {
+    return NextResponse.json({ error: "No se pudo comprobar tu sesión. Reintentá en unos instantes." }, { status: 503, headers: PRIVATE_HEADERS });
+  }
   return null;
 }
-export function loginAllowed() {
-  if (Date.now() - start > 60_000) { start = Date.now(); attempts = 0; }
-  return ++attempts <= 10;
-}
-
 export async function readStoreJson(request: Request, max = 8192) {
   if (Number(request.headers.get("content-length") || 0) > max) throw new Error("Solicitud demasiado grande");
   const reader = request.body?.getReader();

@@ -7,7 +7,7 @@ export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 export async function GET(request: Request) {
-  const denied = authorizeIntegration(request);
+  const denied = await authorizeIntegration(request);
   if (denied) return denied;
   let assumptions;
   try { assumptions = parseSellingCosts(new URL(request.url).searchParams); }

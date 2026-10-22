@@ -6,7 +6,7 @@ export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 export async function GET(request: Request) {
-  const denied = authorizeIntegration(request);
+  const denied = await authorizeIntegration(request);
   if (denied) return denied;
   let range;
   try { range = parseReportRange(new URL(request.url).searchParams); }

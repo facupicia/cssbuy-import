@@ -1,3 +1,4 @@
+import { storeGuard } from "@/lib/store-auth";
 import { NextResponse } from "next/server";
 import { isPgConfigured, updateMarca, deleteMarca } from "@/lib/db";
 
@@ -7,6 +8,7 @@ export const dynamic = "force-dynamic";
 const NO_DB = { error: "Postgres no configurado." };
 
 export async function PATCH(request: Request, { params }: { params: Promise<{ id: string }> }) {
+  const denied = await storeGuard(request); if (denied) return denied;
   const { id } = await params;
   if (!isPgConfigured()) return NextResponse.json(NO_DB, { status: 500 });
   try {
@@ -31,7 +33,8 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
 }
 
 /** Borra la marca; los productos que la tenían quedan sin marca (FK ON DELETE SET NULL). */
-export async function DELETE(_req: Request, { params }: { params: Promise<{ id: string }> }) {
+export async function DELETE(request: Request, { params }: { params: Promise<{ id: string }> }) {
+  const denied = await storeGuard(request); if (denied) return denied;
   const { id } = await params;
   if (!isPgConfigured()) return NextResponse.json(NO_DB, { status: 500 });
   try {

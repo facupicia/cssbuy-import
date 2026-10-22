@@ -1,4 +1,4 @@
-import { createHash, createHmac, timingSafeEqual } from "node:crypto";
+import { createHash, timingSafeEqual } from "node:crypto";
 import { NextResponse } from "next/server";
 
 import { storeAuthenticated } from "./admin-session";
@@ -19,30 +19,16 @@ export function secretMatches(actual: string, expected: string) {
   return timingSafeEqual(hash(actual), hash(expected));
 }
 
-export function createReportingSession(key: string, now = Date.now()) {
-  const expires = String(now + 8 * 60 * 60 * 1000);
-  return `${expires}.${createHmac("sha256", key).update(expires).digest("hex")}`;
-}
-
-function validSession(request: Request, key: string) {
-  const cookie = request.headers.get("cookie")?.split(";").map(c => c.trim())
-    .find(c => c.startsWith("reporting_session="))?.slice("reporting_session=".length);
-  if (!cookie) return false;
-  const [expires, signature, extra] = cookie.split(".");
-  if (!expires || !signature || extra || !/^\d+$/.test(expires) || Number(expires) <= Date.now()
-    || Number(expires) > Date.now() + 8 * 60 * 60 * 1000) return false;
-  return secretMatches(signature, createHmac("sha256", key).update(expires).digest("hex"));
-}
-
 /** A separate read-only integration key, never the Meta token or a public env var. */
-export function authorizeIntegration(request: Request): NextResponse | null {
+export async function authorizeIntegration(request: Request): Promise<NextResponse | null> {
+  if (await storeAuthenticated(request)) return null;
   const key = process.env.BUSINESS_READ_API_KEY;
   if (!key || key.length < 32) {
     return NextResponse.json({ error: "Integración pendiente de configurar en el servidor." },
       { status: 503, headers: PRIVATE_HEADERS });
   }
   const supplied = request.headers.get("authorization") ?? "";
-  if (!secretMatches(supplied, `Bearer ${key}`) && !validSession(request, key) && !storeAuthenticated(request)) {
+  if (!secretMatches(supplied, `Bearer ${key}`)) {
     return NextResponse.json({ error: "Acceso no autorizado." },
       { status: 401, headers: { ...PRIVATE_HEADERS, "WWW-Authenticate": "Bearer" } });
   }

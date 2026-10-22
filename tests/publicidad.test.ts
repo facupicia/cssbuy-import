@@ -1,8 +1,9 @@
+import { createHmac } from "node:crypto";
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { productAdEconomics, parseSellingCosts, DEFAULT_SELLING_COSTS } from "../src/lib/profitability";
 import { normalizeInsight, parseReportRange, getMetaCampaignReport, type MetaInsight } from "../src/lib/meta-report";
-import { authorizeIntegration, createReportingSession } from "../src/lib/integration-auth";
+import { authorizeIntegration } from "../src/lib/integration-auth";
 import type { InventoryItem } from "../src/lib/types";
 import { GET as restoreSession, POST as login, DELETE as logout } from "../src/app/api/publicidad/session/route";
 
@@ -13,6 +14,11 @@ const product: InventoryItem = {
 };
 const insight: MetaInsight = { campaign_id: "123", campaign_name: "Ventas", account_currency: "ARS",
   date_start: "2026-10-10", date_stop: "2026-10-14", spend: "10000", impressions: "2000" };
+
+function createReportingSession(key: string, now = Date.now()) {
+  const expires = String(now + 8 * 3600000);
+  return `${expires}.${createHmac("sha256", key).update(expires).digest("hex")}`;
+}
 
 test("límites descuentan gastos y ganancia objetivo, sin mezclar unidades vendidas", () => {
   const result = productAdEconomics(product, { feePercent: 10, shippingARS: 4000, packagingARS: 1000, targetProfitARS: 15000 });
@@ -54,21 +60,21 @@ test("ausencia de eventos no se convierte en cero; no suma compras omni y pixel"
   assert.equal(result.roas, 15);
 });
 
-test("API rechaza acceso anónimo, clave incorrecta, sesión vencida y manipulación", () => {
+test("API rechaza acceso anónimo, clave incorrecta, sesión vencida y manipulación", async () => {
   const previous = process.env.BUSINESS_READ_API_KEY;
   const key = "test-key-".repeat(8);
   process.env.BUSINESS_READ_API_KEY = key;
   try {
     const request = (headers: HeadersInit = {}) => new Request("https://test.invalid", { headers });
-    assert.equal(authorizeIntegration(request())?.status, 401);
-    assert.equal(authorizeIntegration(request({ authorization: "Bearer wrong" }))?.status, 401);
-    assert.equal(authorizeIntegration(request({ authorization: `Bearer ${key}` })), null);
+    assert.equal((await authorizeIntegration(request()))?.status, 401);
+    assert.equal((await authorizeIntegration(request({ authorization: "Bearer wrong" })))?.status, 401);
+    assert.equal(await authorizeIntegration(request({ authorization: `Bearer ${key}` })), null);
     const session = createReportingSession(key);
-    assert.equal(authorizeIntegration(request({ cookie: `reporting_session=${session}` })), null);
-    assert.equal(authorizeIntegration(request({ cookie: `reporting_session=${session}x` }))?.status, 401);
-    assert.equal(authorizeIntegration(request({ cookie: `reporting_session=${createReportingSession(key, Date.now() - 9 * 3600000)}` }))?.status, 401);
+    assert.equal((await authorizeIntegration(request({ cookie: `reporting_session=${session}` })))?.status, 401);
+    assert.equal((await authorizeIntegration(request({ cookie: `reporting_session=${session}x` })))?.status, 401);
+    assert.equal((await authorizeIntegration(request({ cookie: `reporting_session=${createReportingSession(key, Date.now() - 9 * 3600000)}` })))?.status, 401);
     delete process.env.BUSINESS_READ_API_KEY;
-    assert.equal(authorizeIntegration(request())?.status, 503);
+    assert.equal((await authorizeIntegration(request()))?.status, 503);
   } finally {
     if (previous === undefined) delete process.env.BUSINESS_READ_API_KEY;
     else process.env.BUSINESS_READ_API_KEY = previous;
@@ -102,33 +108,12 @@ test("Meta pagina en host fijo, envía el token en header y rechaza reportes inc
   }
 });
 
-test("ingreso exige origen permitido y contraseña, devuelve cookie HttpOnly y permite cierre", async () => {
-  const previous = [process.env.BUSINESS_READ_API_KEY, process.env.ADMIN_PASSWORD, process.env.BUSINESS_APP_ORIGIN];
-  process.env.BUSINESS_READ_API_KEY = "test-private-key-".repeat(4);
-  process.env.ADMIN_PASSWORD = "test-private-admin-password";
+test("el ingreso antiguo de publicidad no permite usar la clave compartida", async () => {
+  const before = process.env.BUSINESS_APP_ORIGIN;
   process.env.BUSINESS_APP_ORIGIN = "https://panel.invalid";
-  const request = (origin: string, password: string) => new Request("http://internal:3001/api/publicidad/session", {
-    method: "POST", headers: { origin, "Content-Type": "application/json" }, body: JSON.stringify({ password }),
-  });
   try {
-    assert.equal((await login(request("https://evil.invalid", process.env.ADMIN_PASSWORD))).status, 403);
-    assert.equal((await login(request("https://panel.invalid", "wrong"))).status, 401);
-    const result = await login(request("https://panel.invalid", process.env.ADMIN_PASSWORD));
-    assert.equal(result.status, 200);
-    const cookie = result.headers.get("set-cookie") ?? "";
-    assert.match(cookie, /HttpOnly/i);
-    assert.match(cookie, /SameSite=strict/i);
-    assert.doesNotMatch(await result.text(), /test-private/);
-    assert.equal(authorizeIntegration(new Request("https://panel.invalid/api/integraciones/costos", { headers: { cookie: cookie.split(";")[0] } })), null);
-    const restored = await restoreSession(new Request("https://panel.invalid/api/publicidad/session", { headers: { cookie: cookie.split(";")[0] } }));
-    assert.equal(restored.status, 200);
-    assert.deepEqual(await restored.json(), { authenticated: true });
-    assert.equal((await restoreSession(new Request("https://panel.invalid/api/publicidad/session"))).status, 401);
-    const closed = await logout(new Request("http://internal:3001/api/publicidad/session", { method: "DELETE", headers: { origin: "https://panel.invalid" } }));
-    assert.match(closed.headers.get("set-cookie") ?? "", /Max-Age=0/i);
-  } finally {
-    ["BUSINESS_READ_API_KEY", "ADMIN_PASSWORD", "BUSINESS_APP_ORIGIN"].forEach((key, index) => {
-      if (previous[index] === undefined) delete process.env[key]; else process.env[key] = previous[index];
-    });
-  }
+    const req = (origin: string) => new Request("https://panel.invalid/api/publicidad/session", { method: "POST", headers: { origin }, body: JSON.stringify({ password: "obsolete-admin-password" }) });
+    assert.equal((await login(req("https://evil.invalid"))).status, 403);
+    assert.equal((await login(req("https://panel.invalid"))).status, 401);
+  } finally { if (before === undefined) delete process.env.BUSINESS_APP_ORIGIN; else process.env.BUSINESS_APP_ORIGIN = before; }
 });

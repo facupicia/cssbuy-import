@@ -1,3 +1,4 @@
+import { mockAccount } from "./helpers/account";
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { Pool } from "pg";
@@ -6,7 +7,7 @@ import { buildTiendanubeCSV } from "../src/lib/tiendanube";
 import { sanitizeInventoryInput } from "../src/lib/inventory";
 import { generarDescripcionTiendaHTML } from "../src/lib/descripcion";
 import { tablaDeMarca, columnasDe } from "../src/lib/tablas-talle";
-import { storeSession, storeAuthenticated, storeGuard } from "../src/lib/store-auth";
+import { storeAuthenticated, storeGuard } from "../src/lib/store-auth";
 import { syncStoreProduct, StoreApiError, storeRequest } from "../src/lib/tiendanube-api";
 import { POST as syncRoute } from "../src/app/api/tiendanube/route";
 import type { InventoryItem } from "../src/lib/types";
@@ -98,17 +99,17 @@ test("descripción automática válida aunque exista una ficha con texto vacío"
   }
 });
 
-test("sesión de escritura independiente, origen y contrato de credenciales", async () => {
+test("sesión de escritura independiente, origen y contrato de credenciales", async t => {
   const before = { ...process.env };
   try {
     process.env.ADMIN_PASSWORD = "clave-de-administracion-segura";
     process.env.BUSINESS_APP_ORIGIN = "https://panel.example";
-    const cookie = `store_session=${storeSession(process.env.ADMIN_PASSWORD)}`;
+    const cookie = mockAccount(t);
     const req = (origin: string, value = cookie) => new Request("https://panel.example/api/tiendanube", { method: "POST", headers: { origin, cookie: value } });
-    assert.equal(storeGuard(req("https://panel.example")), null);
-    assert.equal(storeGuard(req("https://evil.example"))?.status, 403);
-    assert.equal(storeAuthenticated(req("https://panel.example", `reporting_session=${storeSession(process.env.ADMIN_PASSWORD)}`)), false);
-    assert.equal(storeAuthenticated(req("https://panel.example", `store_session=${storeSession(process.env.ADMIN_PASSWORD, Date.now() - 1000)}`)), false);
+    assert.equal(await storeGuard(req("https://panel.example")), null);
+    assert.equal((await storeGuard(req("https://evil.example")))?.status, 403);
+    assert.equal(await storeAuthenticated(req("https://panel.example", "store_session=obsolete")), false);
+    assert.equal(await storeAuthenticated(req("https://panel.example", "store_session=obsolete")), false);
     assert.equal((await syncRoute(req("https://panel.example", ""))).status, 401);
     const invalid = new Request("https://panel.example/api/tiendanube", { method: "POST", headers: { origin: "https://panel.example", cookie }, body: JSON.stringify({ id: item.id, publish: "yes" }) });
     assert.equal((await syncRoute(invalid)).status, 400);

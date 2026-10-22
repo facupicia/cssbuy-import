@@ -8,12 +8,12 @@ export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 const reply = (body: unknown, status = 200) => NextResponse.json(body, { status, headers: PRIVATE_HEADERS });
 export async function GET(request: Request) {
-  const denied = storeGuard(request); if (denied) return denied;
+  const denied = await storeGuard(request); if (denied) return denied;
   try { return reply({ proveedores: await readSuppliers() }); }
   catch { return reply({ error: "No se pudo cargar la agenda. Reintentá en unos segundos." }, 503); }
 }
 async function write(request: Request) {
-  const denied = storeGuard(request); if (denied) return denied;
+  const denied = await storeGuard(request); if (denied) return denied;
   let input, id = "", version = 0;
   try {
     const body = await readStoreJson(request, 32_000);

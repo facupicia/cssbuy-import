@@ -1,3 +1,4 @@
+import { storeGuard } from "@/lib/store-auth";
 import { NextResponse } from "next/server";
 import { isPgConfigured, getMarcas, insertMarca, contarItemsPorMarca } from "@/lib/db";
 
@@ -6,7 +7,8 @@ export const dynamic = "force-dynamic";
 
 const NO_DB = { error: "Postgres no configurado." };
 
-export async function GET() {
+export async function GET(request: Request) {
+  const denied = await storeGuard(request); if (denied) return denied;
   if (!isPgConfigured()) return NextResponse.json({ ...NO_DB, marcas: [] }, { status: 500 });
   try {
     const [marcas, conteo] = await Promise.all([getMarcas(), contarItemsPorMarca()]);
@@ -23,6 +25,7 @@ export async function GET() {
 }
 
 export async function POST(request: Request) {
+  const denied = await storeGuard(request); if (denied) return denied;
   if (!isPgConfigured()) return NextResponse.json(NO_DB, { status: 500 });
   try {
     const body = await request.json();

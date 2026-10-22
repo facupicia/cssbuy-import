@@ -1,3 +1,4 @@
+import { storeGuard } from "@/lib/store-auth";
 import { NextResponse } from "next/server";
 import { supabaseAdmin, isSupabaseConfigured } from "@/lib/supabase";
 import { isPgConfigured, getCotizacion, deleteCotizacion, CotizacionRow } from "@/lib/db";
@@ -33,6 +34,7 @@ function mapPgRow(row: CotizacionRow): Cotizacion {
 }
 
 export async function GET(request: Request, { params }: { params: Promise<{ id: string }> }) {
+  const denied = await storeGuard(request); if (denied) return denied;
   const { id } = await params;
 
   if (isPgConfigured()) {
@@ -76,6 +78,7 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
 }
 
 export async function DELETE(request: Request, { params }: { params: Promise<{ id: string }> }) {
+  const denied = await storeGuard(request); if (denied) return denied;
   const { id } = await params;
 
   // Las cotizaciones "local-…" solo viven en el navegador: no hay nada que borrar acá.

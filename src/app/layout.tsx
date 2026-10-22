@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import "./globals.css";
 import { Toaster } from "@/components/ui/Toast";
+import { SessionRefresh } from "@/components/admin/SessionRefresh";
 
 export const metadata: Metadata = {
   title: "CSSBuy Landed Cost Calculator & Cotizaciones",
@@ -16,6 +17,7 @@ export default function RootLayout({
     <html lang="es" suppressHydrationWarning>
       <body className="min-h-screen bg-[var(--color-bg)] text-[var(--color-fg)] antialiased">
         {children}
+        <SessionRefresh />
         <Toaster />
       </body>
     </html>

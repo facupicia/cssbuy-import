@@ -12,13 +12,13 @@ function failure(error: unknown) {
   return NextResponse.json({ error: error instanceof StoreApiError ? error.message : "No se pudo completar la edición. Reintentá el mismo lote para retomar el progreso guardado" }, { status: error instanceof StoreApiError ? error.status : 503, headers: PRIVATE_HEADERS });
 }
 export async function GET(request: Request) {
-  const denied = storeGuard(request); if (denied) return denied;
+  const denied = await storeGuard(request); if (denied) return denied;
   const url = new URL(request.url); const page = Number(url.searchParams.get("page") || 1); const search = url.searchParams.get("q") || "";
   if (!Number.isSafeInteger(page) || page < 1 || page > 1000 || search.length > 200) return NextResponse.json({ error: "Búsqueda inválida" }, { status: 400, headers: PRIVATE_HEADERS });
   try { return NextResponse.json(await listStoreCatalog(page, search), { headers: PRIVATE_HEADERS }); } catch (e) { return failure(e); }
 }
 export async function POST(request: Request) {
-  const denied = storeGuard(request); if (denied) return denied;
+  const denied = await storeGuard(request); if (denied) return denied;
   let body; let changes;
   try {
     body = await readStoreJson(request, 64 * 1024);
