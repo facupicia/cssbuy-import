@@ -14,6 +14,7 @@ import {
   MoreHorizontal,
   ChartNoAxesCombined,
   Store,
+  ShoppingBag,
 } from "lucide-react";
 import { Button } from "./ui/Button";
 import { Menu, MenuTrigger, MenuContent, MenuItem, MenuLabel } from "./ui/Menu";
@@ -26,6 +27,7 @@ const links = [
   { href: "/inventario", label: "Inventario", icon: Boxes },
   { href: "/publicidad", label: "Publicidad", icon: ChartNoAxesCombined },
   { href: "/tiendanube/publicar", label: "Tienda", icon: Store },
+  { href: "/marketplace", label: "Marketplace", icon: ShoppingBag },
 ];
 
 export function Navbar({
@@ -86,7 +88,7 @@ export function Navbar({
           </Link>
 
           {/* Navegación (desktop) */}
-          <nav className="hidden md:flex items-center gap-1">
+          <nav className="hidden lg:flex items-center gap-1">
             {links.map((link) => {
               const active = pathname === link.href || (link.href === "/" && pathname.startsWith("/calculadora/")) || (link.label === "Tienda" && (pathname.startsWith("/tiendanube") || pathname === "/tienda"));
               const Icon = link.icon;
@@ -192,8 +194,8 @@ export function Navbar({
       </header>
 
       {/* Navegación inferior en mobile: alcanzable con el pulgar */}
-      <nav className="md:hidden fixed bottom-0 inset-x-0 z-40 border-t border-[var(--color-border)] bg-[var(--color-bg-elevated)]/95 backdrop-blur-md">
-        <div className="grid grid-cols-5">
+      <nav className="lg:hidden fixed bottom-0 inset-x-0 z-40 border-t border-[var(--color-border)] bg-[var(--color-bg-elevated)]/95 backdrop-blur-md">
+        <div className="grid grid-cols-6">
           {links.map((link) => {
             const active = pathname === link.href || (link.href === "/" && pathname.startsWith("/calculadora/")) || (link.label === "Tienda" && (pathname.startsWith("/tiendanube") || pathname === "/tienda"));
             const Icon = link.icon;
@@ -201,6 +203,7 @@ export function Navbar({
               <Link
                 key={link.href}
                 href={link.href}
+                aria-label={link.label}
                 aria-current={active ? "page" : undefined}
                 className={cn(
                   "flex flex-col items-center justify-center gap-0.5 py-2 text-[11px] font-medium transition-colors",
@@ -210,7 +213,7 @@ export function Navbar({
                 )}
               >
                 <Icon className="h-4 w-4" />
-                {link.label}
+                {{ Calculadora: "Calc.", Cotizaciones: "Cotiz.", Inventario: "Stock", Marketplace: "Market" }[link.label] || link.label}
               </Link>
             );
           })}

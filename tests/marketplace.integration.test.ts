@@ -1,0 +1,51 @@
+import { test } from "node:test";
+import assert from "node:assert/strict";
+import { mkdtemp } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import { createServer } from "node:net";
+import EmbeddedPostgres from "embedded-postgres";
+
+test("Marketplace: sesión, origen, aislamiento, duplicados, versiones, stock y confirmación explícita", { timeout: 120000 }, async () => {
+  const before = { ...process.env };
+  const listener = createServer(); await new Promise<void>(r => listener.listen(0, "127.0.0.1", r)); const port = (listener.address() as { port: number }).port; await new Promise<void>(r => listener.close(() => r()));
+  const database = new EmbeddedPostgres({ databaseDir: await mkdtemp(join(tmpdir(), "plug-market-test-")), port, user: "postgres", password: "local-test-only", persistent: false, onLog: () => {}, onError: () => {}, initdbFlags: ["--encoding=UTF8", "--locale=C"], postgresFlags: ["-h", "127.0.0.1"] });
+  let pool: import("pg").Pool | undefined;
+  try {
+    await database.initialise(); await database.start();
+    Object.assign(process.env, { PGHOST: "127.0.0.1", PGPORT: String(port), PGUSER: "postgres", PGPASSWORD: "local-test-only", PGDATABASE: "postgres", ADMIN_PASSWORD: "initial-test-key-not-production", BUSINESS_APP_ORIGIN: "https://panel.example" });
+    const db = await import("../src/lib/db"); pool = db.getPool();
+    const { POST: bootstrap } = await import("../src/app/api/admin/bootstrap/route");
+    const route = await import("../src/app/api/marketplace/route");
+    const marketDb = await import("../src/lib/marketplace-db");
+    const req = (body?: unknown, cookie = "", origin = "https://panel.example") => new Request("https://panel.example/api/marketplace", { method: body === undefined ? "GET" : "POST", headers: { cookie, origin, "Content-Type": "application/json" }, ...(body === undefined ? {} : { body: JSON.stringify(body) }) });
+    assert.equal((await route.GET(req())).status, 401);
+    assert.equal((await route.POST(req({ action: "save" }, "", "https://evil.test"))).status, 403);
+    const login = await bootstrap(new Request("https://panel.example/api/admin/bootstrap", { method: "POST", headers: { origin: "https://panel.example", "Content-Type": "application/json" }, body: JSON.stringify({ name: "Marketplace Test", email: "fixture-market@example.com", password: "isolated-test-password", adminPassword: process.env.ADMIN_PASSWORD, rememberMe: true }) }));
+    assert.equal(login.status, 200); const cookie = login.headers.getSetCookie().map(v => v.split(";")[0]).filter(v => !v.endsWith("=")).join("; ");
+    const item = await db.insertInventoryItem({ nombre: "Remera de prueba", precioVentaARS: 52000, cantidadInicial: 1, cantidadVendida: 0, estado: "en_deposito", origen: "manual", variante: "Color: Azul; Talle: XL", costoUnitARS: 5000, costoUnitUSD: 3, notas: "nota privada de prueba", imagen: "data:image/png;base64,aGVsbG8=" });
+    let state = await (await route.GET(req(undefined, cookie))).json();
+    assert.equal(state.products.length, 1); assert.ok(!JSON.stringify(state).includes("costoUnit")); assert.ok(!JSON.stringify(state).includes("nota privada"));
+    const input = { ...state.products[0].generated, condition: "Nuevo" };
+    let response = await route.POST(req({ action: "save", draft: input, revision: 0 }, cookie)); assert.equal(response.status, 200);
+    let draft = (await response.json()).draft;
+    assert.equal((await route.POST(req({ action: "save", draft: input, revision: 0 }, cookie))).status, 409);
+    assert.equal((await marketDb.marketplaceWorkspace("another-owner")).drafts.length, 0);
+    assert.equal((await route.POST(req({ action: "export", itemId: item.id, revision: draft.revision }, cookie))).status, 200);
+    assert.equal((await route.POST(req({ action: "status", itemId: item.id, revision: draft.revision, status: "published", listingUrl: "https://evil.test" }, cookie))).status, 400);
+    response = await route.POST(req({ action: "status", itemId: item.id, revision: draft.revision, status: "published", listingUrl: "https://www.facebook.com/marketplace/item/123456789" }, cookie)); assert.equal(response.status, 200);
+    draft = (await response.json()).draft; assert.equal(draft.status, "published");
+    assert.equal((await route.POST(req({ action: "export", itemId: item.id, revision: draft.revision }, cookie))).status, 409);
+    response = await route.POST(req({ action: "save", draft: { ...input, title: "Título actualizado" }, revision: draft.revision }, cookie)); assert.equal(response.status, 200);
+    draft = (await response.json()).draft; assert.equal(draft.needsUpdate, true);
+    assert.equal((await route.POST(req({ action: "save", draft: input, revision: draft.revision - 1 }, cookie))).status, 409);
+    await db.updateInventoryItem(item.id, { cantidadVendida: 1 });
+    assert.equal((await route.POST(req({ action: "status", itemId: item.id, revision: draft.revision, status: "published", listingUrl: draft.listingUrl }, cookie))).status, 409);
+    assert.equal((await route.POST(req({ action: "save", draft: input, revision: draft.revision }, cookie))).status, 409);
+    response = await route.POST(req({ action: "status", itemId: item.id, revision: draft.revision, status: "sold" }, cookie)); assert.equal(response.status, 200);
+    const updatedItem = await db.getInventoryItem(item.id); assert.equal(updatedItem?.cantidadVendida, 1);
+    assert.equal((await route.POST(req({ action: "save", draft: { ...input, title: "x".repeat(17000) }, revision: 1 }, cookie))).status, 400);
+    state = await (await route.GET(req(undefined, cookie))).json(); assert.equal(state.products[0].stock, 0);
+    const unchanged = await db.getInventoryItem(item.id); assert.equal(unchanged?.precioVentaARS, 52000);
+  } finally { if (pool) await pool.end(); await database.stop(); for (const key of Object.keys(process.env)) if (!(key in before)) delete process.env[key]; Object.assign(process.env, before); }
+});

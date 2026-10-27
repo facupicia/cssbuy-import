@@ -4,6 +4,8 @@ Aplicación web independiente y moderna para el cálculo de costos de importaci�
 
 ## Características
 
+- **Marketplace de Facebook**: borradores desde el inventario propio, títulos y descripciones breves editables, cola de prendas y conector de Chrome para carga asistida. Ver [uso e instalación](docs/marketplace.md).
+
 - 🧮 **Calculadora Multiproducto de Landed Cost**: Simulación en tiempo real de flete internacional, comisiones de depósito de CSSBuy (5.3%), franquicia aduanera de USD 50, aranceles, IVA e IIBB.
 - 📦 **Scraper de CSSBuy Warehouse**: Script en un clic para extraer todos los pedidos almacenados y descargarlos en `orders.json`.
 - 💳 **Costos desde movimientos CSSBuy**: La calculadora puede importar `records.json` para calcular el costo real por orden, incluyendo fotos, servicios adicionales y flete interno.

@@ -1,0 +1,15 @@
+{
+  "manifest_version": 3,
+  "name": "PLUG · Marketplace",
+  "version": "1.0.0",
+  "description": "Carga tus productos de PLUG en el formulario de Facebook Marketplace para que revises y publiques.",
+  "permissions": ["activeTab", "scripting", "storage"],
+  "host_permissions": ["https://db.vidaeventofiesta.site/*", "http://localhost:3001/*", "http://127.0.0.1:3001/*"],
+  "optional_host_permissions": ["https://*/*"],
+  "background": { "service_worker": "background.js" },
+  "content_scripts": [{
+    "matches": ["https://db.vidaeventofiesta.site/*", "http://localhost:3001/*", "http://127.0.0.1:3001/*"],
+    "js": ["bridge.js"]
+  }],
+  "action": { "default_title": "PLUG Marketplace", "default_popup": "popup.html" }
+}

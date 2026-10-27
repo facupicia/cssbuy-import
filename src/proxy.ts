@@ -3,6 +3,7 @@ import { authConfigured, ensureAuthSchema, getAuth } from "@/lib/auth";
 
 const publicAssets = new Set([
   "/plug-cssbuy-connector.zip", "/plug-storefront.min.js", "/plug-storefront-theme.css",
+  "/plug-marketplace-connector.zip",
   "/storefront-carousel.html", "/storefront-video.html",
 ]);
 

@@ -4,7 +4,8 @@
   "private": true,
   "scripts": {
     "dev": "next dev -p 3001",
-    "build": "npm run build:storefront && next build",
+    "build": "npm run build:storefront && npm run build:marketplace && next build",
+    "build:marketplace": "node scripts/package-marketplace-connector.mjs",
     "build:storefront": "node scripts/build-storefront.mjs",
     "start": "next start -p 3001",
     "lint": "eslint",
