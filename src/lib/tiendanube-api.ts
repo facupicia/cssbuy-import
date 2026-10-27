@@ -64,6 +64,21 @@ export async function getStoreCategories(connection?: StoreCredentials) {
 
 const translated = (v: Translation) => v.es || Object.values(v)[0] || "";
 export function variantKey(values: string[]) { return JSON.stringify(values.map(s => s.trim().toLowerCase())); }
+
+/** Keep the remote attribute order: variant values are positional in Tiendanube. */
+export function alignStoreVariants(variants: ReturnType<typeof storeVariants>, remoteAttributes: Translation[]) {
+  const names = remoteAttributes.map(attribute => translated(attribute).trim().toLowerCase());
+  if (new Set(names).size !== names.length || names.some(name => !name)) {
+    throw new StoreApiError("Los atributos de Tiendanube están vacíos o repetidos. Revisá la estructura del producto", 409);
+  }
+  return variants.map(variant => {
+    const byName = new Map(variant.props.map(prop => [prop.nombre.trim().toLowerCase(), prop]));
+    if (variant.props.length !== names.length || byName.size !== names.length || names.some(name => !byName.has(name))) {
+      throw new StoreApiError("Los atributos del inventario no coinciden con los de Tiendanube. Revisá sus nombres antes de actualizar", 409);
+    }
+    return { ...variant, props: names.map(name => byName.get(name)!) };
+  });
+}
 async function saveLink(client: PoolClient, itemId: string, productId: number, storeId: string) {
   await client.query("UPDATE tiendanube_links SET product_id=$3 WHERE store_id=$1 AND item_id=$2", [storeId, itemId, String(productId)]);
 }
@@ -91,7 +106,7 @@ export async function syncStoreProduct(itemId: string, publish: boolean, expecte
     const readiness = storeReadiness(item, brand);
     if (!readiness.ready) throw new StoreApiError(readiness.errors.join(". "), 422);
     if (!item.tienda?.categoriaId) throw new StoreApiError("Seleccioná una categoría de Tiendanube en la ficha", 422);
-    const variants = storeVariants(item);
+    let variants = storeVariants(item);
     const skuSet = new Set(variants.map(v => v.sku));
     const duplicate = (await getInventoryItems({ media: "none" })).find(other => other.id !== item.id && storeVariants(other).some(v => skuSet.has(v.sku)));
     if (duplicate) throw new StoreApiError(`Hay SKU compartidos con ${duplicate.nombre}. Corregilos antes de enviar`, 422);
@@ -123,7 +138,7 @@ export async function syncStoreProduct(itemId: string, publish: boolean, expecte
     const remoteLock = `tiendanube:product:${credentials.storeId}:${remote.id}`;
     if (!(await client.query("SELECT pg_try_advisory_lock(hashtextextended($1, 0)) AS locked", [remoteLock])).rows[0].locked) throw new StoreApiError("Este producto se está editando en el catálogo. Reintentá cuando termine", 409);
     productLock = remoteLock;
-    if (variantKey((remote.attributes ?? []).map(translated)) !== variantKey(attributes.map(translated))) throw new StoreApiError("Cambió la estructura de variantes. Conservá los mismos atributos para actualizar este producto", 409);
+    variants = alignStoreVariants(variants, remote.attributes ?? []);
     // Hide while updating so an interrupted operation cannot publish an incomplete product.
     await request(`/products/${remote.id}`, "PUT", { ...metadata, published: false });
     await client.query("UPDATE tiendanube_links SET visibility='hidden' WHERE store_id=$1 AND item_id=$2", [credentials.storeId, itemId]);
