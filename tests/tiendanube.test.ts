@@ -8,7 +8,7 @@ import { sanitizeInventoryInput } from "../src/lib/inventory";
 import { generarDescripcionTiendaHTML } from "../src/lib/descripcion";
 import { tablaDeMarca, columnasDe } from "../src/lib/tablas-talle";
 import { storeAuthenticated, storeGuard } from "../src/lib/store-auth";
-import { syncStoreProduct, StoreApiError, storeRequest } from "../src/lib/tiendanube-api";
+import { alignStoreVariants, syncStoreProduct, StoreApiError, storeRequest } from "../src/lib/tiendanube-api";
 import { POST as syncRoute } from "../src/app/api/tiendanube/route";
 import type { InventoryItem } from "../src/lib/types";
 
@@ -85,6 +85,18 @@ test("validación y precios: mantiene talles agotados, bloquea datos incoherente
   assert.throws(() => sanitizeStoreProfile({ ...item.tienda, categoriaId: -1 }));
 });
 
+test("las variantes conservan sus valores al alinearse con el orden remoto de atributos", () => {
+  const variants = storeVariants(item);
+  const aligned = alignStoreVariants(variants, [{ es: " Color " }, { es: "talle" }]);
+  assert.deepEqual(aligned.map(v => v.props.map(p => p.valor)), [["Negro", "M"], ["Negro", "L"]]);
+  assert.deepEqual(aligned.map(v => [v.sku, v.stock, v.price]), variants.map(v => [v.sku, v.stock, v.price]));
+  assert.deepEqual(variants[0].props.map(p => p.nombre), ["Talle", "Color"]);
+  for (const attributes of [[], [{ es: "Talle" }], [{ es: "Talle" }, { es: "Modelo" }], [{ es: "Talle" }, { es: "Talle" }]]) {
+    assert.throws(() => alignStoreVariants(variants, attributes), e => e instanceof StoreApiError && e.status === 409);
+  }
+  assert.throws(() => alignStoreVariants([{ ...variants[0], props: [variants[0].props[0], variants[0].props[0]] }], [{ es: "Talle" }, { es: "Color" }]), StoreApiError);
+});
+
 test("descripción automática válida aunque exista una ficha con texto vacío", () => {
   for (const descripcion of ["", " \n\t "]) {
     const automatic = { ...item, nombre: "Remera Bape", tienda: { ...item.tienda!, descripcion } };
@@ -128,6 +140,7 @@ test("envíos recuperables: creación, actualización por ID, SKU existente y re
   let images = 0;
   let unavailable = false;
   let locked = true;
+  const writes: { path: string; method: string }[] = [];
   const toRow = () => ({ id: item.id, nombre: item.nombre, sku: item.sku, variante: item.variante, cantidad_inicial: item.cantidadInicial,
     cantidad_vendida: item.cantidadVendida, costo_unit_ars: item.costoUnitARS, costo_unit_usd: 0, precio_venta_ars: item.precioVentaARS,
     estado: item.estado, origen: item.origen, marca_id: item.marcaId, talles: item.talles, tienda: item.tienda,
@@ -149,6 +162,7 @@ test("envíos recuperables: creación, actualización por ID, SKU existente y re
     assert.equal((init?.headers as Record<string, string>).Authorization, "Bearer private-token");
     const path = new URL(input).pathname.replace("/2025-03/99", "");
     const data = init?.body ? JSON.parse(String(init.body)) : null;
+    if (init?.method !== "GET") writes.push({ path, method: init?.method ?? "GET" });
     const ok = (data: unknown) => new Response(JSON.stringify(data), { status: 200 });
     if (path === "/categories") return ok([{ id: 12, name: { es: "Camperas" } }]);
     if (unavailable) return new Response("", { status: 429 });
@@ -164,6 +178,10 @@ test("envíos recuperables: creación, actualización por ID, SKU existente y re
     }
     if (path === "/products/100" && init?.method === "GET") return ok(remote);
     if (path === "/products/100" && init?.method === "PUT") { Object.assign(remote!, data); return ok(remote); }
+    if (path === "/products/100/variants" && init?.method === "POST") {
+      const variant = { ...data, id: Math.max(...remote!.variants.map((v: any) => v.id)) + 1 };
+      remote!.variants.push(variant); return ok(variant);
+    }
     if (path.startsWith("/products/100/variants/")) { Object.assign(remote!.variants.find((v: any) => v.id === Number(path.split("/").pop())), data); return ok({}); }
     if (path === "/products/100/images" && init?.method === "POST") { images++; const img = { ...data, id: 300 }; remote!.images.push(img); return ok(img); }
     if (path === "/products/100/images/300") return ok({ id: 300 });
@@ -189,6 +207,30 @@ test("envíos recuperables: creación, actualización por ID, SKU existente y re
     assert.equal(link!.product_id, "100");
     await syncStoreProduct(item.id, true, item.updatedAt, "100");
     assert.equal(creations, countAfterTimeout);
+    // Existing CSV/imported products use Color/Talle; multi-size inventory uses Talle/Color.
+    remote!.attributes.reverse();
+    remote!.variants.forEach((variant: any) => variant.values.reverse());
+    const originalSizes = item.talles;
+    const existingIds = remote!.variants.map((variant: any) => variant.id);
+    try {
+      item.talles = [...item.talles!, { talle: "S", cantidadInicial: 1, cantidadVendida: 0, sku: "CAMP-S" }];
+      await syncStoreProduct(item.id, true, item.updatedAt, "100");
+      assert.equal(creations, countAfterTimeout);
+      assert.deepEqual(remote!.attributes, [{ es: "Color" }, { es: "Talle" }]);
+      assert.deepEqual(remote!.variants.slice(0, 2).map((v: any) => v.id), existingIds);
+      assert.deepEqual(remote!.variants.map((v: any) => v.values.map((p: any) => p.es)), [["Negro", "M"], ["Negro", "L"], ["Negro", "S"]]);
+      assert.equal(remote!.variants[2].inventory_levels[0].stock, 1);
+      await syncStoreProduct(item.id, true, item.updatedAt, "100");
+      assert.equal(remote!.variants.length, 3, "a retry must not duplicate the new size");
+      item.talles = originalSizes;
+      await syncStoreProduct(item.id, true, item.updatedAt, "100");
+      assert.equal(remote!.variants[2].inventory_levels[0].stock, 0, "removed sizes retain their ID at zero stock");
+      const writeCount = writes.length;
+      remote!.attributes[0] = { es: "Modelo" };
+      await assert.rejects(() => syncStoreProduct(item.id, true, item.updatedAt, "100"), e => e instanceof StoreApiError && e.status === 409);
+      assert.equal(writes.length, writeCount, "an incompatible structure must fail before any remote mutation");
+      remote!.attributes[0] = { es: "Color" };
+    } finally { item.talles = originalSizes; }
     link = null;
     remote!.handle = { es: "campera-importada-antes" };
     await assert.rejects(() => syncStoreProduct(item.id, true, item.updatedAt), e => e instanceof StoreApiError && e.status === 409);
