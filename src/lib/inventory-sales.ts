@@ -39,7 +39,7 @@ export function validateSale(raw: Record<string, unknown>): SaleInput {
 }
 
 export interface InventorySalesReport {
-  meses: { mes: string; facturadoARS: number; unidades: number }[];
+  meses: { mes: string; facturadoARS: number; costoMercaderiaARS: number; gananciaARS: number; unidades: number }[];
   ventas: { id: string; fecha: string; nombre: string; talle: string; unidades: number; precioUnitARS: number; totalARS: number }[];
   pendientes: { itemId: string; talle: string; unidades: number }[];
   discrepancias: number;

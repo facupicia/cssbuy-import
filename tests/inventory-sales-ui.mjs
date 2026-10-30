@@ -51,6 +51,9 @@ try {
     const section = page.getByRole("region", { name: "Facturación por mes" });
     await section.getByLabel("Mes a consultar").fill("2025-07");
     await section.getByText("No hay ventas con fecha registrada en este mes.", { exact: false }).waitFor();
+    assert.match(await section.innerText(), /Ganancia de mercadería/);
+    const emptyAmounts = await section.locator("dd").allTextContents();
+    assert.equal(emptyAmounts.length, 3); assert.ok(emptyAmounts.every(amount => /0,00/.test(amount)));
     await section.locator("summary").filter({ hasText: "unidades vendidas sin fecha" }).click();
     await section.getByRole("button", { name: `Completar venta de ${item.nombre}`, exact: true }).click();
     const dialog = page.getByRole("dialog");
@@ -73,12 +76,17 @@ try {
     await dialog.waitFor({ state: "hidden" });
     const saved = (await api(`/api/inventario/${item.id}`)).item;
     assert.equal(saved.cantidadVendida, 3); assert.equal(saved.precioVentaARS, 75000);
-    await api(`/api/inventario/${item.id}`, { precioVentaARS: 99000 }, "PATCH");
+    await api(`/api/inventario/${item.id}`, { precioVentaARS: 99000, costoUnitARS: 50000 }, "PATCH");
     await section.getByLabel("Mes a consultar").fill("2025-09");
     await section.getByRole("cell", { name: "30/09/2025" }).first().waitFor();
     const report = await api("/api/inventario/ventas?mes=2025-09");
     assert.ok(report.ventas.some(s => s.nombre === item.nombre && s.fecha === "2025-09"));
     assert.equal(report.ventas.filter(s => s.nombre === item.nombre).reduce((sum, sale) => sum + sale.totalARS, 0), 130000.50);
+    const monthTotal = report.meses.find(m => m.mes === "2025-09");
+    assert.equal(monthTotal.costoMercaderiaARS, 50000 * (width === 1365 ? 1 : 2));
+    assert.equal(monthTotal.gananciaARS, 80000.50 * (width === 1365 ? 1 : 2));
+    await section.getByText("Comparar meses registrados", { exact: true }).click();
+    await section.getByRole("table", { name: "Facturación y ganancia de mercadería por mes" }).waitFor({ state: "visible" });
     assert.equal(await page.evaluate(() => document.documentElement.scrollWidth > innerWidth), false);
     await page.evaluate(() => { document.activeElement?.blur(); window.scrollTo(0, 0); });
     await page.waitForTimeout(4200); // Success toasts must not cover the captured content.

@@ -68,7 +68,8 @@ export async function getInventorySalesReport(mes: string): Promise<InventorySal
   try {
     await client.query("BEGIN ISOLATION LEVEL REPEATABLE READ READ ONLY");
     const months = await client.query(`SELECT to_char(fecha,'YYYY-MM') AS mes, SUM(unidades) AS units,
-      SUM(unidades*precio_unit_ars) AS amount FROM inventory_sales GROUP BY 1 ORDER BY 1 DESC`);
+      SUM(unidades*precio_unit_ars) AS amount, SUM(unidades*costo_unit_ars) AS cost,
+      SUM(unidades*(precio_unit_ars-costo_unit_ars)) AS profit FROM inventory_sales GROUP BY 1 ORDER BY 1 DESC`);
     const sales = await client.query(`SELECT id,CASE WHEN fecha_precision='mes' THEN to_char(fecha,'YYYY-MM') ELSE to_char(fecha,'YYYY-MM-DD') END AS fecha,nombre,talle,unidades,precio_unit_ars,
       unidades*precio_unit_ars AS total FROM inventory_sales WHERE fecha >= $1::date AND fecha < $1::date + INTERVAL '1 month' ORDER BY fecha DESC,created_at DESC,id`, [`${mes}-01`]);
     const pending = await client.query(`WITH sold AS (
@@ -80,7 +81,7 @@ export async function getInventorySalesReport(mes: string): Promise<InventorySal
       WHERE EXISTS (SELECT 1 FROM inventory_items i WHERE i.id=COALESCE(s.id,r.item_id))`);
     await client.query("COMMIT");
     return {
-      meses: months.rows.map(r => ({ mes: r.mes, facturadoARS: Number(r.amount), unidades: Number(r.units) })),
+      meses: months.rows.map(r => ({ mes: r.mes, facturadoARS: Number(r.amount), costoMercaderiaARS: Number(r.cost), gananciaARS: Number(r.profit), unidades: Number(r.units) })),
       ventas: sales.rows.map(r => ({ id: r.id, fecha: r.fecha, nombre: r.nombre, talle: r.talle, unidades: r.unidades, precioUnitARS: Number(r.precio_unit_ars), totalARS: Number(r.total) })),
       pendientes: pending.rows.filter(r => Number(r.pending) > 0).map(r => ({ itemId: r.id, talle: r.talle, unidades: Number(r.pending) })),
       discrepancias: pending.rows.filter(r => Number(r.pending) < 0).length,

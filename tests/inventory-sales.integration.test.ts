@@ -46,6 +46,8 @@ test("ventas por mes: transacción, historial, fechas anteriores, concurrencia y
     report = await sales.getInventorySalesReport("2025-08");
     assert.equal(report.ventas.length, 1);
     assert.equal(report.meses[0].facturadoARS, 65000);
+    assert.equal(report.meses[0].costoMercaderiaARS, 25000);
+    assert.equal(report.meses[0].gananciaARS, 40000);
     assert.equal(report.pendientes[0].unidades, 1);
     await assert.rejects(sales.recordInventorySale({ ...first, precioUnitARS: 66000 }), /otra venta/);
     await assert.rejects(sales.recordInventorySale({ ...first, requestId: randomUUID(), unidades: 2 }), /pendientes/);
@@ -57,6 +59,8 @@ test("ventas por mes: transacción, historial, fechas anteriores, concurrencia y
     await db.updateInventoryItem(item.id, { precioVentaARS: 99000, costoUnitARS: 50000, nombre: "Nombre cambiado" });
     report = await sales.getInventorySalesReport("2025-09");
     assert.equal(report.meses.find(m => m.mes === "2025-09")!.facturadoARS, 204001.10);
+    assert.equal(report.meses.find(m => m.mes === "2025-09")!.costoMercaderiaARS, 75000, "uses saved cost before item cost changes");
+    assert.equal(report.meses.find(m => m.mes === "2025-09")!.gananciaARS, 129001.10);
     assert.equal(report.ventas.find(v => v.fecha === "2025-09-02")!.nombre, "Remera fixture");
     assert.equal(report.pendientes.length, 0);
     assert.equal((await sales.getInventorySalesReport("2025-07")).ventas.length, 0);
@@ -95,7 +99,14 @@ test("ventas por mes: transacción, historial, fechas anteriores, concurrencia y
     const monthReport = await sales.getInventorySalesReport("2025-10");
     assert.equal(monthReport.ventas.length, 1); assert.equal(monthReport.ventas[0].fecha, "2025-10");
     assert.equal(monthReport.meses.find(m => m.mes === "2025-10")!.facturadoARS, 55000);
+    assert.equal(monthReport.meses.find(m => m.mes === "2025-10")!.gananciaARS, 54900);
     await assert.rejects(sales.recordInventorySale({ ...monthSale, fecha: "2025-10-01" }), /otra venta/);
     assert.equal((await pool.query("SELECT fecha_precision FROM inventory_sales WHERE id=$1", [monthSale.requestId])).rows[0].fecha_precision, "mes");
+    const lossItem = await db.insertInventoryItem({ nombre: "Pérdida fixture", cantidadInicial: 2, cantidadVendida: 0, costoUnitARS: 100.25, precioVentaARS: 50, estado: "en_deposito", origen: "manual" });
+    await sales.recordInventorySale({ requestId: randomUUID(), itemId: lossItem.id, fecha: "2025-11", unidades: 2, precioUnitARS: 50 });
+    const loss = (await sales.getInventorySalesReport("2025-11")).meses.find(m => m.mes === "2025-11")!;
+    assert.equal(loss.costoMercaderiaARS, 200.50); assert.equal(loss.gananciaARS, -100.50);
+    await db.deleteInventoryItem(lossItem.id);
+    assert.equal((await sales.getInventorySalesReport("2025-11")).meses.find(m => m.mes === "2025-11")!.gananciaARS, -100.50);
   } finally { if (pool) await pool.end(); await database.stop(); process.env = before; }
 });
