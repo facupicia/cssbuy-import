@@ -46,6 +46,8 @@ import {
   suggestEstado,
   ESTADO_LABEL,
 } from "@/lib/inventory";
+import { MonthlySales } from "@/components/inventario/MonthlySales";
+import { salesToday, type InventorySalesReport } from "@/lib/inventory-sales";
 import { fmtARS, fmtUSD, fmtPct } from "@/lib/utils";
 import {
   parseTalle,
@@ -203,6 +205,7 @@ export default function InventarioPage() {
   const [formError, setFormError] = useState("");
 
   const [ventaFor, setVentaFor] = useState<InventoryItem | null>(null);
+  const [ventasAnteriores, setVentasAnteriores] = useState<InventorySalesReport["pendientes"]>([]);
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
   const [deleting, setDeleting] = useState(false);
 
@@ -530,50 +533,19 @@ export default function InventarioPage() {
   }
 
   async function registrarVenta(
-    it: InventoryItem,
-    unidades: number,
-    precioUnit: number,
-    talleSeleccionado?: string
+    it: InventoryItem, unidades: number, precioUnit: number,
+    talleSeleccionado: string | undefined, fecha: string, requestId: string
   ) {
-    const calc = calcInventoryItem(it);
-    const patch: Record<string, unknown> = { precioVentaARS: precioUnit };
-
-    if (calc.tallesCalc) {
-      // Con talles, la venta se descuenta del talle: el servidor recalcula el
-      // total a partir de ellos, así que sumar solo al total se perdería.
-      const talle = calc.tallesCalc.find((t) => t.talle === talleSeleccionado);
-      if (!talle) {
-        toast.error("Elegí el talle vendido");
-        return;
-      }
-      if (unidades <= 0 || unidades > talle.stock) {
-        toast.error(`Solo hay ${talle.stock} unidades del talle ${talle.talle}`);
-        return;
-      }
-      patch.talles = calc.tallesCalc.map(({ stock: _stock, ...t }) =>
-        t.talle === talle.talle ? { ...t, cantidadVendida: t.cantidadVendida + unidades } : t
-      );
-    } else if (unidades <= 0 || unidades > calc.stock) {
-      toast.error(`Solo hay ${calc.stock} unidades disponibles`);
-      return;
-    }
-
-    const nuevaVendida = calc.cantidadVendida + unidades;
-    patch.cantidadVendida = nuevaVendida;
-    if (nuevaVendida >= calc.cantidadInicial) patch.estado = "agotado";
-    try {
-      await fetcherPatch(`/api/inventario/${it.id}`, patch);
-      toast.success(
-        `Venta registrada: ${unidades} u.${talleSeleccionado ? ` (${talleSeleccionado})` : ""} de "${it.nombre}"`,
-        { description: `Ingreso ${fmtARS(precioUnit * unidades)}` }
-      );
-      setVentaFor(null);
-      await load();
-    } catch (err: any) {
-      toast.error("No se pudo registrar la venta", {
-        description: err?.info?.error || err?.message,
-      });
-    }
+    await fetcherPost("/api/inventario/ventas", {
+      itemId: it.id, unidades, precioUnitARS: precioUnit, talle: talleSeleccionado,
+      fecha, requestId, anterior: ventasAnteriores.length > 0,
+    });
+    toast.success(ventasAnteriores.length ? "Venta anterior completada" : "Venta registrada", {
+      description: `${fmtARS(precioUnit * unidades)} · ${fecha.split("-").reverse().join("/")}`,
+    });
+    setVentaFor(null);
+    setVentasAnteriores([]);
+    await load();
   }
 
   async function doDelete() {
@@ -683,23 +655,25 @@ export default function InventarioPage() {
             </Card>
             <Card padding="sm">
               <StatTile
-                label="Facturado"
+                label="Ventas acumuladas estimadas"
                 value={fmtARS(summary.ingresoRealizadoARS)}
-                sub={`${summary.unidadesVendidas} unidades vendidas · Total acumulado`}
+                sub={`${summary.unidadesVendidas} unidades vendidas × precios actuales. El detalle por fecha está abajo.`}
                 icon={<ShoppingCart className="h-3.5 w-3.5" />}
               />
             </Card>
             <Card padding="sm">
               <StatTile
-                label="Ganancia de las ventas"
+                label="Margen estimado de mercadería"
                 value={fmtARS(summary.gananciaRealizadaARS)}
-                sub="Facturado menos costo de las prendas vendidas. Antes de publicidad y comisiones."
+                sub="Calculado con precios y costos actuales. Antes de publicidad y comisiones."
                 icon={<Wallet2 className="h-3.5 w-3.5" />}
                 tone={summary.gananciaRealizadaARS < 0 ? "danger" : "accent"}
               />
             </Card>
           </div>
         )}
+
+        {!error && <MonthlySales items={items} onDateSale={(item, pending) => { setVentasAnteriores(pending); setVentaFor(item); }} />}
 
         {items.length > 0 && <>
           <div className="flex flex-wrap items-end justify-between gap-3">
@@ -949,7 +923,7 @@ export default function InventarioPage() {
                         <td className="py-2.5 px-3">
                           <div className="flex items-center justify-end gap-1">
                             <Button variant="outline" size="sm" onClick={() => openEdit(it)}>Editar</Button>
-                            <Menu><MenuTrigger asChild><Button variant="ghost" size="sm" aria-label={`Más acciones de ${it.nombre}`} icon={<MoreHorizontal className="h-4 w-4" />} /></MenuTrigger><MenuContent><MenuItem icon={<ShoppingCart className="h-4 w-4" />} disabled={c.stock === 0} onSelect={() => setVentaFor(it)}>Registrar venta</MenuItem><MenuItem icon={<FileText className="h-4 w-4" />} onSelect={() => void openSheet(it)}>Ver ficha pública</MenuItem><MenuItem icon={<Trash2 className="h-4 w-4" />} onSelect={() => setConfirmDeleteId(it.id)}>Eliminar del inventario</MenuItem></MenuContent></Menu>
+                            <Menu><MenuTrigger asChild><Button variant="ghost" size="sm" aria-label={`Más acciones de ${it.nombre}`} icon={<MoreHorizontal className="h-4 w-4" />} /></MenuTrigger><MenuContent><MenuItem icon={<ShoppingCart className="h-4 w-4" />} disabled={c.stock === 0} onSelect={() => { setVentasAnteriores([]); setVentaFor(it); }}>Registrar venta</MenuItem><MenuItem icon={<FileText className="h-4 w-4" />} onSelect={() => void openSheet(it)}>Ver ficha pública</MenuItem><MenuItem icon={<Trash2 className="h-4 w-4" />} onSelect={() => setConfirmDeleteId(it.id)}>Eliminar del inventario</MenuItem></MenuContent></Menu>
 
                           </div>
                         </td>
@@ -1079,7 +1053,7 @@ export default function InventarioPage() {
                     </div>
 
                     <div className="flex items-center justify-between gap-2">
-                      <Button variant="outline" size="sm" icon={<ShoppingCart className="h-4 w-4" />} disabled={c.stock === 0} onClick={() => setVentaFor(it)}>Registrar venta</Button>
+                      <Button variant="outline" size="sm" icon={<ShoppingCart className="h-4 w-4" />} disabled={c.stock === 0} onClick={() => { setVentasAnteriores([]); setVentaFor(it); }}>Registrar venta</Button>
                       <div className="flex items-center gap-1"><Button variant="outline" size="sm" icon={<Pencil className="h-4 w-4" />} onClick={() => openEdit(it)}>Editar</Button><Menu><MenuTrigger asChild><Button variant="ghost" size="sm" aria-label={`Más acciones de ${it.nombre}`} icon={<MoreHorizontal className="h-4 w-4" />} /></MenuTrigger><MenuContent><MenuItem icon={<FileText className="h-4 w-4" />} onSelect={() => void openSheet(it)}>Ver ficha pública</MenuItem><MenuItem icon={<Trash2 className="h-4 w-4" />} onSelect={() => setConfirmDeleteId(it.id)}>Eliminar del inventario</MenuItem></MenuContent></Menu></div>
                     </div>
                   </div>
@@ -1109,7 +1083,8 @@ export default function InventarioPage() {
       {/* Dialog: registrar venta */}
       <VentaDialog
         item={ventaFor}
-        onOpenChange={(open) => !open && setVentaFor(null)}
+        onOpenChange={(open) => { if (!open) { setVentaFor(null); setVentasAnteriores([]); } }}
+        anteriores={ventasAnteriores}
         onConfirm={registrarVenta}
       />
 
@@ -1883,43 +1858,63 @@ function VentaDialog({
   item,
   onOpenChange,
   onConfirm,
+  anteriores,
 }: {
   item: InventoryItem | null;
   onOpenChange: (open: boolean) => void;
-  onConfirm: (it: InventoryItem, unidades: number, precioUnit: number, talleSeleccionado?: string) => void;
+  anteriores: InventorySalesReport["pendientes"];
+  onConfirm: (it: InventoryItem, unidades: number, precioUnit: number, talleSeleccionado: string | undefined, fecha: string, requestId: string) => Promise<void>;
 }) {
+  const [fecha, setFecha] = useState(salesToday());
+  const [requestId, setRequestId] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState("");
+  const anterior = anteriores.length > 0;
+  const [precioConfirmado, setPrecioConfirmado] = useState(false);
   const [unidades, setUnidades] = useState(1);
   const [precio, setPrecio] = useState(0);
   const [talleElegido, setTalleElegido] = useState<string>("");
 
   useEffect(() => {
     if (item) {
+      setFecha(anterior ? "" : salesToday());
+      setRequestId(crypto.randomUUID());
+      setError("");
+      setPrecioConfirmado(false);
       setUnidades(1);
       setPrecio(item.precioVentaARS || 0);
       const calc = calcInventoryItem(item);
-      const conStock = (calc.tallesCalc || []).filter((t) => t.stock > 0);
+      const conStock = (calc.tallesCalc || []).filter((t) => anterior ? anteriores.some(p => p.talle === t.talle && p.unidades > 0) : t.stock > 0);
       setTalleElegido(conStock[0]?.talle || "");
     }
-  }, [item]);
+  }, [item, anteriores, anterior]);
 
   const calc = item ? calcInventoryItem(item) : null;
-  const maxDisp = calc?.tallesCalc
+  const maxDisp = anterior ? anteriores.find(p => p.talle === talleElegido)?.unidades ?? 0 : calc?.tallesCalc
     ? calc.tallesCalc.find((t) => t.talle === talleElegido)?.stock ?? 0
     : calc?.stock ?? 1;
 
+  async function submit() {
+    if (!item || busy) return;
+    setBusy(true); setError("");
+    try { await onConfirm(item, unidades, precio, talleElegido || undefined, fecha, requestId); }
+    catch (err: any) { setError(err?.info?.error || err?.message || "No se pudo guardar. Volvé a intentar."); }
+    finally { setBusy(false); }
+  }
   return (
-    <Dialog open={Boolean(item)} onOpenChange={onOpenChange}>
+    <Dialog open={Boolean(item)} onOpenChange={open => { if (!busy) onOpenChange(open); }}>
       {item && calc && (
         <DialogContent className="max-w-md">
           <DialogHeader>
-            <DialogTitle>Registrar venta</DialogTitle>
+            <DialogTitle>{anterior ? "Completar venta anterior" : "Registrar venta"}</DialogTitle>
             <DialogDescription>
               {item.nombre}
-              {!calc.tallesCalc && item.variante ? ` · ${item.variante}` : ""} — {calc.stock} unidades disponibles
+              {!calc.tallesCalc && item.variante ? ` · ${item.variante}` : ""} · {anterior ? "La cantidad vendida ya está descontada del stock" : `${calc.stock} unidades disponibles`}
             </DialogDescription>
           </DialogHeader>
 
           <div className="space-y-4">
+            <Input label="Fecha de venta" type="date" min="1900-01-01" max={salesToday()} value={fecha} onChange={e => setFecha(e.target.value)} disabled={busy} hint={anterior ? "Ingresá la fecha real y el precio que cobraste. Si fueron ventas en fechas distintas, cargalas por separado." : "La fecha determina en qué mes se suma el importe."} />
             {calc.tallesCalc && (
               <div className="space-y-1.5">
                 <label className="block text-xs font-medium text-[var(--color-fg-muted)] tracking-wide uppercase">
@@ -1927,13 +1922,14 @@ function VentaDialog({
                 </label>
                 <div className="flex flex-wrap gap-1.5">
                   {calc.tallesCalc.map((t) => {
-                    const disponible = t.stock > 0;
+                    const available = anterior ? anteriores.find(p => p.talle === t.talle)?.unidades ?? 0 : t.stock;
+                    const disponible = available > 0;
                     const seleccionado = talleElegido === t.talle;
                     return (
                       <button
                         key={t.talle}
                         type="button"
-                        disabled={!disponible}
+                        disabled={busy || !disponible}
                         onClick={() => {
                           setTalleElegido(t.talle);
                           setUnidades(1);
@@ -1948,7 +1944,7 @@ function VentaDialog({
                       >
                         <span>{t.talle}</span>
                         <span className={`text-[10px] font-mono ${seleccionado ? "opacity-90" : "text-[var(--color-fg-muted)]"}`}>
-                          ({t.stock} disp.)
+                          ({available} {anterior ? "sin fecha" : "disp."})
                         </span>
                       </button>
                     );
@@ -1965,13 +1961,15 @@ function VentaDialog({
                 onChange={(n) => setUnidades(Math.max(1, Math.min(maxDisp, Math.round(n))))}
               />
               <NumberField
-                label="Precio unit. ARS"
+                label="Precio cobrado por unidad ARS"
                 prefix="$"
                 step="0.01"
                 value={precio}
                 onChange={setPrecio}
               />
             </div>
+
+            {anterior && <div className="space-y-2 text-sm"><p className="text-[var(--color-fg-muted)]">El precio sugerido es el actual de la ficha. Revisá cuánto cobraste realmente.</p><label className="flex items-start gap-2"><input type="checkbox" checked={precioConfirmado} disabled={busy} onChange={e => setPrecioConfirmado(e.target.checked)} className="mt-1 shrink-0" /><span>Confirmo que el precio ingresado es el que cobré en esa venta.</span></label></div>}
 
             <div className="grid grid-cols-2 gap-3 p-3 bg-[var(--color-bg-subtle)] rounded-[var(--radius)] text-xs">
               <div>
@@ -1981,7 +1979,7 @@ function VentaDialog({
                 </p>
               </div>
               <div>
-                <span className="text-[11px] text-[var(--color-fg-muted)] uppercase">Ganancia</span>
+                <span className="text-[11px] text-[var(--color-fg-muted)] uppercase">Margen de mercadería</span>
                 <p className="font-bold font-mono tnum text-sm text-[var(--color-success)]">
                   {fmtARS((precio - calc.costoUnitARS) * unidades)}
                 </p>
@@ -1989,16 +1987,20 @@ function VentaDialog({
             </div>
           </div>
 
+          {error && <p role="alert" className="mt-4 text-sm text-[var(--color-danger)]">{error}</p>}
+          <p className="mt-4 text-xs text-[var(--color-fg-muted)]">El precio de esta venta queda guardado por separado del precio del producto. El margen usa el costo actual, antes de otros gastos.</p>
           <div className="mt-2 flex items-center justify-end gap-2 pt-3 border-t border-[var(--color-border)]">
-            <Button variant="outline" onClick={() => onOpenChange(false)}>
+            <Button variant="outline" disabled={busy} onClick={() => onOpenChange(false)}>
               Cancelar
             </Button>
             <Button
               variant="primary"
               icon={<ShoppingCart className="h-3.5 w-3.5" />}
-              onClick={() => onConfirm(item, unidades, precio, talleElegido || undefined)}
+              loading={busy}
+              disabled={!fecha || fecha > salesToday() || !Number.isInteger(unidades) || unidades < 1 || unidades > maxDisp || !Number.isFinite(precio) || precio < 0 || (anterior && !precioConfirmado)}
+              onClick={() => void submit()}
             >
-              Registrar venta
+              {anterior ? "Guardar fecha e importe" : "Registrar venta"}
             </Button>
           </div>
         </DialogContent>
