@@ -54,10 +54,12 @@ try {
     await section.locator("summary").filter({ hasText: "unidades vendidas sin fecha" }).click();
     await section.getByRole("button", { name: `Completar venta de ${item.nombre}`, exact: true }).click();
     const dialog = page.getByRole("dialog");
-    await dialog.getByLabel("Fecha de venta").fill("2025-09-01");
+    await dialog.getByLabel("Solo recuerdo el mes").check();
+    await dialog.getByLabel("Mes de venta", { exact: true }).fill("2025-09");
     await dialog.getByLabel("Precio cobrado por unidad ARS").fill("60000");
     assert.equal(await dialog.getByRole("button", { name: "Guardar fecha e importe" }).isDisabled(), true);
     await dialog.getByLabel("Confirmo que el precio ingresado es el que cobré en esa venta.").check();
+    await page.screenshot({ path: `.impeccable/review/inventory-month-dialog-${width}.png` });
     await dialog.getByRole("button", { name: "Guardar fecha e importe" }).click();
     await dialog.waitFor({ state: "hidden" });
     if (width >= 768) {
@@ -75,6 +77,7 @@ try {
     await section.getByLabel("Mes a consultar").fill("2025-09");
     await section.getByRole("cell", { name: "30/09/2025" }).first().waitFor();
     const report = await api("/api/inventario/ventas?mes=2025-09");
+    assert.ok(report.ventas.some(s => s.nombre === item.nombre && s.fecha === "2025-09"));
     assert.equal(report.ventas.filter(s => s.nombre === item.nombre).reduce((sum, sale) => sum + sale.totalARS, 0), 130000.50);
     assert.equal(await page.evaluate(() => document.documentElement.scrollWidth > innerWidth), false);
     await page.evaluate(() => { document.activeElement?.blur(); window.scrollTo(0, 0); });

@@ -10,6 +10,7 @@ async function ensureSales() {
     precio_unit_ars NUMERIC(14,2) NOT NULL CHECK (precio_unit_ars >= 0),
     costo_unit_ars NUMERIC NOT NULL, anterior BOOLEAN NOT NULL DEFAULT false,
     created_at TIMESTAMPTZ NOT NULL DEFAULT now());
+    ALTER TABLE inventory_sales ADD COLUMN IF NOT EXISTS fecha_precision TEXT NOT NULL DEFAULT 'dia' CHECK (fecha_precision IN ('dia','mes'));
     CREATE INDEX IF NOT EXISTS inventory_sales_item_idx ON inventory_sales(item_id);
     CREATE INDEX IF NOT EXISTS inventory_sales_date_idx ON inventory_sales(fecha);`)
     .then(() => {}).catch(error => { schema = undefined; throw error; });
@@ -18,6 +19,8 @@ async function ensureSales() {
 
 export async function recordInventorySale(raw: Record<string, unknown>) {
   const sale = validateSale(raw);
+  const precision = sale.fecha.length === 7 ? "mes" : "dia";
+  const fechaRegistro = precision === "mes" ? `${sale.fecha}-01` : sale.fecha;
   await ensureSales();
   const client = await getPool().connect();
   try {
@@ -26,7 +29,7 @@ export async function recordInventorySale(raw: Record<string, unknown>) {
     const { rows: items } = await client.query("SELECT * FROM inventory_items WHERE id=$1 FOR UPDATE", [sale.itemId]);
     const existing = (await client.query("SELECT *,to_char(fecha,'YYYY-MM-DD') AS sale_date FROM inventory_sales WHERE id=$1", [sale.requestId])).rows[0];
     if (existing) {
-      if (existing.item_id !== sale.itemId || existing.sale_date !== sale.fecha || existing.unidades !== sale.unidades || Number(existing.precio_unit_ars) !== sale.precioUnitARS || existing.talle !== sale.talle || existing.anterior !== sale.anterior) throw new InventorySaleError("Ese identificador ya corresponde a otra venta.", 409);
+      if (existing.item_id !== sale.itemId || existing.sale_date !== fechaRegistro || existing.fecha_precision !== precision || existing.unidades !== sale.unidades || Number(existing.precio_unit_ars) !== sale.precioUnitARS || existing.talle !== sale.talle || existing.anterior !== sale.anterior) throw new InventorySaleError("Ese identificador ya corresponde a otra venta.", 409);
       await client.query("COMMIT"); return;
     }
     const item = items[0];
@@ -51,8 +54,8 @@ export async function recordInventorySale(raw: Record<string, unknown>) {
       [sale.itemId, totalSold, JSON.stringify(talles), totalInitial]);
     }
     // Snapshots survive later price edits and removal of the inventory product.
-    await client.query(`INSERT INTO inventory_sales (id,item_id,fecha,nombre,talle,unidades,precio_unit_ars,costo_unit_ars,anterior)
-      VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)`, [sale.requestId, sale.itemId, sale.fecha, item.nombre, sale.talle, sale.unidades, sale.precioUnitARS, item.costo_unit_ars, sale.anterior]);
+    await client.query(`INSERT INTO inventory_sales (id,item_id,fecha,nombre,talle,unidades,precio_unit_ars,costo_unit_ars,anterior,fecha_precision)
+      VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)`, [sale.requestId, sale.itemId, fechaRegistro, item.nombre, sale.talle, sale.unidades, sale.precioUnitARS, item.costo_unit_ars, sale.anterior, precision]);
     await client.query("COMMIT");
   } catch (error) { await client.query("ROLLBACK"); throw error; }
   finally { client.release(); }
@@ -66,7 +69,7 @@ export async function getInventorySalesReport(mes: string): Promise<InventorySal
     await client.query("BEGIN ISOLATION LEVEL REPEATABLE READ READ ONLY");
     const months = await client.query(`SELECT to_char(fecha,'YYYY-MM') AS mes, SUM(unidades) AS units,
       SUM(unidades*precio_unit_ars) AS amount FROM inventory_sales GROUP BY 1 ORDER BY 1 DESC`);
-    const sales = await client.query(`SELECT id,to_char(fecha,'YYYY-MM-DD') AS fecha,nombre,talle,unidades,precio_unit_ars,
+    const sales = await client.query(`SELECT id,CASE WHEN fecha_precision='mes' THEN to_char(fecha,'YYYY-MM') ELSE to_char(fecha,'YYYY-MM-DD') END AS fecha,nombre,talle,unidades,precio_unit_ars,
       unidades*precio_unit_ars AS total FROM inventory_sales WHERE fecha >= $1::date AND fecha < $1::date + INTERVAL '1 month' ORDER BY fecha DESC,created_at DESC,id`, [`${mes}-01`]);
     const pending = await client.query(`WITH sold AS (
       SELECT i.id, t->>'talle' AS talle,(t->>'cantidadVendida')::numeric AS units FROM inventory_items i CROSS JOIN LATERAL jsonb_array_elements(COALESCE(i.talles,'[]')) t

@@ -21,3 +21,7 @@ La venta nueva y la actualización de stock se guardan en una sola transacción 
 - `node tests/inventory-sales-ui.mjs`: flujo real con autenticación, HTTP, base temporal y navegador en 1365 y 390 px; mes vacío, completar venta anterior, venta nueva, stock y precio histórico.
 
 Las verificaciones usan datos sintéticos en una base aislada. No consultan ni modifican el inventario de producción.
+
+## Cuando solo se conoce el mes
+
+La opción **Solo recuerdo el mes** permite registrar `AAAA-MM` sin inventar el día. El detalle muestra el mes con la aclaración `(solo mes)`. Internamente se almacena una fecha de agrupación junto con `fecha_precision=mes`; el primer día es únicamente una referencia de agrupación, no un día de venta afirmado. Los registros diarios existentes conservan su precisión y los reintentos diferencian un mes de una fecha exacta. El pendiente de venta muestra también el SKU para distinguir prendas con el mismo nombre.

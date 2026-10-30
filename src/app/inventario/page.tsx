@@ -47,7 +47,7 @@ import {
   ESTADO_LABEL,
 } from "@/lib/inventory";
 import { MonthlySales } from "@/components/inventario/MonthlySales";
-import { salesToday, type InventorySalesReport } from "@/lib/inventory-sales";
+import { formatSaleDate, salesToday, type InventorySalesReport } from "@/lib/inventory-sales";
 import { fmtARS, fmtUSD, fmtPct } from "@/lib/utils";
 import {
   parseTalle,
@@ -541,7 +541,7 @@ export default function InventarioPage() {
       fecha, requestId, anterior: ventasAnteriores.length > 0,
     });
     toast.success(ventasAnteriores.length ? "Venta anterior completada" : "Venta registrada", {
-      description: `${fmtARS(precioUnit * unidades)} · ${fecha.split("-").reverse().join("/")}`,
+      description: `${fmtARS(precioUnit * unidades)} · ${formatSaleDate(fecha)}`,
     });
     setVentaFor(null);
     setVentasAnteriores([]);
@@ -1866,6 +1866,7 @@ function VentaDialog({
   onConfirm: (it: InventoryItem, unidades: number, precioUnit: number, talleSeleccionado: string | undefined, fecha: string, requestId: string) => Promise<void>;
 }) {
   const [fecha, setFecha] = useState(salesToday());
+  const [soloMes, setSoloMes] = useState(false);
   const [requestId, setRequestId] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
@@ -1878,6 +1879,7 @@ function VentaDialog({
   useEffect(() => {
     if (item) {
       setFecha(anterior ? "" : salesToday());
+      setSoloMes(false);
       setRequestId(crypto.randomUUID());
       setError("");
       setPrecioConfirmado(false);
@@ -1914,7 +1916,8 @@ function VentaDialog({
           </DialogHeader>
 
           <div className="space-y-4">
-            <Input label="Fecha de venta" type="date" min="1900-01-01" max={salesToday()} value={fecha} onChange={e => setFecha(e.target.value)} disabled={busy} hint={anterior ? "Ingresá la fecha real y el precio que cobraste. Si fueron ventas en fechas distintas, cargalas por separado." : "La fecha determina en qué mes se suma el importe."} />
+            <label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={soloMes} disabled={busy} onChange={e => { setSoloMes(e.target.checked); setFecha(e.target.checked ? fecha.slice(0, 7) : ""); }} />Solo recuerdo el mes</label>
+            <Input label={soloMes ? "Mes de venta" : "Fecha de venta"} type={soloMes ? "month" : "date"} min={soloMes ? "1900-01" : "1900-01-01"} max={soloMes ? salesToday().slice(0, 7) : salesToday()} value={fecha} onChange={e => setFecha(e.target.value)} disabled={busy} hint={soloMes ? "Se guardará solo el mes, sin asignar un día de venta." : anterior ? "Ingresá la fecha real y el precio que cobraste. Si fueron ventas en fechas distintas, cargalas por separado." : "La fecha determina en qué mes se suma el importe."} />
             {calc.tallesCalc && (
               <div className="space-y-1.5">
                 <label className="block text-xs font-medium text-[var(--color-fg-muted)] tracking-wide uppercase">

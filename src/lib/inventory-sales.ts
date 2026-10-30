@@ -5,6 +5,11 @@ export function salesToday(now = new Date()): string {
   return ["year", "month", "day"].map(key => parts.find(p => p.type === key)!.value).join("-");
 }
 
+export function formatSaleDate(fecha: string): string {
+  if (fecha.length === 7) return new Intl.DateTimeFormat("es-AR", { month: "long", year: "numeric", timeZone: "UTC" }).format(new Date(`${fecha}-01T12:00:00Z`)) + " (solo mes)";
+  return fecha.split("-").reverse().join("/");
+}
+
 export class InventorySaleError extends Error {
   constructor(message: string, public status = 400) { super(message); }
 }
@@ -23,7 +28,9 @@ export function validateSale(raw: Record<string, unknown>): SaleInput {
   const uuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
   if (typeof raw.requestId !== "string" || !uuid.test(raw.requestId) || typeof raw.itemId !== "string" || !uuid.test(raw.itemId)) throw new InventorySaleError("Identificador de venta o producto inválido.");
   const fecha = typeof raw.fecha === "string" ? raw.fecha : "";
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(fecha) || !Number.isFinite(Date.parse(fecha)) || new Date(fecha).toISOString().slice(0, 10) !== fecha || fecha < "1900-01-01" || fecha > salesToday()) throw new InventorySaleError("Elegí una fecha válida, hasta hoy.");
+  const soloMes = /^\d{4}-(0[1-9]|1[0-2])$/.test(fecha);
+  const fechaDia = soloMes ? `${fecha}-01` : fecha;
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(fechaDia) || !Number.isFinite(Date.parse(fechaDia)) || new Date(fechaDia).toISOString().slice(0, 10) !== fechaDia || fechaDia < "1900-01-01" || fechaDia > salesToday()) throw new InventorySaleError("Elegí una fecha o un mes válido, hasta hoy.");
   if (typeof raw.unidades !== "number" || !Number.isSafeInteger(raw.unidades) || raw.unidades < 1) throw new InventorySaleError("Las unidades deben ser un número entero mayor a cero.");
   if (typeof raw.precioUnitARS !== "number" || !Number.isFinite(raw.precioUnitARS) || raw.precioUnitARS < 0 || raw.precioUnitARS > 999999999 || Math.abs(raw.precioUnitARS * 100 - Math.round(raw.precioUnitARS * 100)) > 0.0001) throw new InventorySaleError("Ingresá un precio válido en pesos, con hasta dos decimales.");
   if (raw.anterior !== undefined && typeof raw.anterior !== "boolean") throw new InventorySaleError("Tipo de registro inválido.");

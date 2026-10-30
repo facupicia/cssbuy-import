@@ -7,13 +7,18 @@ import { createServer } from "node:net";
 import { randomUUID } from "node:crypto";
 import EmbeddedPostgres from "embedded-postgres";
 import { mockAccount } from "./helpers/account";
-import { salesToday, validateSale } from "../src/lib/inventory-sales";
+import { formatSaleDate, salesToday, validateSale } from "../src/lib/inventory-sales";
 
 test("fechas argentinas y validación estricta de ventas", () => {
   assert.equal(salesToday(new Date("2026-11-01T02:59:59Z")), "2026-10-31");
   assert.equal(salesToday(new Date("2026-11-01T03:00:00Z")), "2026-11-01");
   const base = { requestId: randomUUID(), itemId: randomUUID(), fecha: "2024-02-29", unidades: 1, precioUnitARS: 120.55 };
   assert.equal(validateSale(base).fecha, "2024-02-29");
+  assert.equal(validateSale({ ...base, fecha: "2025-09" }).fecha, "2025-09");
+  assert.match(formatSaleDate("2025-09"), /septiembre de 2025 \(solo mes\)/);
+  assert.equal(formatSaleDate("2025-09-12"), "12/09/2025");
+  assert.throws(() => validateSale({ ...base, fecha: "9999-01" }));
+  assert.throws(() => validateSale({ ...base, fecha: "2025-13" }));
   for (const patch of [{ fecha: "2025-02-29" }, { fecha: "9999-01-01" }, { fecha: "2026-00-01" }, { unidades: 1.5 }, { unidades: 0 }, { precioUnitARS: -1 }, { precioUnitARS: Infinity }, { precioUnitARS: "120" }, { precioUnitARS: 0.001 }, { anterior: "true" }]) assert.throws(() => validateSale({ ...base, ...patch }));
 });
 
@@ -83,5 +88,14 @@ test("ventas por mes: transacción, historial, fechas anteriores, concurrencia y
     const response = await route.GET(req("GET"));
     assert.equal(response.status, 200); assert.match(response.headers.get("cache-control")!, /private/);
     assert.equal((await route.POST(req("POST", cookie, first))).status, 200, "retries remain safe after product deletion");
+    const monthlyItem = await db.insertInventoryItem({ nombre: "Solo mes fixture", cantidadInicial: 1, cantidadVendida: 1, costoUnitARS: 100, precioVentaARS: 55000, estado: "agotado", origen: "manual" });
+    const monthSale = { requestId: randomUUID(), itemId: monthlyItem.id, fecha: "2025-10", unidades: 1, precioUnitARS: 55000, anterior: true };
+    await sales.recordInventorySale(monthSale); await sales.recordInventorySale(monthSale);
+    assert.equal((await db.getInventoryItem(monthlyItem.id))!.cantidadVendida, 1);
+    const monthReport = await sales.getInventorySalesReport("2025-10");
+    assert.equal(monthReport.ventas.length, 1); assert.equal(monthReport.ventas[0].fecha, "2025-10");
+    assert.equal(monthReport.meses.find(m => m.mes === "2025-10")!.facturadoARS, 55000);
+    await assert.rejects(sales.recordInventorySale({ ...monthSale, fecha: "2025-10-01" }), /otra venta/);
+    assert.equal((await pool.query("SELECT fecha_precision FROM inventory_sales WHERE id=$1", [monthSale.requestId])).rows[0].fecha_precision, "mes");
   } finally { if (pool) await pool.end(); await database.stop(); process.env = before; }
 });
