@@ -78,7 +78,15 @@ try {
     assert.equal(saved.cantidadVendida, 3); assert.equal(saved.precioVentaARS, 75000);
     await api(`/api/inventario/${item.id}`, { precioVentaARS: 99000, costoUnitARS: 50000 }, "PATCH");
     await section.getByLabel("Mes a consultar").fill("2025-09");
+    const salesTable = section.getByRole("table", { name: "Detalle de ventas del mes 2025-09" });
+    assert.equal(await salesTable.isVisible(), false);
+    await section.getByText(/^Detalle de ventas \(\d+\)$/).click();
     await section.getByRole("cell", { name: "30/09/2025" }).first().waitFor();
+    await section.getByText(/^Detalle de ventas \(\d+\)$/).press("Enter");
+    assert.equal(await salesTable.isVisible(), false);
+    assert.equal(await section.getByRole("term").filter({ hasText: "Ganancia de mercadería" }).isVisible(), true);
+    await page.evaluate(() => { document.activeElement?.blur(); window.scrollTo(0, 0); });
+    await section.getByText(/^Detalle de ventas \(\d+\)$/).click();
     const report = await api("/api/inventario/ventas?mes=2025-09");
     assert.ok(report.ventas.some(s => s.nombre === item.nombre && s.fecha === "2025-09"));
     assert.equal(report.ventas.filter(s => s.nombre === item.nombre).reduce((sum, sale) => sum + sale.totalARS, 0), 130000.50);
@@ -91,6 +99,9 @@ try {
     await page.evaluate(() => { document.activeElement?.blur(); window.scrollTo(0, 0); });
     await page.waitForTimeout(4200); // Success toasts must not cover the captured content.
     await page.screenshot({ path: `.impeccable/review/inventory-sales-${width}.png`, fullPage: true });
+    await section.getByText(/^Detalle de ventas \(\d+\)$/).click();
+    await page.evaluate(() => window.scrollTo(0, 0));
+    await page.screenshot({ path: `.impeccable/review/inventory-sales-collapsed-${width}.png`, fullPage: true });
     assert.deepEqual(errors, []);
     await context.close();
     console.log(`${width}px: mes vacío, fecha anterior, nueva venta, precio histórico y stock verificados`);

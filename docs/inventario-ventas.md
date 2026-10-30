@@ -29,3 +29,5 @@ La opción **Solo recuerdo el mes** permite registrar `AAAA-MM` sin inventar el 
 ## Ganancia mensual de mercadería
 
 Cada mes muestra facturado, costo de las prendas vendidas y ganancia de mercadería. Se suman las unidades por la diferencia entre el precio cobrado y el costo unitario que quedó guardado al registrar cada venta. La comparación de meses también muestra esa ganancia. Los cambios posteriores de precios o costos de la ficha no alteran el historial. Las pérdidas se conservan con signo negativo. Este resultado es anterior a publicidad, comisiones y otros gastos; no es utilidad neta. En ventas anteriores completadas, el costo de referencia es el que tenía la ficha al completar el historial.
+
+El listado individual se abre desde **Detalle de ventas**, que indica la cantidad de registros. Arranca colapsado y se puede abrir o cerrar con clic o teclado. Facturado, costo y ganancia permanecen visibles; la comparación entre meses conserva su control independiente.
