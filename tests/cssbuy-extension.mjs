@@ -15,6 +15,7 @@ try {
     const url = new URL(route.request().url());
     const json = data => route.fulfill({ contentType: "application/json", body: JSON.stringify(data) });
     if (url.hostname === "www.cssbuy.com") {
+      if (url.pathname === "/shop/goodsDetail") return route.fulfill({ contentType: "text/html", body: '<title>Producto de prueba</title><script type="application/ld+json">{"@type":"Product","name":"Remera de prueba","offers":{"priceCurrency":"CNY","price":"79.5"}}</script>' });
       if (url.pathname === "/api/v3/user/order") return json({ code: 0, data: { records: [{ id: "123", state: 4 }], total: 1 } });
       if (url.pathname === "/api/v2/user/record") {
         assert.ok(route.request().headers()["content-type"].startsWith("multipart/form-data;"));
@@ -42,6 +43,15 @@ try {
   await panel.waitForFunction(() => document.querySelector('#result').textContent.includes('"ok":true'), { timeout: 15000 });
   assert.equal(posted.orders.length, 1); assert.equal(posted.records.length, 1);
   assert.ok(!JSON.stringify(posted).includes("FAKE-CSSBUY-SESSION"));
+  const productUrl = "https://www.cssbuy.com/shop/goodsDetail?id=1029556292572&type=1688";
+  const productTab = await context.newPage(); await productTab.goto(productUrl);
+  await panel.evaluate(url => window.postMessage({ channel: "PLUG_CSSBUY_REQUEST", id: "product-test", action: "product", url }, location.origin), productUrl);
+  await panel.waitForFunction(() => document.querySelector('#result').textContent.includes('"product-test"'));
+  const product = JSON.parse(await panel.locator("#result").innerText());
+  assert.equal(product.product.nombre, "Remera de prueba");
+  assert.equal(product.product.precioCNY, 79.5);
+  assert.ok(!JSON.stringify(product).includes("FAKE-CSSBUY-SESSION"));
+  assert.equal(posted.orders.length, 1, "leer un producto no modifica el historial de compras");
   console.log("Extensión Chrome real: sesión simulada CSSBuy → puente → importación, sin transferir tokens, OK");
 } finally {
   await context.close();

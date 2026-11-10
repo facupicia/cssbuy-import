@@ -4,6 +4,8 @@ Aplicación web independiente y moderna para el cálculo de costos de importaci�
 
 ## Características
 
+- **Próximos pedidos**: borradores guardados de compras futuras desde enlaces CSSBuy, con variantes, cantidades, costos estimados, presupuesto y traspaso a la calculadora. Ver [uso y límites de lectura de enlaces](docs/proximos-pedidos.md).
+
 - **Marketplace de Facebook**: borradores desde el inventario propio, títulos y descripciones breves editables, cola de prendas y conector de Chrome para carga asistida. Ver [uso e instalación](docs/marketplace.md).
 
 - 🧮 **Calculadora Multiproducto de Landed Cost**: Simulación en tiempo real de flete internacional, comisiones de depósito de CSSBuy (5.3%), franquicia aduanera de USD 50, aranceles, IVA e IIBB.

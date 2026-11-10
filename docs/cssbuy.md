@@ -1,5 +1,7 @@
 # CSSBuy → PLUG
 
+**Próximos pedidos:** el conector 1.1.0 también admite una lectura de metadatos de la ficha abierta para preparar compras futuras. No compra ni selecciona variantes; si no hay metadatos suficientes se completa a mano. Ver [flujo, cálculo y límites](proximos-pedidos.md).
+
 El botón **Herramientas → Sincronizar órdenes** abre la conexión con Chrome.
 El servidor recibe HTTP 403 al consultar CSSBuy directamente; el conector usa
 la sesión que el propietario ya abrió en su navegador. No resuelve captchas
