@@ -1,5 +1,6 @@
 import type { Cotizacion, Product } from "./types";
 import { calcularTodo } from "./utils";
+import { supplierUrl } from "./suppliers";
 
 export interface PlanLine {
   id: string;
@@ -43,6 +44,15 @@ export function cssbuyProductUrl(value: string): string {
   if (!id || !/^\d{1,30}$/.test(id) || !type || !/^[a-zA-Z0-9_]{1,30}$/.test(type)) throw new Error("Al enlace de CSSBuy le falta el producto o la plataforma de origen.");
   return `https://www.cssbuy.com/shop/goodsDetail?id=${id}&type=${type}`;
 }
+/** References may come from a saved supplier, inventory, or an original marketplace. No server fetch. */
+export function planProductUrl(value: string): string {
+  const url = supplierUrl(value);
+  if (!url) throw new Error("Agregá el enlace del producto.");
+  try { return cssbuyProductUrl(url); } catch { return url; }
+}
+export function canReadCssbuyProduct(value: string) {
+  try { cssbuyProductUrl(value); return true; } catch { return false; }
+}
 function object(input: unknown): Record<string, unknown> {
   if (!input || typeof input !== "object" || Array.isArray(input)) throw new Error("Revisá los datos del pedido.");
   return input as Record<string, unknown>;
@@ -76,7 +86,7 @@ export function parsePlan(value: unknown): PlanInput {
     const leidoEn = line.leidoEn === null ? null : text(line.leidoEn, "la fecha de lectura", 40);
     if (leidoEn !== null && !Number.isFinite(Date.parse(leidoEn))) throw new Error("Revisá la fecha de lectura.");
     return {
-      id, url: cssbuyProductUrl(text(line.url, "el enlace", 2048, true)),
+      id, url: planProductUrl(text(line.url, "el enlace", 2048, true)),
       nombre: text(line.nombre, "el nombre del producto", 200), variante: text(line.variante, "el talle o color", 200), cantidad,
       precioCNY: number(line.precioCNY, "el precio en yuanes", 1000000, true, true),
       envioChinaCNY: number(line.envioChinaCNY, "el envío en China", 1000000)!,
@@ -132,5 +142,5 @@ export function newPlan(usdARS: number, cnyUSD: number, comisionPct: number): Pl
   return { nombre: "Próximo pedido", notas: "", estado: "borrador", lineas: [], usdARS, cnyUSD, comisionPct, fleteUSD: null, impuestosUSD: null, extraUSD: 0, presupuestoARS: null };
 }
 export function newPlanLine(url: string): PlanLine {
-  return { id: crypto.randomUUID(), url: cssbuyProductUrl(url), nombre: "", variante: "", cantidad: 1, precioCNY: null, envioChinaCNY: 0, pesoG: null, ventaARS: null, leidoEn: null };
+  return { id: crypto.randomUUID(), url: planProductUrl(url), nombre: "", variante: "", cantidad: 1, precioCNY: null, envioChinaCNY: 0, pesoG: null, ventaARS: null, leidoEn: null };
 }

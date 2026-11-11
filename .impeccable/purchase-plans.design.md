@@ -4,7 +4,7 @@
 
 Existing-system feature in **Operate** mode, under **Calculadora → Próximos pedidos** (`/calculadora/pedidos`). The owner prepares future CSSBuy purchases, saves and resumes plans, and compares estimated landed costs before buying. `PRODUCT.md` defines scope; root `DESIGN.md` remains the visual-system authority. This brief records this surface without replacing system tokens or identity.
 
-Implementation is local. Publication, production behavior and metadata extraction from the real CSSBuy product page remain unverified. Manual entry is always available. This workflow does not buy, pay or change stock.
+The baseline module was published on main in `840d4c2`; deployment was confirmed through protected routes and the exact connector ZIP. The authenticated production interface and metadata extraction from the real CSSBuy product page remain unverified. The saved-link picker extension below is awaiting publication. Manual entry is always available. This workflow does not buy, pay or change stock.
 
 ## Colors
 
@@ -36,6 +36,16 @@ Preserve shared rounded controls and bordered section surfaces. This surface use
 - **Estimate:** missing costs produce “Estimación parcial” and “Subtotal conocido,” with omissions stated. Landed unit cost waits for complete costs and weights. Optional sale values expose merchandise margin only with complete inputs, explicitly before advertising, payment fees and other selling costs. Freight, taxes and commission are allocated by weight.
 - **Recovery:** errors use a focusable alert, programmatic focus and scroll into view; form controls and alerts have sticky-header scroll clearance. Busy operations disable the editor and announce status. Dirty changes are guarded on editor return, links, unload and browser Back; this page enables the shared guard's optional history protection. Discarding preserves the last saved plan.
 
+### Saved-link picker
+
+An inline disclosure, **Elegir de mis enlaces guardados**, extends this **Operate** surface inside the editor. It reuses the existing bordered, elevated section and shared controls. Source selection, search and refresh stack on mobile and form a row at `sm`; product rows and actions wrap, with ten results per page. Sources are **Proveedores**, **Inventario**, **Pedidos CSSBuy**, **Cotizaciones** and **Pedidos guardados**. Search covers names, variants, supplier/source detail and URLs. Selection persists across sources, searches and pages until added, cleared or refreshed; counts and an explicit add action expose the full selection. Catalog links are open-only and cannot be selected as products.
+
+Adding copies the product name, link and variant into a new row with quantity one. Historical price and weight are not copied; the owner reviews price, weight and shipping for the new purchase. Matching URL/variant pairs are skipped, including duplicates within the selection. Archived plans and the currently edited plan are excluded as sources. Original-marketplace HTTP/HTTPS links are supported for manual entry; the strict CSSBuy connector validation remains unchanged.
+
+The protected, read-only `/api/compras/guardados` endpoint returns sanitized link fields rather than full source records. Independent source failures produce partial warnings while available sources remain usable; loading, empty, error, refresh and add-result feedback stay within the picker. Sources: `SavedPurchaseLinks.tsx`, `purchase-plan-sources.ts`, `purchase-plans.ts` and the endpoint route.
+
+The supplied final build was tested at desktop and mobile sizes against temporary PostgreSQL, with reviewer disposition **ship**. Review references from that isolated build: [desktop, 1365px](<C:/Users/facup/.codex/worktrees/pedido-enlaces-guardados/Meta ads PLUG/.impeccable/review/saved-links-1365.png>) and [mobile, 390px](<C:/Users/facup/.codex/worktrees/pedido-enlaces-guardados/Meta ads PLUG/.impeccable/review/saved-links-390.png>). Extension publication remains pending; these checks do not establish authenticated production visual verification.
+
 ## Do's and Don'ts
 
 - Do keep manual entry usable when CSSBuy or its connector cannot supply data.
@@ -43,4 +53,4 @@ Preserve shared rounded controls and bordered section surfaces. This surface use
 - Don't present plans as purchased goods, actual stock or net profit.
 - Don't infer real-page extraction success from simulated connector tests.
 
-Review references: [desktop, 1365px](review/purchase-plans-1365.png) and [mobile, 390px](review/purchase-plans-390.png). Final reviewer disposition supplied for this bounded feature: **ship**, following fixes to calculator navigation, sticky save placement and error recovery. Browser Back protection is enabled in source. Publication remains pending.
+Baseline review references: [desktop, 1365px](review/purchase-plans-1365.png) and [mobile, 390px](review/purchase-plans-390.png). Final reviewer disposition supplied for the baseline: **ship**, following fixes to calculator navigation, sticky save placement and error recovery. Browser Back protection is enabled in source. The baseline is published in `840d4c2`; the saved-link extension is awaiting publication.

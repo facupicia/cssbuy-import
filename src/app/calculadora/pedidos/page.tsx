@@ -3,6 +3,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Navbar } from "@/components/Navbar";
 import { CalculatorNavigation } from "@/components/calculadora/CalculatorNavigation";
+import { SavedPurchaseLinks } from "@/components/calculadora/SavedPurchaseLinks";
 import { AdminAccessNotice } from "@/components/admin/AdminAccessNotice";
 import { UnsavedNavigationGuard } from "@/components/admin/UnsavedNavigationGuard";
 import { Button } from "@/components/ui/Button";
@@ -11,7 +12,8 @@ import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 import { loadCalcConfig } from "@/lib/pricing";
 import { fetchLiveFx } from "@/lib/fx";
 import { fmtARS, fmtUSD } from "@/lib/utils";
-import { newPlan, newPlanLine, parsePlan, planMissing, planQuote, type PlanInput, type PlanLine, type PurchasePlan } from "@/lib/purchase-plans";
+import { newPlan, newPlanLine, parsePlan, planMissing, planQuote, canReadCssbuyProduct, type PlanInput, type PlanLine, type PurchasePlan } from "@/lib/purchase-plans";
+import { appendSavedLinks, type SavedProductLink } from "@/lib/purchase-plan-sources";
 import { readCssbuyProduct } from "@/lib/purchase-plans-client";
 
 const surface = "rounded-xl border border-[var(--color-border)] bg-[var(--color-bg-elevated)] p-4 sm:p-6";
@@ -87,6 +89,13 @@ export default function PurchasePlansPage() {
       change({ lineas: [...(form?.lineas ?? []), line] }); setLink(""); setError("");
     } catch (error) { setError((error as Error).message); }
   }
+  function addSaved(items: SavedProductLink[]) {
+    if (!form) return "Abrí un pedido antes de agregar productos.";
+    const result = appendSavedLinks(form.lineas, items);
+    change({ lineas: result.lineas }); setError("");
+    const message = `${result.added} productos agregados desde tus enlaces guardados.${result.skipped ? ` ${result.skipped} ya estaban en el pedido y se omitieron.` : ""} Revisá precio, peso y envío antes de presupuestar.`;
+    setNotice(message); return message;
+  }
   async function read(line: PlanLine) {
     setReading(line.id); setError(""); setNotice("");
     try {
@@ -156,10 +165,11 @@ export default function PurchasePlansPage() {
         </section>
         <section className="space-y-4" aria-labelledby="products-title">
           <div><h2 id="products-title" className="text-xl font-semibold">Productos y variantes</h2><p className={muted}>Una fila por talle o color. Podés repetir el mismo enlace para combinar variantes.</p></div>
-          <div className="flex flex-col items-end gap-4 sm:flex-row"><Input label="Enlace de CSSBuy" type="url" value={link} placeholder="https://www.cssbuy.com/shop/goodsDetail?..." onChange={event => setLink(event.target.value)} onKeyDown={event => { if (event.key === "Enter") { event.preventDefault(); addLink(); } }} /><Button variant="primary" className="w-full shrink-0 sm:w-auto" disabled={!link.trim()} onClick={addLink}>Agregar producto</Button></div>
+          <SavedPurchaseLinks currentPlanId={saved?.id ?? ""} onAdd={addSaved} />
+          <div className="flex flex-col items-end gap-4 sm:flex-row"><Input label="Enlace del producto" type="url" value={link} placeholder="https://www.cssbuy.com/shop/goodsDetail?..." onChange={event => setLink(event.target.value)} onKeyDown={event => { if (event.key === "Enter") { event.preventDefault(); addLink(); } }} /><Button variant="primary" className="w-full shrink-0 sm:w-auto" disabled={!link.trim()} onClick={addLink}>Agregar producto</Button></div>
           {!form.lineas.length && <p className="rounded-xl bg-[var(--color-bg-subtle)] p-6 text-sm">Pegá un enlace para empezar. El precio y el peso se pueden completar a mano o revisar después.</p>}
           {form.lineas.map((line, index) => <article key={line.id} className={`${surface} space-y-4`} aria-label={`Producto ${index + 1}`}>
-            <div className="flex flex-wrap items-center justify-between gap-4"><a className="break-all text-sm underline underline-offset-4" href={line.url} target="_blank" rel="noreferrer">Ver producto en CSSBuy</a><div className="flex flex-wrap gap-2"><Button onClick={() => read(line)}>Leer enlace en Chrome</Button><Button disabled={form.lineas.length >= 100} onClick={() => change({ lineas: [...form.lineas, { ...line, id: crypto.randomUUID(), variante: "", cantidad: 1, envioChinaCNY: 0 }] })}>Otra variante</Button><Button variant="ghost" aria-label={`Quitar producto ${index + 1}`} onClick={() => change({ lineas: form.lineas.filter(item => item.id !== line.id) })}>Quitar</Button></div></div>
+            <div className="flex flex-wrap items-center justify-between gap-4"><a className="break-all text-sm underline underline-offset-4" href={line.url} target="_blank" rel="noreferrer">{canReadCssbuyProduct(line.url) ? "Ver producto en CSSBuy" : "Ver producto de origen"}</a><div className="flex flex-wrap gap-2">{canReadCssbuyProduct(line.url) && <Button onClick={() => read(line)}>Leer enlace en Chrome</Button>}<Button disabled={form.lineas.length >= 100} onClick={() => change({ lineas: [...form.lineas, { ...line, id: crypto.randomUUID(), variante: "", cantidad: 1, envioChinaCNY: 0 }] })}>Otra variante</Button><Button variant="ghost" aria-label={`Quitar producto ${index + 1}`} onClick={() => change({ lineas: form.lineas.filter(item => item.id !== line.id) })}>Quitar</Button></div></div>
             <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
               <Input id={`name-${line.id}`} label="Producto" maxLength={200} value={line.nombre} placeholder="Nombre del modelo" onChange={event => lineChange(line.id, { nombre: event.target.value })} />
               <Input id={`variant-${line.id}`} label="Talle y color" maxLength={200} value={line.variante} placeholder="Ej.: L · Negro" onChange={event => lineChange(line.id, { variante: event.target.value })} />

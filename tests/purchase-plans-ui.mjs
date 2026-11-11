@@ -30,9 +30,16 @@ try {
   console.log("Cuenta de prueba creada");
   const cookies = signup.headers.getSetCookie().map(cookie => cookie.split(";")[0]).filter(cookie => !cookie.endsWith("="));
   const url = "https://www.cssbuy.com/shop/goodsDetail?id=1029556292572&type=1688";
+  async function seed(path, body) {
+    const response = await fetch(base + path, { method: "POST", headers: { origin: base, cookie: cookies.join("; "), "content-type": "application/json" }, body: JSON.stringify(body) });
+    const result = await response.json(); assert.ok(response.ok, JSON.stringify(result)); return result;
+  }
   browser = await chromium.launch({ headless: true });
   await mkdir(".impeccable/review", { recursive: true });
   for (const width of [1365, 390]) {
+    const original = `https://detail.1688.com/offer/${width}12345.html`;
+    await seed("/api/proveedores", { nombre: `Proveedor de prueba ${width}`, tipo: "fabrica", categoria: "Remeras", tiendaUrl: `https://example.com/catalogo/${width}`, referenciaUrl: original, contacto: "", notas: "", favorito: false });
+    const { item: stock } = await seed("/api/inventario", { nombre: `Prenda guardada ${width}`, variante: "XL · Azul", link: original, cantidadInicial: 3, cantidadVendida: 0, costoUnitARS: 20000, precioVentaARS: 60000, origen: "manual", estado: "en_deposito" });
     const context = await browser.newContext({ viewport: { width, height: 1000 } });
     await context.addCookies(cookies.map(cookie => { const index = cookie.indexOf("="); return { name: cookie.slice(0, index), value: cookie.slice(index + 1), url: base }; }));
     const page = await context.newPage(); const errors = [];
@@ -43,7 +50,7 @@ try {
     console.log(`${width}px: página cargada`);
     await page.getByRole("button", { name: "Crear pedido", exact: true }).click();
     await page.getByLabel("Nombre del pedido").fill(`Pedido de prueba ${width}`);
-    await page.getByLabel("Enlace de CSSBuy").fill(url);
+    await page.getByLabel("Enlace del producto").fill(url);
     await page.getByRole("button", { name: "Agregar producto", exact: true }).click();
     let line = page.getByRole("article", { name: "Producto 1", exact: true });
     await line.getByLabel("Producto", { exact: true }).fill("Remera de prueba");
@@ -110,6 +117,43 @@ try {
     await page.waitForURL(`${base}/`);
     await page.locator('input[value="Remera de prueba · L · Negro"]:visible').waitFor();
     await page.locator('input[value="Buzo de prueba · M · Blanco"]:visible').waitFor();
+    await page.getByRole("link", { name: "Próximos pedidos", exact: true }).click();
+    await page.getByRole("button", { name: "Crear pedido", exact: true }).click();
+    await page.getByLabel("Nombre del pedido").fill(`Desde guardados ${width}`);
+    await page.getByRole("button", { name: "Elegir de mis enlaces guardados", exact: true }).click();
+    const picker = page.getByRole("region", { name: "Enlaces guardados", exact: true });
+    await picker.getByLabel("Buscar producto o proveedor").fill(`Proveedor de prueba ${width}`);
+    await picker.getByRole("checkbox", { name: new RegExp(`Producto de referencia · Proveedor de prueba ${width}`) }).check();
+    assert.equal(await picker.getByRole("checkbox").count(), 1, "el catálogo no se selecciona como producto");
+    await picker.getByLabel("Buscar en", { exact: true }).selectOption("inventario");
+    await picker.getByLabel("Buscar producto o proveedor").fill(`Prenda guardada ${width}`);
+    await picker.getByRole("checkbox", { name: new RegExp(`Prenda guardada ${width}`) }).check();
+    await picker.getByLabel("Buscar producto o proveedor").fill("no-hay-este-producto");
+    await picker.getByText("No hay enlaces que coincidan con esa búsqueda.").waitFor();
+    await picker.getByLabel("Buscar en", { exact: true }).selectOption("proveedores");
+    await picker.getByLabel("Buscar producto o proveedor").fill(`Proveedor de prueba ${width}`);
+    await picker.getByText("2 productos seleccionados", { exact: false }).waitFor();
+    await page.getByText("Cotización cargada con éxito", { exact: true }).waitFor({ state: "hidden" });
+    await page.evaluate(() => { document.activeElement?.blur(); scrollTo(0, 0); });
+    assert.equal(await page.evaluate(() => document.documentElement.scrollWidth > innerWidth), false);
+    await page.screenshot({ path: `.impeccable/review/saved-links-${width}.png`, fullPage: true });
+    await picker.getByRole("button", { name: "Agregar seleccionados (2)", exact: true }).click();
+    assert.equal(await page.getByRole("article").count(), 2);
+    const referenceLine = page.getByRole("article", { name: "Producto 1", exact: true });
+    const inventoryLine = page.getByRole("article", { name: "Producto 2", exact: true });
+    assert.equal(await referenceLine.getByLabel("Producto", { exact: true }).inputValue(), "");
+    assert.equal(await inventoryLine.getByLabel("Producto", { exact: true }).inputValue(), `Prenda guardada ${width}`);
+    assert.equal(await inventoryLine.getByLabel("Talle y color").inputValue(), "XL · Azul");
+    assert.equal(await inventoryLine.getByLabel("Cantidad", { exact: true }).inputValue(), "1");
+    assert.equal(await inventoryLine.getByLabel("Precio unitario CNY").inputValue(), "");
+    assert.equal(await inventoryLine.getByLabel("Peso estimado por unidad (g)").inputValue(), "");
+    await page.getByRole("button", { name: "Guardar pedido", exact: true }).click();
+    await page.getByText("Pedido guardado. Podés retomarlo", { exact: false }).waitFor();
+    await page.reload();
+    await page.getByRole("article").filter({ hasText: `Desde guardados ${width}` }).getByRole("button", { name: "Abrir pedido" }).click();
+    assert.equal(await page.getByRole("article").count(), 2);
+    const unchanged = await page.evaluate(async id => (await (await fetch('/api/inventario')).json()).items.find(item => item.id === id), stock.id);
+    assert.equal(unchanged.cantidadInicial, 3); assert.equal(unchanged.cantidadVendida, 0);
     assert.deepEqual(errors, []);
     await context.close(); console.log(`${width}px: crear, guardar, recargar, variantes, cantidades, costos y traspaso verificados`);
   }
